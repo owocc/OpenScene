@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
-import type { Surface } from "@/core/editor-state";
+import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,20 @@ interface DesktopHeaderProps {
   surface: Surface;
   revision: number;
   valid: boolean;
+  locale: string;
+  locales: string[];
+  manifestVersion: string;
+  activeToolMode: ActiveToolMode;
+  viewport: Pick<ViewportState, "zoom" | "isRotated">;
+  pastLength: number;
+  futureLength: number;
   onSurfaceChange: (surface: Surface) => void;
+  onLocaleChange: (locale: string) => void;
+  onToolChange: (mode: ActiveToolMode) => void;
+  onZoomChange: (zoom: number) => void;
+  onRotate: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onCopyJson: () => void;
   onSave: () => void;
 }
@@ -47,7 +60,20 @@ export function DesktopHeader({
   surface,
   revision,
   valid,
+  locale,
+  locales,
+  manifestVersion,
+  activeToolMode,
+  viewport,
+  pastLength,
+  futureLength,
   onSurfaceChange,
+  onLocaleChange,
+  onToolChange,
+  onZoomChange,
+  onRotate,
+  onUndo,
+  onRedo,
   onCopyJson,
   onSave,
 }: DesktopHeaderProps) {
@@ -55,7 +81,7 @@ export function DesktopHeader({
 
   return (
     <>
-      <header className="relative z-40 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur">
+      <header className="relative z-40 grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur">
         <div className="flex min-w-0 items-center gap-3">
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -100,6 +126,9 @@ export function DesktopHeader({
           <span className="hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground md:inline">
             {valid ? "Valid" : "Needs review"} · rev {revision}
           </span>
+          <span className="hidden text-[10px] text-muted-foreground 2xl:inline">
+            Canvas · iframe · {bootstrap.preview.profileId}
+          </span>
         </div>
 
         <Tabs
@@ -120,8 +149,82 @@ export function DesktopHeader({
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center justify-end gap-2">
-          <span className="hidden text-[10px] text-muted-foreground lg:inline">
+        <div className="flex min-w-0 items-center justify-end gap-1 whitespace-nowrap">
+          <select
+            className="hidden h-7 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30 lg:block"
+            value={locale}
+            onChange={(event) => onLocaleChange(event.target.value)}
+            aria-label="Preview locale"
+          >
+            {locales.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <span className="hidden text-[10px] text-muted-foreground xl:inline">
+            manifest {manifestVersion}
+          </span>
+          <span className="mx-1 hidden h-4 w-px bg-border lg:block" />
+          <Button
+            variant="ghost"
+            size="xs"
+            className="whitespace-nowrap"
+            onClick={onUndo}
+            disabled={pastLength === 0}
+          >
+            撤销
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="whitespace-nowrap"
+            onClick={onRedo}
+            disabled={futureLength === 0}
+          >
+            重做
+          </Button>
+          <span className="mx-1 hidden h-4 w-px bg-border lg:block" />
+          <div className="hidden items-center gap-0.5 xl:flex">
+            {(["select", "interact", "hand"] as const).map((mode) => (
+              <button
+                key={mode}
+                className={cn(
+                  "h-7 whitespace-nowrap rounded-md px-2 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  activeToolMode === mode && "bg-muted text-foreground",
+                )}
+                onClick={() => onToolChange(mode)}
+              >
+                {mode === "select" ? "选择" : mode === "interact" ? "交互" : "平移"}
+              </button>
+            ))}
+          </div>
+          <span className="mx-1 hidden h-4 w-px bg-border xl:block" />
+          <button
+            className="hidden h-7 rounded-md px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
+            onClick={() => onZoomChange(viewport.zoom - 0.1)}
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+          <span className="hidden w-8 text-center text-[10px] text-muted-foreground xl:inline">
+            {Math.round(viewport.zoom * 100)}%
+          </span>
+          <button
+            className="hidden h-7 rounded-md px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
+            onClick={() => onZoomChange(viewport.zoom + 0.1)}
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          <button
+            className="hidden h-7 whitespace-nowrap rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
+            onClick={onRotate}
+            aria-label="Rotate device"
+          >
+            旋转
+          </button>
+          <span className="hidden text-[10px] text-muted-foreground 2xl:inline">
             {bootstrap.capabilities.saveDraft ? "Draft changes" : "Local session"}
           </span>
           <Button size="sm" onClick={onSave} aria-label="Save document">

@@ -299,7 +299,25 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         surface={surface}
         revision={revision}
         valid={validation.valid}
+        locale={locale}
+        locales={locales}
+        manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
+        activeToolMode={activeToolMode}
+        viewport={viewport}
+        pastLength={past.length}
+        futureLength={future.length}
         onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+        onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
+        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
+        onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
+        onRotate={() =>
+          dispatch({
+            type: "viewport.patch",
+            patch: { isRotated: !viewport.isRotated },
+          })
+        }
+        onUndo={undo}
+        onRedo={redo}
         onCopyJson={() => void copyJson()}
         onSave={saveDocument}
       />
@@ -357,100 +375,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         )}
 
         <main className="flex h-full min-w-0 flex-col">
-          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/70 bg-background/80 px-4 backdrop-blur">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {surface === "developer"
-                  ? "Canvas"
-                  : surface === "preview"
-                    ? "Preview"
-                    : "Text editor"}
-              </span>
-              {surface !== "text" && (
-                <span className="text-[10px] text-muted-foreground">
-                  iframe · {bootstrap.preview.profileId}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <select
-                className="h-7 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                value={locale}
-                onChange={(event) =>
-                  dispatch({ type: "locale.switch", locale: event.target.value })
-                }
-                aria-label="Preview locale"
-              >
-                {locales.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-              <span className="hidden text-[10px] text-muted-foreground sm:inline">
-                manifest {bootstrap.manifest?.protocolVersion ?? "none"}
-              </span>
-              <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
-              <Button variant="ghost" size="xs" onClick={undo} disabled={past.length === 0}>
-                撤销
-              </Button>
-              <Button variant="ghost" size="xs" onClick={redo} disabled={future.length === 0}>
-                重做
-              </Button>
-              {surface !== "text" && (
-                <>
-                  <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
-                  {(["select", "interact", "hand"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      className={cn(
-                        "hidden h-7 rounded-md px-2 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex sm:items-center",
-                        activeToolMode === mode && "bg-muted text-foreground",
-                      )}
-                      onClick={() => dispatch({ type: "tool.set", mode })}
-                    >
-                      {mode === "select" ? "选择" : mode === "interact" ? "交互" : "平移"}
-                    </button>
-                  ))}
-                  <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
-                  <button
-                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() =>
-                      dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom - 0.1 } })
-                    }
-                    aria-label="Zoom out"
-                  >
-                    −
-                  </button>
-                  <span className="w-9 text-center text-[10px] text-muted-foreground">
-                    {Math.round(viewport.zoom * 100)}%
-                  </span>
-                  <button
-                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() =>
-                      dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom + 0.1 } })
-                    }
-                    aria-label="Zoom in"
-                  >
-                    +
-                  </button>
-                  <button
-                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() =>
-                      dispatch({
-                        type: "viewport.patch",
-                        patch: { isRotated: !viewport.isRotated },
-                      })
-                    }
-                    aria-label="Rotate device"
-                  >
-                    旋转
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
           {surface === "text" ? (
             <div className="min-h-0 flex-1 overflow-auto bg-[#101114] p-4 text-xs text-slate-200 sm:p-8">
               <div className="mx-auto flex h-full max-w-4xl flex-col">
