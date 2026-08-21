@@ -16,7 +16,7 @@ interface CanvasViewportProps {
  * Handles:
  * 1. Figma-style focal-point zoom (zooming towards mouse cursor)
  * 2. Two-finger trackpad panning / Shift horizontal scrolling
- * 3. Spacebar / Middle-click / Hand tool drag panning
+ * 3. Hand tool drag panning (manual toggle or temporary spacebar mode)
  * 4. Theme-adaptive background texture (dots / grid, toggleable)
  */
 const TEXTURE_CLASSES: Record<BackgroundTexture, string> = {
@@ -117,7 +117,8 @@ export function CanvasViewport({
   }, [viewport.zoom, viewport.panX, viewport.panY, onPatch]);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (activeToolMode !== "hand" && event.button !== 1) return;
+    // Only pan in hand mode (manual tool toggle or temporary spacebar mode).
+    if (activeToolMode !== "hand") return;
     event.currentTarget.setPointerCapture(event.pointerId);
     panRef.current = {
       x: viewport.panX,
