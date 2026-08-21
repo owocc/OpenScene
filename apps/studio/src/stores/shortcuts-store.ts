@@ -125,24 +125,24 @@ export const REGISTERED_SHORTCUTS: ShortcutItem[] = [
 
   // 3. View
   {
-    id: "surface.developer",
+    id: "surface.visual",
     category: "View",
-    name: "开发者模式",
-    nameEn: "Developer mode",
+    name: "可视化编辑模式",
+    nameEn: "Visual editor mode",
     keys: ["Mod", "1"],
-  },
-  {
-    id: "surface.preview",
-    category: "View",
-    name: "预览模式",
-    nameEn: "Preview mode",
-    keys: ["Mod", "2"],
   },
   {
     id: "surface.text",
     category: "View",
     name: "文档编辑模式",
     nameEn: "Document edit mode",
+    keys: ["Mod", "2"],
+  },
+  {
+    id: "surface.developer",
+    category: "View",
+    name: "开发者模式",
+    nameEn: "Developer mode",
     keys: ["Mod", "3"],
   },
   {

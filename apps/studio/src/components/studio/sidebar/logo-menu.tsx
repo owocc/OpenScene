@@ -126,17 +126,16 @@ export function LogoMenu({
               {/* 1. Surface Modes */}
               {modeTabs.map((tab) => (
                 <DropdownMenuItem key={tab.value} onClick={() => onSurfaceChange(tab.value)}>
-                  <tab.icon />
-                  {tab.value === "developer"
-                    ? LL.panels.tools.developer()
-                    : tab.value === "preview"
-                      ? LL.panels.tools.preview()
-                      : LL.panels.tools.text()}
-                  <DropdownMenuShortcut>{tab.shortcut}</DropdownMenuShortcut>
+                  {tab.value === "visual"
+                    ? LL.panels.tools.visual()
+                    : tab.value === "text"
+                      ? LL.panels.tools.text()
+                      : tab.value === "developer"
+                        ? LL.panels.tools.developer()
+                        : LL.panels.tools.preview()}
+                  {tab.shortcut && <DropdownMenuShortcut>{tab.shortcut}</DropdownMenuShortcut>}
                 </DropdownMenuItem>
               ))}
-
-              <DropdownMenuSeparator />
 
               {/* 2. Frame Size Submenu (Mobile & Desktop Sizes) */}
               <DropdownMenuSub>

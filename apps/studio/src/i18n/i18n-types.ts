@@ -60,9 +60,10 @@ export type TranslationFunctions = {
     };
     tools: {
       modes: () => string;
+      visual: () => string;
+      text: () => string;
       developer: () => string;
       preview: () => string;
-      text: () => string;
     };
     variables: {
       locales: () => string;
@@ -132,9 +133,10 @@ export type TranslationFunctions = {
   shortcuts: {
     title: () => string;
     description: () => string;
+    visualMode: () => string;
+    textMode: () => string;
     developerMode: () => string;
     previewMode: () => string;
-    textMode: () => string;
     undoRedo: () => string;
     save: () => string;
     copyJson: () => string;

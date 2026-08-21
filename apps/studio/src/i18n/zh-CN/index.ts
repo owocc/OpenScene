@@ -54,9 +54,10 @@ const zh_CN: BaseTranslation = {
     },
     tools: {
       modes: "编辑模式",
+      visual: "可视化编辑模式",
+      text: "文档编辑模式",
       developer: "开发者模式",
       preview: "预览模式",
-      text: "文档编辑模式",
     },
     variables: {
       locales: "预览语言 (i18n)",
@@ -129,9 +130,10 @@ const zh_CN: BaseTranslation = {
   shortcuts: {
     title: "快捷键指南",
     description: "快速切换模式和管理当前编辑会话。",
+    visualMode: "可视化编辑模式",
+    textMode: "文档编辑模式",
     developerMode: "开发者模式",
     previewMode: "预览模式",
-    textMode: "文档编辑模式",
     undoRedo: "撤销 / 重做",
     save: "保存文档",
     copyJson: "复制 JSON 快照",

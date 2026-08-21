@@ -333,7 +333,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         />
 
         {/* 3. Floating Collapsed Properties Pill (Minimal Figma style) */}
-        {surface === "developer" && propertiesCollapsed && (
+        {(surface === "visual" || surface === "developer") && propertiesCollapsed && (
           <div className="fixed top-3 right-3 z-30 hidden xl:block">
             <IconTooltip label={LL.sidebar.expandProperties()} side="bottom">
               <button
@@ -349,7 +349,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         )}
 
         {/* 4. Right Properties Panel */}
-        {surface === "developer" && !propertiesCollapsed && (
+        {(surface === "visual" || surface === "developer") && !propertiesCollapsed && (
           <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
             <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
               <span className="text-xs font-semibold">{LL.properties.title()}</span>

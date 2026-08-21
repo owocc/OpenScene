@@ -45,7 +45,7 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   serverUrl: null,
   sessionId: null,
   token: null,
-  surface: "developer",
+  surface: "visual",
   nodeId: null,
   locale: null,
   tool: "select",
@@ -78,9 +78,12 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
   // 4. Surface Mode
   const surfaceRaw = searchParams.get("surface");
   const surface: Surface =
-    surfaceRaw === "preview" || surfaceRaw === "text" || surfaceRaw === "developer"
+    surfaceRaw === "visual" ||
+    surfaceRaw === "text" ||
+    surfaceRaw === "developer" ||
+    surfaceRaw === "preview"
       ? surfaceRaw
-      : "developer";
+      : "visual";
 
   // 5. Node selection (supports ?nodeId=... or ?selectedId=...)
   const nodeId = searchParams.get("nodeId") || searchParams.get("selectedId") || null;
@@ -146,12 +149,11 @@ export function formatQueryParams(params: StudioQueryParams): { search: string; 
   // Session ID
   if (params.sessionId) searchParams.set("sessionId", params.sessionId);
 
-  // Surface
-  if (params.surface && params.surface !== "developer") searchParams.set("surface", params.surface);
+  // Surface (omit if default "visual")
+  if (params.surface && params.surface !== "visual") searchParams.set("surface", params.surface);
 
   // Node Selection
   if (params.nodeId) searchParams.set("nodeId", params.nodeId);
-
   // Locale
   if (params.locale) searchParams.set("locale", params.locale);
 

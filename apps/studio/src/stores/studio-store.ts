@@ -40,7 +40,7 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => ({
   future: [],
   revision: 0,
   locale: "en-US",
-  surface: "developer",
+  surface: "visual",
   activeToolMode: "select",
   viewport: {
     selectedDeviceId: "mobile",

@@ -18,12 +18,13 @@ export function ToolsPanel({ surface, onSurfaceChange }: ToolsPanelProps) {
         <div className="grid gap-1">
           {modeTabs.map((tab) => {
             const label =
-              tab.value === "developer"
-                ? LL.panels.tools.developer()
-                : tab.value === "preview"
-                  ? LL.panels.tools.preview()
-                  : LL.panels.tools.text();
-
+              tab.value === "visual"
+                ? LL.panels.tools.visual()
+                : tab.value === "text"
+                  ? LL.panels.tools.text()
+                  : tab.value === "developer"
+                    ? LL.panels.tools.developer()
+                    : LL.panels.tools.preview();
             return (
               <button
                 key={tab.value}
@@ -39,7 +40,9 @@ export function ToolsPanel({ surface, onSurfaceChange }: ToolsPanelProps) {
                   <tab.icon className="size-4" />
                   <span>{label}</span>
                 </div>
-                <kbd className="font-mono text-[10px] text-muted-foreground">{tab.shortcut}</kbd>
+                {tab.shortcut && (
+                  <kbd className="font-mono text-[10px] text-muted-foreground">{tab.shortcut}</kbd>
+                )}
               </button>
             );
           })}

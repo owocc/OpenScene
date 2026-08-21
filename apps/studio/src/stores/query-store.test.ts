@@ -75,7 +75,7 @@ describe("query-store pure functions", () => {
       ...DEFAULT_QUERY_PARAMS,
       serverUrl: "http://localhost:3000",
       sessionId: "local-test",
-      surface: "developer", // default -> omitted
+      surface: "visual", // default -> omitted
       tool: "select", // default -> omitted
       panel: "file", // default -> omitted
     });

@@ -2,11 +2,11 @@ import {
   Check,
   ChevronDown,
   Code2,
-  Eye,
   FileText,
   Hand,
   MousePointer2,
   MousePointerClick,
+  SquareMousePointer,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,9 +43,9 @@ const modeIcons: Array<{
   shortcut: string;
   icon: LucideIcon;
 }> = [
-  { value: "developer", shortcut: "⌘1", icon: Code2 },
-  { value: "preview", shortcut: "⌘2", icon: Eye },
-  { value: "text", shortcut: "⌘3", icon: FileText },
+  { value: "visual", shortcut: "⌘1", icon: SquareMousePointer },
+  { value: "text", shortcut: "⌘2", icon: FileText },
+  { value: "developer", shortcut: "⌘3", icon: Code2 },
 ];
 
 export function CanvasToolbar({
@@ -148,11 +148,11 @@ export function CanvasToolbar({
               const Icon = mode.icon;
               const isActive = surface === mode.value;
               const modeLabel =
-                mode.value === "developer"
-                  ? LL.panels.tools.developer()
-                  : mode.value === "preview"
-                    ? LL.panels.tools.preview()
-                    : LL.panels.tools.text();
+                mode.value === "visual"
+                  ? LL.panels.tools.visual()
+                  : mode.value === "text"
+                    ? LL.panels.tools.text()
+                    : LL.panels.tools.developer();
 
               return (
                 <IconTooltip key={mode.value} label={`${modeLabel} (${mode.shortcut})`} side="top">

@@ -55,9 +55,10 @@ const en_US: Translation = {
     },
     tools: {
       modes: "Editor Modes",
+      visual: "Visual editor mode",
+      text: "Document edit mode",
       developer: "Developer mode",
       preview: "Preview mode",
-      text: "Document edit mode",
     },
     variables: {
       locales: "Preview Languages (i18n)",
@@ -130,9 +131,10 @@ const en_US: Translation = {
   shortcuts: {
     title: "Keyboard shortcuts",
     description: "Quickly switch modes and manage the current editing session.",
+    visualMode: "Visual editor mode",
+    textMode: "Document edit mode",
     developerMode: "Developer mode",
     previewMode: "Preview mode",
-    textMode: "Document edit mode",
     undoRedo: "Undo / Redo",
     save: "Save document",
     copyJson: "Copy JSON snapshot",

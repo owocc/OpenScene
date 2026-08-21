@@ -6,6 +6,7 @@ import {
   Hexagon,
   PlusCircle,
   Sparkles,
+  SquareMousePointer,
   type LucideIcon,
 } from "lucide-react";
 
@@ -108,7 +109,8 @@ export const modeTabs: Array<{
   shortcut: string;
   icon: LucideIcon;
 }> = [
-  { value: "developer", label: "开发者模式", shortcut: "⌘1", icon: Code2 },
-  { value: "preview", label: "预览模式", shortcut: "⌘2", icon: Eye },
-  { value: "text", label: "文档编辑模式", shortcut: "⌘3", icon: FileText },
+  { value: "visual", label: "可视化编辑模式", shortcut: "⌘1", icon: SquareMousePointer },
+  { value: "text", label: "文档编辑模式", shortcut: "⌘2", icon: FileText },
+  { value: "developer", label: "开发者模式", shortcut: "⌘3", icon: Code2 },
+  { value: "preview", label: "预览模式", shortcut: "", icon: Eye },
 ];

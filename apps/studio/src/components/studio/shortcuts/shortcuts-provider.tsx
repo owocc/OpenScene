@@ -96,20 +96,20 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 5. Surface Mode Switcher (Cmd + 1, 2, 3)
+      // 5. Surface Mode Switcher (Cmd+1 Visual, Cmd+2 Document, Cmd+3 Developer)
       if (modifier && event.key === "1") {
         event.preventDefault();
-        useQueryStore.getState().setSurface("developer");
+        useQueryStore.getState().setSurface("visual");
         return;
       }
       if (modifier && event.key === "2") {
         event.preventDefault();
-        useQueryStore.getState().setSurface("preview");
+        useQueryStore.getState().setSurface("text");
         return;
       }
       if (modifier && event.key === "3") {
         event.preventDefault();
-        useQueryStore.getState().setSurface("text");
+        useQueryStore.getState().setSurface("developer");
         return;
       }
 

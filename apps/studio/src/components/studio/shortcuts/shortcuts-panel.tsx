@@ -6,6 +6,7 @@ import {
   Copy,
   Crop,
   Eye,
+  FileText,
   Hand,
   Hash,
   LayoutGrid,
@@ -22,6 +23,7 @@ import {
   Search,
   Sparkles,
   Square,
+  SquareMousePointer,
   Trash2,
   Type,
   Undo2,
@@ -86,7 +88,9 @@ function getShortcutIcon(id: string): LucideIcon {
   if (id.includes("undo")) return Undo2;
   if (id.includes("redo")) return Redo2;
   if (id.includes("delete")) return Trash2;
+  if (id.includes("visual")) return SquareMousePointer;
   if (id.includes("developer")) return Code2;
+  if (id.includes("text")) return FileText;
   if (id.includes("preview")) return Eye;
   if (id.includes("zoom.in")) return ZoomIn;
   if (id.includes("zoom.out")) return ZoomOut;
@@ -113,7 +117,7 @@ export function ShortcutsPanel() {
 
   return (
     <div
-      className="flex h-54 w-full flex-col select-none border-t border-border/80 bg-[#1e1e1e] text-zinc-100 shadow-2xl dark:bg-[#141416]"
+      className="flex h-[420px] w-full flex-col select-none border-t border-border/80 bg-[#1e1e1e] text-zinc-100 shadow-2xl dark:bg-[#141416]"
       role="dialog"
       aria-label="Figma Keyboard Shortcuts Panel"
     >
