@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useI18n } from "@/i18n";
 import { SHORTCUT_CATEGORIES, useShortcutsStore } from "@/stores/shortcuts-store";
 import { cn } from "@/lib/utils";
@@ -170,26 +171,25 @@ export function ShortcutsPanel() {
                 </div>
 
                 {/* Keycaps */}
-                <div className="flex shrink-0 items-center gap-1">
+                <KbdGroup className="shrink-0">
                   {item.keys.map((k, index) => {
                     const formatted = formatKeyBadge(k);
                     const isSingleChar = formatted.length === 1 && !/[⌘⇧⌥⌃↵]/.test(formatted);
 
                     return (
-                      <span
+                      <Kbd
                         key={index}
-                        className={cn(
-                          "inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 font-mono text-[11px] font-semibold select-none",
+                        className={
                           isSingleChar
                             ? "bg-primary text-primary-foreground shadow-xs"
-                            : "border border-border bg-muted text-foreground/80 shadow-xs",
-                        )}
+                            : "shadow-xs"
+                        }
                       >
                         {formatted}
-                      </span>
+                      </Kbd>
                     );
                   })}
-                </div>
+                </KbdGroup>
               </div>
             );
           })}
