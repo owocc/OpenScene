@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { PanelRight, PanelRightClose } from "lucide-react";
-import { CanvasViewport } from "@/components/studio/canvas-viewport";
-import { CanvasToolbar } from "@/components/studio/canvas-toolbar";
-import { StudioSidebar } from "@/components/studio/studio-sidebar";
-import { PreviewFrame } from "@/components/studio/preview-frame";
+import { StudioCanvas } from "@/components/studio/canvas";
+import { StudioSidebar } from "@/components/studio/sidebar";
 import { PropertyEditor } from "@/components/studio/property-editor";
 import { IconTooltip } from "@/components/studio/icon-tooltip";
+import { useQueryStore } from "@/stores";
 import {
   normalizeAppDocument,
   type AppDocument,
@@ -75,6 +74,16 @@ function StandaloneScreen() {
   );
 }
 
+function MissingServerUrlScreen() {
+  return (
+    <StatusScreen
+      title="缺少必要参数 server-url"
+      description="Studio 遵循无本地存储架构，不内置任何默认后端地址。必须通过 URL query 参数显式提供目标后端服务地址，例如：?server-url=http://localhost:3000&sessionId=...#token=..."
+      tone="error"
+    />
+  );
+}
+
 function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const adapterMeta = useMemo(
     () => materialManifestToAdapterMeta(bootstrap.manifest),
@@ -84,7 +93,24 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const [editor, dispatch] = useReducer(
     editorReducer,
     normalizeAppDocument(bootstrap.draft.document),
-    (document) => createEditorState(document, bootstrap.draft.revision),
+    (document) => {
+      const initial = createEditorState(document, bootstrap.draft.revision);
+      const query = useQueryStore.getState();
+      return {
+        ...initial,
+        surface: query.surface ?? initial.surface,
+        selectedNodeId: query.nodeId ?? initial.selectedNodeId,
+        locale: query.locale ?? initial.locale,
+        activeToolMode: query.tool ?? initial.activeToolMode,
+        viewport: {
+          ...initial.viewport,
+          zoom: query.zoom ?? initial.viewport.zoom,
+          panX: query.panX ?? initial.viewport.panX,
+          panY: query.panY ?? initial.viewport.panY,
+          isRotated: query.rotated ?? initial.viewport.isRotated,
+        },
+      };
+    },
   );
   const {
     document,
@@ -105,14 +131,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const temporaryToolRef = useRef<ActiveToolMode | null>(null);
 
   const validation = useMemo(() => validateAppDocument(document), [document]);
-  const previewIdentity = useMemo(
-    () => ({
-      appKey: bootstrap.app.key,
-      resourceId: bootstrap.resource.id,
-      resourceKind: bootstrap.resource.kind,
-    }),
-    [bootstrap.app.key, bootstrap.resource.id, bootstrap.resource.kind],
-  );
   const selectedElement = document.spec.elements[selectedId];
   const selectedMeta = selectedElement ? registry.getComponent(selectedElement.type) : undefined;
   const components = registry.getAllComponents();
@@ -149,6 +167,61 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     activeToolRef.current = activeToolMode;
   }, [activeToolMode]);
 
+  // Synchronize editor state to URL query parameters
+  useEffect(() => {
+    useQueryStore.getState().setQuery(
+      {
+        surface,
+        nodeId: selectedNodeId,
+        locale,
+        tool: activeToolMode,
+        zoom: viewport.zoom,
+        panX: viewport.panX,
+        panY: viewport.panY,
+        rotated: viewport.isRotated,
+        propsCollapsed: propertiesCollapsed,
+      },
+      { push: false },
+    );
+  }, [surface, selectedNodeId, locale, activeToolMode, viewport, propertiesCollapsed]);
+
+  // Subscribe to external/browser popstate URL query changes
+  useEffect(() => {
+    const unsub = useQueryStore.subscribe((state, prevState) => {
+      if (state.surface !== prevState.surface) {
+        dispatch({ type: "surface.set", surface: state.surface });
+      }
+      if (state.nodeId !== prevState.nodeId) {
+        dispatch({ type: "node.select", nodeId: state.nodeId });
+      }
+      if (state.locale && state.locale !== prevState.locale) {
+        dispatch({ type: "locale.switch", locale: state.locale });
+      }
+      if (state.tool !== prevState.tool) {
+        dispatch({ type: "tool.set", mode: state.tool });
+      }
+      if (
+        state.zoom !== prevState.zoom ||
+        state.panX !== prevState.panX ||
+        state.panY !== prevState.panY ||
+        state.rotated !== prevState.rotated
+      ) {
+        dispatch({
+          type: "viewport.patch",
+          patch: {
+            ...(state.zoom !== null ? { zoom: state.zoom } : {}),
+            ...(state.panX !== null ? { panX: state.panX } : {}),
+            ...(state.panY !== null ? { panY: state.panY } : {}),
+            isRotated: state.rotated,
+          },
+        });
+      }
+      if (state.propsCollapsed !== prevState.propsCollapsed) {
+        setPropertiesCollapsed(state.propsCollapsed);
+      }
+    });
+    return unsub;
+  }, []);
   useEffect(() => {
     const isEditorField = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
@@ -294,75 +367,31 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
 
   const undo = () => dispatch({ type: "history.undo" });
   const redo = () => dispatch({ type: "history.redo" });
-  const previewFrame = (
-    <PreviewFrame
-      url={bootstrap.preview.url}
-      allowedOrigin={bootstrap.preview.allowedOrigin}
-      identity={previewIdentity}
-      document={document}
-      locale={locale}
-      revision={revision}
-      selectedId={selectedId}
-      interactionMode={activeToolMode === "select" ? "select" : "preview"}
-      onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
-    />
-  );
 
   return (
     <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground select-none">
-      {/* 1. Full-screen Canvas Layer (Occupies 100% width and height, never changes size) */}
-      <main className="absolute inset-0 z-0 flex h-full w-full flex-col overflow-hidden">
-        {surface === "text" ? (
-          <div className="grid h-full w-full grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] bg-background">
-            <div className="min-h-0 min-w-0 overflow-hidden border-r border-border">
-              {previewFrame}
-            </div>
-            <aside className="min-h-0 overflow-auto bg-background">
-              <div className="border-b border-border px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold">Document editor</span>
-                  <span className="rounded-md bg-muted px-1.5 py-1 text-[9px] text-muted-foreground">
-                    placeholder
-                  </span>
-                </div>
-                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                  在这里编辑文档文本。当前仅作为编辑器占位，不会回写 AppDocument。
-                </p>
-              </div>
-              <div className="grid gap-4 p-4">
-                <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
-                  Title
-                  <input
-                    className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                    defaultValue={document.pageInfo.title}
-                    aria-label="Document title placeholder"
-                  />
-                </label>
-                <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
-                  Body text
-                  <textarea
-                    className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                    defaultValue={document.pageInfo.description}
-                    placeholder="开始输入文档内容…"
-                    aria-label="Document body text placeholder"
-                  />
-                </label>
-                <div className="rounded-lg border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">
-                  Revision {revision} · Text editing bridge will be connected in a later slice.
-                </div>
-              </div>
-            </aside>
-          </div>
-        ) : (
-          <CanvasViewport
-            viewport={viewport}
-            activeToolMode={activeToolMode}
-            onPatch={(patch) => dispatch({ type: "viewport.patch", patch })}
-          >
-            {previewFrame}
-          </CanvasViewport>
-        )}
-      </main>
+      {/* 1. Full-screen StudioCanvas Subsystem */}
+      <StudioCanvas
+        kind="web-iframe"
+        surface={surface}
+        bootstrap={bootstrap}
+        document={document}
+        locale={locale}
+        revision={revision}
+        selectedId={selectedId}
+        viewport={viewport}
+        activeToolMode={activeToolMode}
+        onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
+        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
+        onRotate={() =>
+          dispatch({
+            type: "viewport.patch",
+            patch: { isRotated: !viewport.isRotated },
+          })
+        }
+        onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
+      />
 
       {/* 2. Floating UI Layer: StudioSidebar (Docked on the left above canvas) */}
       <StudioSidebar
@@ -489,21 +518,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           </div>
         </aside>
       )}
-      <CanvasToolbar
-        activeToolMode={activeToolMode}
-        viewport={viewport}
-        surface={surface}
-        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
-        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-        onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
-        onRotate={() =>
-          dispatch({
-            type: "viewport.patch",
-            patch: { isRotated: !viewport.isRotated },
-          })
-        }
-      />
-
       {notice && (
         <div className="absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
           {notice}
@@ -545,6 +559,7 @@ export function App() {
 
   if (state.status === "loading") return <LoadingScreen />;
   if (state.status === "standalone") return <StandaloneScreen />;
+  if (state.status === "missing-server-url") return <MissingServerUrlScreen />;
   if (state.status === "error") {
     return (
       <StatusScreen title="Studio session unavailable" description={state.message} tone="error" />

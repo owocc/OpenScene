@@ -1,6 +1,9 @@
+import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
+
 import { normalizeAppDocument, type AppDocument } from "./document";
 import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
 import type { AppMaterialManifest } from "./material-manifest";
+import { useQueryStore } from "@/stores/query-store";
 
 export interface StudioBootstrap {
   session: { id: string; expiresAt: string };
@@ -21,77 +24,72 @@ export interface StudioBootstrap {
 export type StudioBootstrapState =
   | { status: "loading" }
   | { status: "standalone" }
+  | { status: "missing-server-url" }
   | { status: "ready"; value: StudioBootstrap }
   | { status: "error"; message: string };
 
-function apiOrigin() {
-  const configured = import.meta.env.VITE_OPENSCENE_ADMIN_API_BASE_URL as string | undefined;
-  return (configured || window.location.origin).replace(/\/$/, "");
-}
-
-function sessionCredentials() {
-  const sessionId = new URLSearchParams(window.location.search).get("sessionId");
-  const token = window.location.hash.startsWith("#token=")
-    ? decodeURIComponent(window.location.hash.slice("#token=".length))
-    : undefined;
-  return { sessionId, token };
-}
-
-function isBootstrap(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioBootstrapState> {
-  const { sessionId, token } = sessionCredentials();
+  const query = useQueryStore.getState();
+  const sessionId = query.sessionId;
+  const token = query.token;
+  const serverUrl = query.serverUrl;
+
+  // 1. Local test session (development only)
   if (sessionId === LOCAL_TEST_SESSION_ID) {
     if (!import.meta.env.DEV) {
       return { status: "error", message: "local-test session is only available in development" };
     }
 
     const value = createLocalTestBootstrap();
-    window.history.replaceState(
-      {},
-      document.title,
-      `${window.location.pathname}${window.location.search}`,
-    );
     return { status: "ready", value };
   }
-  if (!sessionId || !token) return { status: "standalone" };
+
+  // 2. Standalone: Missing sessionId or token
+  if (!sessionId || !token) {
+    return { status: "standalone" };
+  }
+
+  // 3. Strict Server URL requirement: App does NOT store baseUrl, must be passed via query parameter
+  if (!serverUrl) {
+    return { status: "missing-server-url" };
+  }
 
   try {
-    const response = await fetch(
-      `${apiOrigin()}/api/v1/studio-sessions/${encodeURIComponent(sessionId)}/bootstrap`,
+    const client = createOpenSceneClient({
+      baseUrl: serverUrl.replace(/\/$/, ""),
+      headers: { "x-openscene-session-token": token },
+      signal,
+    });
+
+    const { data, error, response } = await client.GET(
+      "/api/v1/studio-sessions/{sessionId}/bootstrap",
       {
-        headers: { "x-openscene-session-token": token },
-        credentials: "include",
+        params: {
+          path: { sessionId },
+        },
         signal,
       },
     );
-    const payload: unknown = await response.json();
-    if (!response.ok) {
-      const detail =
-        isBootstrap(payload) && typeof payload.detail === "string"
-          ? payload.detail
-          : `Bootstrap failed (${response.status})`;
-      return { status: "error", message: detail };
+
+    if (error) {
+      const message = isApiProblem(error) ? error.detail : `Bootstrap failed (${response.status})`;
+      return { status: "error", message };
     }
-    if (!isBootstrap(payload) || !isBootstrap(payload.draft)) {
+
+    if (!data || typeof data !== "object" || !("draft" in data) || !data.draft) {
       return { status: "error", message: "Studio bootstrap payload is invalid" };
     }
 
-    const value = payload as unknown as StudioBootstrap;
+    const value = data as unknown as StudioBootstrap;
     value.draft = {
       revision: value.draft.revision,
       document: normalizeAppDocument(value.draft.document),
     };
+
     if (!value.manifest && !value.preview?.url) {
       return { status: "error", message: "Target App did not provide a preview profile" };
     }
-    window.history.replaceState(
-      {},
-      document.title,
-      `${window.location.pathname}${window.location.search}`,
-    );
+
     return { status: "ready", value };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;

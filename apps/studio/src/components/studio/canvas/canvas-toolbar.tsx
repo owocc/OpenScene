@@ -70,21 +70,22 @@ export function CanvasToolbar({
   return (
     <StudioTooltipProvider>
       <div
-        className="pointer-events-auto fixed bottom-4 left-1/2 z-30 -translate-x-1/2 select-none"
+        className="pointer-events-auto absolute bottom-4 left-1/2 z-30 -translate-x-1/2 select-none"
         role="toolbar"
         aria-label="Canvas tools and modes"
       >
         <div
-          className="flex items-center gap-1.5 rounded-full border border-border/80 bg-background/95 p-1 shadow-xl backdrop-blur"
+          className="flex items-center gap-1.5 rounded-2xl border border-border/80 bg-background/95 p-1 shadow-xl shadow-slate-950/15 backdrop-blur"
           role="group"
           aria-label="Canvas tools"
         >
-          {/* 1. Left Section: Tool Selection Split Button (Only tool switcher uses ButtonGroup) */}
-          <ButtonGroup>
+          {/* 1. Tool Selection Split Button */}
+          <ButtonGroup className="overflow-hidden rounded-xl border border-border/50 bg-secondary/80">
             <IconTooltip label={currentTool.label} side="top">
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="rounded-none border-0 text-secondary-foreground hover:bg-secondary"
                 aria-label={currentTool.label}
                 aria-pressed={true}
               >
@@ -171,7 +172,7 @@ export function CanvasToolbar({
           <div className="mx-0.5 h-4 w-px bg-border/80" />
 
           {/* 5. Right Section: View Mode Switcher */}
-          <div className="flex items-center gap-0.5 rounded-full bg-muted/60 p-0.5">
+          <div className="flex items-center gap-0.5 rounded-xl bg-muted/60 p-0.5">
             {surfaceModes.map((mode) => {
               const Icon = mode.icon;
               const isActive = surface === mode.value;
@@ -179,7 +180,7 @@ export function CanvasToolbar({
                 <IconTooltip key={mode.value} label={`${mode.label} (${mode.shortcut})`} side="top">
                   <button
                     className={cn(
-                      "flex size-7 items-center justify-center rounded-full transition-all focus-visible:outline-none",
+                      "flex size-7 items-center justify-center rounded-lg transition-all focus-visible:outline-none",
                       isActive
                         ? "bg-background text-foreground shadow-xs ring-1 ring-border/50"
                         : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",

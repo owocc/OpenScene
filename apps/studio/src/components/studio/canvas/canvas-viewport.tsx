@@ -9,6 +9,14 @@ interface CanvasViewportProps {
   onPatch: (patch: Partial<ViewportState>) => void;
 }
 
+/**
+ * Full-screen Canvas Viewport & Camera Engine.
+ * Handles:
+ * 1. Figma-style focal-point zoom (zooming towards mouse cursor)
+ * 2. Two-finger trackpad panning / Shift horizontal scrolling
+ * 3. Spacebar / Middle-click / Hand tool drag panning
+ * 4. Dark mode adaptive dot grid background
+ */
 export function CanvasViewport({
   children,
   viewport,
@@ -19,8 +27,6 @@ export function CanvasViewport({
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | undefined>(
     undefined,
   );
-  const width = viewport.isRotated ? viewport.currentDeviceHeight : viewport.currentDeviceWidth;
-  const height = viewport.isRotated ? viewport.currentDeviceWidth : viewport.currentDeviceHeight;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -100,6 +106,7 @@ export function CanvasViewport({
       el.removeEventListener("gestureend", onGestureEnd);
     };
   }, [viewport.zoom, viewport.panX, viewport.panY, onPatch]);
+
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (activeToolMode !== "hand" && event.button !== 1) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -127,26 +134,13 @@ export function CanvasViewport({
   return (
     <div
       ref={containerRef}
-      className="relative min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle,#cbd5e1_1px,transparent_1px)] [background-size:18px_18px]"
+      className="relative min-h-0 flex-1 overflow-hidden bg-background bg-[radial-gradient(circle,rgba(100,116,139,0.25)_1px,transparent_1px)] dark:bg-[radial-gradient(circle,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={stopPan}
       onPointerCancel={stopPan}
     >
-      <div className="absolute inset-0 grid place-items-center overflow-hidden">
-        <div
-          className="origin-center transition-transform duration-75"
-          style={{
-            width,
-            height,
-            transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
-          }}
-        >
-          <div className="h-full w-full overflow-hidden border border-border/80 bg-background">
-            {children}
-          </div>
-        </div>
-      </div>
+      <div className="absolute inset-0 grid place-items-center overflow-hidden">{children}</div>
       {activeToolMode === "hand" && (
         <div
           className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"

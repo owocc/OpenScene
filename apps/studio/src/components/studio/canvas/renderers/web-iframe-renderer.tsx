@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { AppDocument } from "@/core/document";
+import type { CanvasRendererProps } from "../types";
 
 const BRIDGE_PROTOCOL = "cms-preview";
 const BRIDGE_VERSION = 2;
-type PreviewInteractionMode = "preview" | "select";
 
 type BridgeEnvelope = {
   protocol: typeof BRIDGE_PROTOCOL;
@@ -18,24 +17,6 @@ type PreviewPortMessage = {
   type: string;
   [key: string]: unknown;
 };
-
-type PreviewIdentity = {
-  appKey: string;
-  resourceId: string;
-  resourceKind: "page" | "template";
-};
-
-interface PreviewFrameProps {
-  url: string;
-  allowedOrigin: string;
-  identity: PreviewIdentity;
-  document: AppDocument;
-  locale: string;
-  revision: number;
-  selectedId: string;
-  interactionMode: PreviewInteractionMode;
-  onSelect: (id: string) => void;
-}
 
 function envelope(instanceId: string, type: string, payload: unknown): BridgeEnvelope {
   return {
@@ -72,7 +53,12 @@ function payloadRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-export function PreviewFrame({
+/**
+ * Default Web Iframe Canvas Renderer.
+ * Connects to the target App iframe over Preview Bridge protocol,
+ * streaming document state, locale, and selection in real time.
+ */
+export function WebIframeRenderer({
   url,
   allowedOrigin,
   identity,
@@ -82,14 +68,15 @@ export function PreviewFrame({
   selectedId,
   interactionMode,
   onSelect,
-}: PreviewFrameProps) {
+}: CanvasRendererProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const portRef = useRef<MessagePort | null>(null);
   const instanceIdRef = useRef<string>(crypto.randomUUID());
   const latestRef = useRef({ document, locale, revision });
   const onSelectRef = useRef(onSelect);
   const interactionModeRef = useRef(interactionMode);
-  const [status, setStatus] = useState<"waiting" | "connected" | "error">("waiting");
+  const [, setStatus] = useState<"waiting" | "connected" | "error">("waiting");
+
   useEffect(() => {
     latestRef.current = { document, locale, revision };
   }, [document, locale, revision]);
@@ -171,23 +158,20 @@ export function PreviewFrame({
   }, [allowedOrigin, identity, url]);
 
   useEffect(() => {
-    if (status !== "connected") return;
     const timer = window.setTimeout(() => {
       send("SPEC_REPLACE", { document, revision });
       send("SET_LOCALE", { locale });
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [document, locale, revision, status]);
+  }, [document, locale, revision]);
 
   useEffect(() => {
-    if (status !== "connected") return;
     send("SET_INTERACTION_MODE", { mode: interactionMode });
-  }, [interactionMode, status]);
+  }, [interactionMode]);
 
   useEffect(() => {
-    if (status !== "connected") return;
     send("SELECT_NODE", { elementId: selectedId || null });
-  }, [selectedId, status]);
+  }, [selectedId]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
