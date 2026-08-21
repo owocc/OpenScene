@@ -36,9 +36,15 @@ export interface StudioCanvasProps {
   selectedId: string;
   viewport: ViewportState;
   activeToolMode: ActiveToolMode;
+  pastLength?: number;
+  futureLength?: number;
   onPatchViewport: (patch: Partial<ViewportState>) => void;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
   onSelectNode: (id: string | null) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onCopyJson?: () => void;
+  onSave?: () => void;
   renderCustomPreview?: (props: CanvasRendererProps) => ReactNode;
 }

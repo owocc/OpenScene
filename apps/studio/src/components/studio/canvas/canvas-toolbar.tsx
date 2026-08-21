@@ -20,8 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
+import { LogoMenu } from "@/components/studio/sidebar/logo-menu";
 import { useI18n } from "@/i18n";
-import type { ActiveToolMode, Surface } from "@/core/editor-state";
+import { useQueryStore, useShortcutsStore } from "@/stores";
+import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
 import { cn } from "@/lib/utils";
 
 interface CanvasToolbarProps {
@@ -29,6 +31,14 @@ interface CanvasToolbarProps {
   surface: Surface;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
+  pastLength?: number;
+  futureLength?: number;
+  viewport?: ViewportState;
+  onPatchViewport?: (patch: Partial<ViewportState>) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onCopyJson?: () => void;
+  onSave?: () => void;
   children?: React.ReactNode;
 }
 
@@ -53,8 +63,17 @@ export function CanvasToolbar({
   surface,
   onSurfaceChange,
   onToolChange,
+  pastLength = 0,
+  futureLength = 0,
+  viewport,
+  onPatchViewport,
+  onUndo,
+  onRedo,
+  onCopyJson,
+  onSave,
   children,
 }: CanvasToolbarProps) {
+  const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const { LL } = useI18n();
 
   const toolLabels: Record<ActiveToolMode, string> = {
@@ -92,7 +111,35 @@ export function CanvasToolbar({
           role="group"
           aria-label="Canvas tools"
         >
-          {/* 1. Tool Selection Split Button */}
+          {/* 1. In Document (text) Mode: Prepend Logo Menu as the first item */}
+          {surface === "text" && (
+            <>
+              <LogoMenu
+                side="top"
+                align="start"
+                sideOffset={8}
+                triggerSize="icon-sm"
+                triggerClassName="rounded-xl hover:bg-muted"
+                pastLength={pastLength}
+                futureLength={futureLength}
+                viewport={viewport}
+                panelCollapsed={sidebarCollapsed}
+                onTogglePanel={() =>
+                  useQueryStore.getState().setSidebarCollapsed(!sidebarCollapsed)
+                }
+                onSurfaceChange={onSurfaceChange}
+                onPatchViewport={onPatchViewport}
+                onOpenShortcuts={() => useShortcutsStore.getState().openPanel()}
+                onUndo={onUndo ?? (() => {})}
+                onRedo={onRedo ?? (() => {})}
+                onCopyJson={onCopyJson ?? (() => {})}
+                onSave={onSave ?? (() => {})}
+              />
+              <div className="mx-0.5 h-4 w-px bg-border/80" />
+            </>
+          )}
+
+          {/* 2. Tool Selection Split Button (Available in all modes) */}
           <ButtonGroup className="overflow-hidden rounded-xl border border-border/50 bg-secondary/80">
             <IconTooltip label={currentLabel} side="top">
               <Button
@@ -138,7 +185,6 @@ export function CanvasToolbar({
               </DropdownMenuContent>
             </DropdownMenu>
           </ButtonGroup>
-
           {/* 2. Vertical Divider Line */}
           <div className="mx-0.5 h-4 w-px bg-border/80" />
 

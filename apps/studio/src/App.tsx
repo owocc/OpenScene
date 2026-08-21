@@ -124,6 +124,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const { LL } = useI18n();
   const selectedId = selectedNodeId ?? "";
   const [addType, setAddType] = useState("");
+  const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
 
@@ -296,45 +297,59 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           selectedId={selectedId}
           viewport={viewport}
           activeToolMode={activeToolMode}
+          pastLength={past.length}
+          futureLength={future.length}
           onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
           onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
           onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
           onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
-        />
-
-        {/* 2. Floating UI Layer: StudioSidebar (Docked on the left above canvas) */}
-        <StudioSidebar
-          bootstrap={bootstrap}
-          document={document}
-          registry={registry}
-          selectedId={selectedId}
-          surface={surface}
-          revision={revision}
-          valid={validation.valid}
-          locale={locale}
-          locales={locales}
-          manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
-          components={components}
-          diagnostics={diagnostics}
-          pastLength={past.length}
-          futureLength={future.length}
-          viewport={viewport}
-          onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
-          addType={addType}
-          onSetAddType={setAddType}
-          onAddComponent={addComponent}
-          onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
-          onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
-          onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
           onUndo={undo}
           onRedo={redo}
           onCopyJson={() => void copyJson()}
           onSave={saveDocument}
         />
 
+        {/* 2. Floating UI Layer: StudioSidebar (Hidden in text/document mode) */}
+        {surface !== "text" && (
+          <StudioSidebar
+            bootstrap={bootstrap}
+            document={document}
+            registry={registry}
+            selectedId={selectedId}
+            surface={surface}
+            revision={revision}
+            valid={validation.valid}
+            locale={locale}
+            locales={locales}
+            manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
+            components={components}
+            diagnostics={diagnostics}
+            pastLength={past.length}
+            futureLength={future.length}
+            viewport={viewport}
+            onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
+            addType={addType}
+            onSetAddType={setAddType}
+            onAddComponent={addComponent}
+            onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
+            onSurfaceChange={(nextSurface) =>
+              dispatch({ type: "surface.set", surface: nextSurface })
+            }
+            onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
+            onUndo={undo}
+            onRedo={redo}
+            onCopyJson={() => void copyJson()}
+            onSave={saveDocument}
+          />
+        )}
         {/* 3. Floating Collapsed Properties Pill (Minimal Figma style) */}
         {(surface === "visual" || surface === "developer") && propertiesCollapsed && (
-          <div className="fixed top-3 right-3 z-30 hidden xl:block">
+          <div
+            className={cn(
+              "fixed z-30 hidden xl:block transition-all",
+              sidebarCollapsed ? "top-4 right-4" : "top-3 right-3",
+            )}
+          >
             <IconTooltip label={LL.sidebar.expandProperties()} side="bottom">
               <button
                 className="flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
@@ -347,89 +362,101 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             </IconTooltip>
           </div>
         )}
-
         {/* 4. Right Properties Panel */}
         {(surface === "visual" || surface === "developer") && !propertiesCollapsed && (
-          <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-              <span className="text-xs font-semibold">{LL.properties.title()}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                  onClick={removeSelected}
-                  disabled={!selectedId || isSlotNodeId(selectedId)}
-                  aria-label="Delete selected node"
-                >
-                  {LL.common.delete()}
-                </button>
-                <IconTooltip label={LL.sidebar.collapse()} side="left">
-                  <button
-                    className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    onClick={() => setPropertiesCollapsed(true)}
-                    aria-label={LL.sidebar.collapse()}
-                  >
-                    <PanelRightClose aria-hidden="true" className="size-4" />
-                  </button>
-                </IconTooltip>
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
-              {selectedElement && selectedMeta ? (
-                <div className="p-3">
-                  <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {selectedElement.name || selectedMeta.title}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                          {selectedElement.type} · #{selectedId}
-                        </p>
-                      </div>
-                      <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
-                        {selectedMeta.category}
-                      </span>
-                    </div>
-                    <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
-                      {LL.properties.layerName()}
-                      <input
-                        className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
-                        value={selectedElement.name ?? ""}
-                        onChange={(event) =>
-                          updateElement(selectedId, (element) => ({
-                            ...element,
-                            name: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <PropertyEditor
-                    meta={selectedMeta}
-                    componentType={selectedElement.type}
-                    elementId={selectedId}
-                    props={selectedElement.props ?? {}}
-                    state={document.spec.state}
-                    onChange={updateProp}
-                  />
-                </div>
-              ) : (
-                <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                  <p>{LL.properties.empty()}</p>
-                </div>
+          <div
+            className={cn(
+              "fixed inset-y-0 right-0 z-30 hidden pointer-events-none xl:flex flex-col items-end transition-all",
+              sidebarCollapsed ? "p-4" : "p-0",
+            )}
+          >
+            <aside
+              className={cn(
+                "pointer-events-auto flex w-80 flex-col overflow-hidden bg-background/95 backdrop-blur transition-all",
+                sidebarCollapsed
+                  ? "h-full rounded-2xl border border-border/80 shadow-lg"
+                  : "h-full rounded-none border-l border-border/80",
               )}
-            </div>
-            <div className="border-t border-border/80 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {LL.properties.runtimeTitle()}
+            >
+              <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+                <span className="text-xs font-semibold">{LL.properties.title()}</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                    onClick={removeSelected}
+                    disabled={!selectedId || isSlotNodeId(selectedId)}
+                    aria-label="Delete selected node"
+                  >
+                    {LL.common.delete()}
+                  </button>
+                  <IconTooltip label={LL.sidebar.collapse()} side="left">
+                    <button
+                      className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => setPropertiesCollapsed(true)}
+                      aria-label={LL.sidebar.collapse()}
+                    >
+                      <PanelRightClose aria-hidden="true" className="size-4" />
+                    </button>
+                  </IconTooltip>
+                </div>
               </div>
-              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                {LL.properties.runtimeDesc()}
-              </p>
-            </div>
-          </aside>
+              <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+                {selectedElement && selectedMeta ? (
+                  <div className="p-3">
+                    <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            {selectedElement.name || selectedMeta.title}
+                          </p>
+                          <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                            {selectedElement.type} · #{selectedId}
+                          </p>
+                        </div>
+                        <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
+                          {selectedMeta.category}
+                        </span>
+                      </div>
+                      <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
+                        {LL.properties.layerName()}
+                        <input
+                          className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
+                          value={selectedElement.name ?? ""}
+                          onChange={(event) =>
+                            updateElement(selectedId, (element) => ({
+                              ...element,
+                              name: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                    <PropertyEditor
+                      meta={selectedMeta}
+                      componentType={selectedElement.type}
+                      elementId={selectedId}
+                      props={selectedElement.props ?? {}}
+                      state={document.spec.state}
+                      onChange={updateProp}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
+                    <p>{LL.properties.empty()}</p>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-border/80 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {LL.properties.runtimeTitle()}
+                </div>
+                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                  {LL.properties.runtimeDesc()}
+                </p>
+              </div>
+            </aside>
+          </div>
         )}
-
         {notice && (
           <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
             {notice}

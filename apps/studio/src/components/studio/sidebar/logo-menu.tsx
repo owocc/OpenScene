@@ -33,7 +33,7 @@ import { useQueryStore } from "@/stores";
 import type { Surface, ViewportState } from "@/core/editor-state";
 import { devicePresets, modeTabs } from "./types";
 
-interface LogoMenuProps {
+export interface LogoMenuProps {
   pastLength: number;
   futureLength: number;
   viewport?: ViewportState;
@@ -46,8 +46,12 @@ interface LogoMenuProps {
   onRedo: () => void;
   onCopyJson: () => void;
   onSave: () => void;
+  side?: "top" | "bottom" | "left" | "right";
+  align?: "start" | "center" | "end";
+  sideOffset?: number;
+  triggerSize?: "default" | "sm" | "lg" | "icon" | "icon-sm" | "icon-xs";
+  triggerClassName?: string;
 }
-
 const zoomLevels = [0.25, 0.5, 0.75, 0.85, 1, 1.25, 1.5, 2, 3];
 
 export function LogoMenu({
@@ -63,6 +67,11 @@ export function LogoMenu({
   onRedo,
   onCopyJson,
   onSave,
+  side = "bottom",
+  align = "start",
+  sideOffset = 4,
+  triggerSize = "icon",
+  triggerClassName,
 }: LogoMenuProps) {
   const { theme, setTheme } = useTheme();
   const { LL, locale } = useI18n();
@@ -79,11 +88,18 @@ export function LogoMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" aria-label="OpenScene Studio" />}
+        render={
+          <Button
+            variant="ghost"
+            size={triggerSize}
+            className={triggerClassName}
+            aria-label="OpenScene Studio"
+          />
+        }
       >
-        <SquareDashedMousePointer />
+        <SquareDashedMousePointer className="size-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="start" side="bottom">
+      <DropdownMenuContent className="w-56" align={align} side={side} sideOffset={sideOffset}>
         {/* File Submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>{LL.menu.file()}</DropdownMenuSubTrigger>
