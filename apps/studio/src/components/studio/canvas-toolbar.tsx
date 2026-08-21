@@ -2,25 +2,23 @@ import {
   Check,
   ChevronDown,
   Hand,
-  Minus,
   MousePointer2,
   MousePointerClick,
-  Plus,
   RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuPositioner,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import { IconTooltip, TooltipProvider } from "@/components/ui/tooltip";
 import type { ActiveToolMode, ViewportState } from "@/core/editor-state";
 import { cn } from "@/lib/utils";
@@ -39,6 +37,8 @@ const tools: Array<{ mode: ActiveToolMode; label: string; shortcut: string; icon
   { mode: "hand", label: "平移", shortcut: "H", icon: Hand },
 ];
 
+const zoomLevels = [0.25, 0.5, 0.75, 0.85, 1, 1.25, 1.5, 2, 3];
+
 export function CanvasToolbar({
   activeToolMode,
   viewport,
@@ -52,13 +52,13 @@ export function CanvasToolbar({
   return (
     <TooltipProvider>
       <div
-        className="absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border/80 bg-background/95 p-1 shadow-xl shadow-slate-950/15 backdrop-blur"
+        className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2"
         role="toolbar"
         aria-label="Canvas tools"
       >
         <ButtonGroup
-          className="overflow-hidden rounded-lg border border-border/80 bg-background/80"
-          aria-label="Canvas interaction"
+          className="gap-1 rounded-xl border border-border/80 bg-background/95 p-1 shadow-xl shadow-slate-950/15 backdrop-blur"
+          aria-label="Canvas tools"
         >
           <IconTooltip label={currentTool.label} side="top">
             <Button
@@ -107,46 +107,49 @@ export function CanvasToolbar({
               </DropdownMenuPositioner>
             </DropdownMenuPortal>
           </DropdownMenu>
+          <ButtonGroupSeparator className="mx-1 h-5" />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="h-7 min-w-12 rounded-md border-0 px-2 text-[10px] font-medium tabular-nums text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-0"
+              aria-label="选择缩放比例"
+            >
+              {Math.round(viewport.zoom * 100)}%
+            </DropdownMenuTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuPositioner side="top" align="center" sideOffset={8}>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>缩放比例</DropdownMenuLabel>
+                  {zoomLevels.map((level) => {
+                    const isActive = Math.abs(level - viewport.zoom) < 0.001;
+                    return (
+                      <DropdownMenuItem
+                        key={level}
+                        onClick={() => onZoomChange(level)}
+                        className="gap-8"
+                      >
+                        <span>{Math.round(level * 100)}%</span>
+                        {isActive && <Check aria-hidden="true" className="size-3.5" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenuPositioner>
+            </DropdownMenuPortal>
+          </DropdownMenu>
+          <ButtonGroupSeparator className="mx-1 h-5" />
+          <IconTooltip label={viewport.isRotated ? "恢复设备方向" : "旋转设备"} side="top">
+            <Button
+              variant={viewport.isRotated ? "secondary" : "ghost"}
+              size="icon-sm"
+              aria-label="Rotate device"
+              aria-pressed={viewport.isRotated}
+              onClick={onRotate}
+              className={cn(viewport.isRotated && "text-foreground")}
+            >
+              <RotateCcw aria-hidden="true" />
+            </Button>
+          </IconTooltip>
         </ButtonGroup>
-        <Separator orientation="vertical" className="h-5" />
-        <div className="flex items-center gap-0.5" role="group" aria-label="Canvas zoom">
-          <IconTooltip label="缩小" side="top">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Zoom out"
-              onClick={() => onZoomChange(viewport.zoom - 0.1)}
-            >
-              <Minus aria-hidden="true" />
-            </Button>
-          </IconTooltip>
-          <span className="w-9 text-center text-[10px] font-medium tabular-nums text-muted-foreground">
-            {Math.round(viewport.zoom * 100)}%
-          </span>
-          <IconTooltip label="放大" side="top">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Zoom in"
-              onClick={() => onZoomChange(viewport.zoom + 0.1)}
-            >
-              <Plus aria-hidden="true" />
-            </Button>
-          </IconTooltip>
-        </div>
-        <Separator orientation="vertical" className="h-5" />
-        <IconTooltip label={viewport.isRotated ? "恢复设备方向" : "旋转设备"} side="top">
-          <Button
-            variant={viewport.isRotated ? "secondary" : "ghost"}
-            size="icon-sm"
-            aria-label="Rotate device"
-            aria-pressed={viewport.isRotated}
-            onClick={onRotate}
-            className={cn(viewport.isRotated && "text-foreground")}
-          >
-            <RotateCcw aria-hidden="true" />
-          </Button>
-        </IconTooltip>
       </div>
     </TooltipProvider>
   );
