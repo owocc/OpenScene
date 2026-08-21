@@ -30,6 +30,19 @@ export type DynamicValue =
 
 export type DynamicMode = "state" | "bindState" | "template" | "i18n";
 
+export function getBindingType(elementType: string, propKey: string): "state" | "bindState" {
+  const normalizedType = elementType.toLowerCase();
+  if (
+    (normalizedType === "input" || normalizedType === "select" || normalizedType === "textarea") &&
+    propKey === "value"
+  ) {
+    return "bindState";
+  }
+  if (normalizedType === "checkbox" && propKey === "checked") return "bindState";
+  if (normalizedType === "dialog" && propKey === "open") return "bindState";
+  return "state";
+}
+
 export interface AppElement {
   type: string;
   name?: string;
@@ -118,7 +131,7 @@ export function dynamicValue(mode: DynamicMode, value: string): DynamicValue {
   if (mode === "state") return { $state: normalizeStatePath(value) };
   if (mode === "bindState") return { $bindState: normalizeStatePath(value) };
   if (mode === "template") return { $template: value };
-  return { $t: value.trim() };
+  return { $t: normalizeI18nPath(value) };
 }
 
 export function dynamicValueText(value: unknown): string {
@@ -137,6 +150,13 @@ export function normalizeStatePath(path: string): string {
   }
 
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+export function normalizeI18nPath(key: string): string {
+  const trimmed = key.trim();
+  if (trimmed.startsWith("/i18n/$lang/")) return trimmed;
+  const cleanKey = trimmed.replace(/^\/+/, "").replace(/\/+/g, "/");
+  return `/i18n/$lang/${cleanKey}`;
 }
 
 export function isReservedStateRoot(key: string): boolean {
@@ -161,7 +181,7 @@ export function getEditableStatePaths(state: Record<string, JsonValue> | undefin
   };
 
   for (const [key, value] of Object.entries(state)) {
-    if (!isReservedStateRoot(key)) {
+    if (key !== "i18n" && key !== "__scene") {
       visit(value, `/${key}`);
     }
   }
@@ -204,7 +224,15 @@ function readTranslation(
     return undefined;
   }
 
-  return dictionary[key];
+  const reference = normalizeI18nPath(key);
+  const translationKey = reference.slice("/i18n/$lang/".length);
+  if (translationKey in dictionary) return dictionary[translationKey];
+  let current: JsonValue = dictionary;
+  for (const segment of translationKey.split(/[./]/).filter(Boolean)) {
+    if (!isRecord(current) || !(segment in current)) return undefined;
+    current = current[segment];
+  }
+  return current;
 }
 
 export function resolveDynamicValue(
@@ -424,7 +452,12 @@ export function validateAppDocument(value: unknown): ValidationResult {
 
   const spec = requireRecord(value.spec, "$.spec", issues) ? value.spec : undefined;
   if (spec) {
-    requireString(spec.root, "$.spec.root", issues);
+    if (typeof spec.root !== "string") {
+      issues.push({
+        path: "$.spec.root",
+        message: "必须是元素 ID 字符串，空字符串表示尚未创建 root",
+      });
+    }
     const elements = requireRecord(spec.elements, "$.spec.elements", issues)
       ? spec.elements
       : undefined;
@@ -433,8 +466,14 @@ export function validateAppDocument(value: unknown): ValidationResult {
         validateElement(element, `$.spec.elements.${id}`, issues);
       }
 
-      if (typeof spec.root === "string" && !(spec.root in elements)) {
+      if (typeof spec.root === "string" && spec.root !== "" && !(spec.root in elements)) {
         issues.push({ path: "$.spec.root", message: "必须引用一个已存在的元素" });
+      }
+      if (typeof spec.root === "string" && spec.root === "" && Object.keys(elements).length > 0) {
+        issues.push({
+          path: "$.spec.root",
+          message: "有元素时必须指定 root；空文档可暂时保持空字符串",
+        });
       }
 
       const references = new Map<string, string[]>();
@@ -512,155 +551,60 @@ export function validateAppDocument(value: unknown): ValidationResult {
     : { valid: false, issues };
 }
 
-export function createStarterDocument(): AppDocument {
+export function normalizeAppDocument(value: unknown): AppDocument {
+  const source = isRecord(value) ? value : {};
+  const pageInfo = isRecord(source.pageInfo) ? source.pageInfo : {};
+  const globalConfig = isRecord(source.globalConfig) ? source.globalConfig : {};
+  const rawSpec = isRecord(source.spec) ? source.spec : {};
+  const rawElements = isRecord(rawSpec.elements) ? rawSpec.elements : {};
+  const rawDesign = isRecord(globalConfig.design) ? globalConfig.design : {};
+  const elements = Object.fromEntries(
+    Object.entries(rawElements)
+      .filter(([, element]) => isRecord(element))
+      .map(([id, element]) => [id, element as unknown as AppElement]),
+  );
+
   return {
-    schemaVersion: "1.0",
+    schemaVersion: typeof source.schemaVersion === "string" ? source.schemaVersion : "1.0",
     pageInfo: {
-      title: "Product launch",
-      description: "A starter document rendered from JSON.",
-      keywords: ["studio", "json-render"],
-      locale: "en-US",
-      metadata: {},
+      title: typeof pageInfo.title === "string" ? pageInfo.title : "Untitled",
+      description: typeof pageInfo.description === "string" ? pageInfo.description : "",
+      keywords: Array.isArray(pageInfo.keywords)
+        ? pageInfo.keywords.filter((keyword): keyword is string => typeof keyword === "string")
+        : [],
+      locale: typeof pageInfo.locale === "string" ? pageInfo.locale : "en-US",
+      metadata: isRecord(pageInfo.metadata) ? (pageInfo.metadata as Record<string, JsonValue>) : {},
     },
     globalConfig: {
-      design: { width: 1200 },
-      body: { className: "bg-[#f7f8fa]" },
-      i18n: { defaultLocale: "en-US" },
-      variables: {
-        audience: "designers",
-        session: { signedIn: true },
+      design: {
+        width: typeof rawDesign.width === "number" ? rawDesign.width : null,
       },
+      body: {
+        className:
+          isRecord(globalConfig.body) && typeof globalConfig.body.className === "string"
+            ? globalConfig.body.className
+            : undefined,
+        styles:
+          isRecord(globalConfig.body) && isRecord(globalConfig.body.styles)
+            ? (globalConfig.body.styles as Record<string, JsonValue>)
+            : undefined,
+      },
+      css:
+        isRecord(globalConfig.css) && isRecord(globalConfig.css.rules)
+          ? (globalConfig.css as AppDocument["globalConfig"]["css"])
+          : undefined,
+      i18n:
+        isRecord(globalConfig.i18n) && typeof globalConfig.i18n.defaultLocale === "string"
+          ? { defaultLocale: globalConfig.i18n.defaultLocale }
+          : undefined,
+      variables: isRecord(globalConfig.variables)
+        ? (globalConfig.variables as Record<string, JsonValue>)
+        : {},
     },
     spec: {
-      root: "page",
-      state: {
-        lang: "en-US",
-        i18n: {
-          "en-US": {
-            brand: "Northstar",
-            eyebrow: "JSON-first design system",
-            heroTitle: "Shape the interface before the code.",
-            heroCopy: "Studio edits a portable document and lets an Adapter decide how it renders.",
-            primaryCta: "Explore the canvas",
-            secondaryCta: "Read the contract",
-            featureTitle: "Everything stays inspectable",
-            featureCopy: "Props, slots, state and translations remain visible as structured JSON.",
-            inputLabel: "Workspace name",
-            inputPlaceholder: "Try a state binding",
-          },
-          "zh-CN": {
-            brand: "Northstar",
-            eyebrow: "JSON 优先的设计系统",
-            heroTitle: "先定义界面，再决定代码。",
-            heroCopy: "Studio 编辑可迁移的文档，由 Adapter 决定具体如何渲染。",
-            primaryCta: "探索画布",
-            secondaryCta: "阅读契约",
-            featureTitle: "一切都可检查",
-            featureCopy: "属性、插槽、状态和翻译都保留为结构化 JSON。",
-            inputLabel: "工作区名称",
-            inputPlaceholder: "试试状态绑定",
-          },
-        },
-        user: { name: "Alex" },
-      },
-      elements: {
-        page: {
-          type: "Container",
-          name: "Page",
-          props: { gap: "20px", padding: "24px", background: "#f7f8fa" },
-          children: ["header", "hero", "featureCard"],
-        },
-        header: {
-          type: "Container",
-          name: "Header",
-          props: { layout: "row", gap: "16px", padding: "10px 4px", align: "center" },
-          slots: { left: ["brand"], right: ["headerAction"] },
-        },
-        brand: {
-          type: "Text",
-          name: "Brand",
-          props: { content: { $t: "brand" }, as: "strong", tone: "default" },
-        },
-        headerAction: {
-          type: "Button",
-          name: "Header action",
-          props: { label: "Preview", variant: "ghost", size: "sm" },
-        },
-        hero: {
-          type: "Container",
-          name: "Hero",
-          props: {
-            gap: "18px",
-            padding: "56px",
-            background: "#111827",
-            color: "#f9fafb",
-            radius: "24px",
-          },
-          children: ["eyebrow", "title", "copy", "actions"],
-        },
-        eyebrow: {
-          type: "Text",
-          name: "Eyebrow",
-          props: { content: { $t: "eyebrow" }, tone: "accent", size: "sm" },
-        },
-        title: {
-          type: "Text",
-          name: "Title",
-          props: { content: { $t: "heroTitle" }, as: "h1", size: "4xl", weight: "bold" },
-        },
-        copy: {
-          type: "Text",
-          name: "Copy",
-          props: { content: { $t: "heroCopy" }, tone: "muted", size: "lg" },
-        },
-        actions: {
-          type: "Container",
-          name: "Actions",
-          props: { layout: "row", gap: "10px", align: "center" },
-          children: ["primary", "secondary"],
-        },
-        primary: {
-          type: "Button",
-          name: "Primary CTA",
-          props: { label: { $t: "primaryCta" }, variant: "default", size: "lg" },
-        },
-        secondary: {
-          type: "Button",
-          name: "Secondary CTA",
-          props: { label: { $t: "secondaryCta" }, variant: "outline", size: "lg" },
-        },
-        featureCard: {
-          type: "Container",
-          name: "Feature card",
-          props: {
-            gap: "12px",
-            padding: "24px",
-            background: "#ffffff",
-            radius: "18px",
-            border: "1px solid #e5e7eb",
-          },
-          children: ["featureTitle", "featureCopy", "workspaceInput"],
-        },
-        featureTitle: {
-          type: "Text",
-          name: "Feature title",
-          props: { content: { $t: "featureTitle" }, as: "h2", size: "xl", weight: "semibold" },
-        },
-        featureCopy: {
-          type: "Text",
-          name: "Feature copy",
-          props: { content: { $t: "featureCopy" }, tone: "muted" },
-        },
-        workspaceInput: {
-          type: "Input",
-          name: "Workspace input",
-          props: {
-            label: { $t: "inputLabel" },
-            placeholder: { $t: "inputPlaceholder" },
-            value: { $bindState: "/user/name" },
-          },
-        },
-      },
+      root: typeof rawSpec.root === "string" ? rawSpec.root : "",
+      elements,
+      state: isRecord(rawSpec.state) ? (rawSpec.state as Record<string, JsonValue>) : {},
     },
   };
 }

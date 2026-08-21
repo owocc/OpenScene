@@ -1,9 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   dynamicMode,
   dynamicValue,
   dynamicValueText,
+  getBindingType,
   getEditableStatePaths,
   isRecord,
   isDynamicValue,
@@ -321,22 +322,34 @@ const controlRegistry: Record<string, ControlRenderer> = {
 
 function DynamicValueControl({
   propMeta,
+  componentType,
   value,
   onChange,
   statePaths,
 }: {
   propMeta: PropMeta;
+  componentType: string;
   value: JsonValue | undefined;
   onChange: (value: JsonValue) => void;
   statePaths: string[];
 }) {
   const meta = propMeta.editor;
-  const supportedModes = propMeta.dynamic ?? [];
+  const supportedModes = propMeta.dynamic ?? [
+    getBindingType(componentType, propMeta.title),
+    "template",
+  ];
+  const dynamicModes = propMeta.translatable
+    ? [...supportedModes, "i18n" as const]
+    : supportedModes;
   const mode = dynamicMode(value);
-  const activeMode = mode && supportedModes.includes(mode) ? mode : "literal";
+  const activeMode = mode && dynamicModes.includes(mode) ? mode : "literal";
   const [literalValue, setLiteralValue] = useState<JsonValue | undefined>(
     activeMode === "literal" ? value : propMeta.default,
   );
+
+  useEffect(() => {
+    if (activeMode === "literal" && !isDynamicValue(value)) setLiteralValue(value);
+  }, [activeMode, value]);
 
   const control = controlRegistry[meta.control] ?? TextControl;
   const updateLiteral = (next: JsonValue) => {
@@ -384,10 +397,10 @@ function DynamicValueControl({
         }}
       >
         <option value="literal">Literal</option>
-        {supportedModes.includes("state") && <option value="state">State read</option>}
-        {supportedModes.includes("bindState") && <option value="bindState">Two-way bind</option>}
-        {supportedModes.includes("template") && <option value="template">Template</option>}
-        {supportedModes.includes("i18n") && <option value="i18n">i18n key</option>}
+        {dynamicModes.includes("state") && <option value="state">State read</option>}
+        {dynamicModes.includes("bindState") && <option value="bindState">Two-way bind</option>}
+        {dynamicModes.includes("template") && <option value="template">Template</option>}
+        {dynamicModes.includes("i18n") && <option value="i18n">i18n key</option>}
       </select>
     </div>
   );
@@ -395,12 +408,21 @@ function DynamicValueControl({
 
 export interface PropertyEditorProps {
   meta: ComponentMeta;
+  componentType: string;
+  elementId: string;
   props: Record<string, JsonValue>;
   state: Record<string, JsonValue> | undefined;
   onChange: (name: string, value: JsonValue) => void;
 }
 
-export function PropertyEditor({ meta, props, state, onChange }: PropertyEditorProps) {
+export function PropertyEditor({
+  meta,
+  componentType,
+  elementId,
+  props,
+  state,
+  onChange,
+}: PropertyEditorProps) {
   const statePaths = useMemo(() => getEditableStatePaths(state), [state]);
   return (
     <div className="grid gap-3">
@@ -411,7 +433,9 @@ export function PropertyEditor({ meta, props, state, onChange }: PropertyEditorP
             <span className="font-mono text-[9px] text-muted-foreground">{name}</span>
           </div>
           <DynamicValueControl
+            key={`${elementId}:${name}`}
             propMeta={prop}
+            componentType={componentType}
             value={props[name] ?? prop.default}
             onChange={(value) => onChange(name, value)}
             statePaths={statePaths}

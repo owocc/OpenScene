@@ -56,6 +56,7 @@ export interface PropMeta {
   description?: string;
   valueType: string;
   required?: boolean;
+  translatable?: boolean;
   default?: JsonValue;
   editor: EditorMeta;
   dynamic?: DynamicMode[];
