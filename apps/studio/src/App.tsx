@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CanvasViewport } from "@/components/studio/canvas-viewport";
+import { CanvasToolbar } from "@/components/studio/canvas-toolbar";
 import { DesktopHeader } from "@/components/studio/desktop-header";
 import { OutlineTree } from "@/components/studio/outline-tree";
 import { PreviewFrame } from "@/components/studio/preview-frame";
 import { PropertyEditor } from "@/components/studio/property-editor";
+import { IconTooltip } from "@/components/ui/tooltip";
 import {
   normalizeAppDocument,
   type AppDocument,
@@ -99,6 +102,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   } = editor;
   const selectedId = selectedNodeId ?? "";
   const [addType, setAddType] = useState("");
+  const [nodeTreeCollapsed, setNodeTreeCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const activeToolRef = useRef(activeToolMode);
   const temporaryToolRef = useRef<ActiveToolMode | null>(null);
@@ -291,6 +295,19 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
 
   const undo = () => dispatch({ type: "history.undo" });
   const redo = () => dispatch({ type: "history.redo" });
+  const previewFrame = (
+    <PreviewFrame
+      url={bootstrap.preview.url}
+      allowedOrigin={bootstrap.preview.allowedOrigin}
+      identity={previewIdentity}
+      document={document}
+      locale={locale}
+      revision={revision}
+      selectedId={selectedId}
+      interactionMode={activeToolMode === "select" ? "select" : "preview"}
+      onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
+    />
+  );
 
   return (
     <div className="flex h-svh min-h-[680px] flex-col overflow-hidden bg-muted/40 text-foreground">
@@ -302,20 +319,10 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         locale={locale}
         locales={locales}
         manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
-        activeToolMode={activeToolMode}
-        viewport={viewport}
         pastLength={past.length}
         futureLength={future.length}
         onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
         onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
-        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-        onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
-        onRotate={() =>
-          dispatch({
-            type: "viewport.patch",
-            patch: { isRotated: !viewport.isRotated },
-          })
-        }
         onUndo={undo}
         onRedo={redo}
         onCopyJson={() => void copyJson()}
@@ -324,71 +331,145 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
 
       <div className="relative min-h-0 flex-1">
         {surface === "developer" && (
-          <aside className="absolute inset-y-3 left-3 z-20 hidden w-72 flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur lg:flex">
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-              <span className="text-xs font-semibold">Node tree</span>
-              <span className="text-[10px] text-muted-foreground">
-                {Object.keys(document.spec.elements).length} nodes
-              </span>
-            </div>
-            <div className="min-h-0 flex-1 overscroll-contain overflow-auto p-2">
-              {document.spec.root ? (
-                <OutlineTree
-                  document={document}
-                  registry={registry}
-                  selectedId={selectedId}
-                  onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
-                />
-              ) : (
-                <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
-                  当前文档为空。添加第一个 App 节点后，它会成为 root。
+          <aside
+            className={cn(
+              "absolute inset-y-3 left-3 z-20 hidden flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur transition-[width] duration-150 lg:flex",
+              nodeTreeCollapsed ? "w-11" : "w-72",
+            )}
+          >
+            <div className="relative flex h-full w-72 flex-col [contain:layout_paint]">
+              <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+                <div
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center justify-between gap-2",
+                    nodeTreeCollapsed && "invisible",
+                  )}
+                >
+                  <span className="text-xs font-semibold">Node tree</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {Object.keys(document.spec.elements).length} nodes
+                  </span>
+                </div>
+                {!nodeTreeCollapsed && (
+                  <IconTooltip label="折叠节点树" side="right">
+                    <button
+                      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => setNodeTreeCollapsed(true)}
+                      aria-label="折叠节点树"
+                    >
+                      <PanelLeftClose aria-hidden="true" className="size-3.5" />
+                    </button>
+                  </IconTooltip>
+                )}
+              </div>
+              {!nodeTreeCollapsed && (
+                <>
+                  <div className="min-h-0 flex-1 overscroll-contain overflow-auto p-2">
+                    {document.spec.root ? (
+                      <OutlineTree
+                        document={document}
+                        registry={registry}
+                        selectedId={selectedId}
+                        onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+                        当前文档为空。添加第一个 App 节点后，它会成为 root。
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-t border-border/80 p-3">
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      App material contract
+                    </div>
+                    <p className="text-[10px] leading-4 text-muted-foreground">
+                      {components.length} types from {bootstrap.app.key}. Studio keeps no local
+                      catalog.
+                    </p>
+                    <div className="mt-3 flex gap-1.5">
+                      <select
+                        className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                        value={addType}
+                        onChange={(event) => setAddType(event.target.value)}
+                        aria-label="Add App node"
+                      >
+                        <option value="">Add node…</option>
+                        {components.map((component) => (
+                          <option key={component.type} value={component.type}>
+                            {component.title}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={addComponent}
+                        disabled={!addType}
+                      >
+                        添加
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+              {nodeTreeCollapsed && (
+                <div className="absolute inset-0 flex w-11 items-start justify-center pt-2">
+                  <IconTooltip label="展开节点树" side="right">
+                    <button
+                      className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => setNodeTreeCollapsed(false)}
+                      aria-label="展开节点树"
+                    >
+                      <PanelLeftOpen aria-hidden="true" className="size-3.5" />
+                    </button>
+                  </IconTooltip>
                 </div>
               )}
-            </div>
-            <div className="border-t border-border/80 p-3">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                App material contract
-              </div>
-              <p className="text-[10px] leading-4 text-muted-foreground">
-                {components.length} types from {bootstrap.app.key}. Studio keeps no local catalog.
-              </p>
-              <div className="mt-3 flex gap-1.5">
-                <select
-                  className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                  value={addType}
-                  onChange={(event) => setAddType(event.target.value)}
-                  aria-label="Add App node"
-                >
-                  <option value="">Add node…</option>
-                  {components.map((component) => (
-                    <option key={component.type} value={component.type}>
-                      {component.title}
-                    </option>
-                  ))}
-                </select>
-                <Button variant="outline" size="sm" onClick={addComponent} disabled={!addType}>
-                  添加
-                </Button>
-              </div>
             </div>
           </aside>
         )}
 
-        <main className="flex h-full min-w-0 flex-col">
+        <main className="relative flex h-full min-w-0 flex-col">
           {surface === "text" ? (
-            <div className="min-h-0 flex-1 overflow-auto bg-[#101114] p-4 text-xs text-slate-200 sm:p-8">
-              <div className="mx-auto flex h-full max-w-4xl flex-col">
-                <div className="mb-3 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Draft document · revision {revision}</span>
-                  <span>read-only snapshot</span>
-                </div>
-                <textarea
-                  className="min-h-0 flex-1 resize-none rounded-xl border border-white/10 bg-black/20 p-4 font-mono text-[11px] leading-5 text-slate-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  value={JSON.stringify(document, null, 2)}
-                  readOnly
-                  aria-label="Document JSON"
-                />
+            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] bg-background">
+              <div className="min-h-0 min-w-0 overflow-hidden border-r border-border">
+                {previewFrame}
               </div>
+              <aside className="min-h-0 overflow-auto bg-background">
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold">Document editor</span>
+                    <span className="rounded-md bg-muted px-1.5 py-1 text-[9px] text-muted-foreground">
+                      placeholder
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                    在这里编辑文档文本。当前仅作为编辑器占位，不会回写 AppDocument。
+                  </p>
+                </div>
+                <div className="grid gap-4 p-4">
+                  <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
+                    Title
+                    <input
+                      className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                      defaultValue={document.pageInfo.title}
+                      aria-label="Document title placeholder"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
+                    Body text
+                    <textarea
+                      className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                      defaultValue={document.pageInfo.description}
+                      placeholder="开始输入文档内容…"
+                      aria-label="Document body text placeholder"
+                    />
+                  </label>
+                  <div className="rounded-lg border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">
+                    Revision {revision} · Text editing bridge will be connected in a later slice.
+                  </div>
+                </div>
+              </aside>
             </div>
           ) : (
             <CanvasViewport
@@ -396,18 +477,22 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
               activeToolMode={activeToolMode}
               onPatch={(patch) => dispatch({ type: "viewport.patch", patch })}
             >
-              <PreviewFrame
-                url={bootstrap.preview.url}
-                allowedOrigin={bootstrap.preview.allowedOrigin}
-                identity={previewIdentity}
-                document={document}
-                locale={locale}
-                revision={revision}
-                selectedId={selectedId}
-                interactionMode={activeToolMode === "select" ? "select" : "preview"}
-                onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
-              />
+              {previewFrame}
             </CanvasViewport>
+          )}
+          {surface === "developer" && (
+            <CanvasToolbar
+              activeToolMode={activeToolMode}
+              viewport={viewport}
+              onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
+              onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
+              onRotate={() =>
+                dispatch({
+                  type: "viewport.patch",
+                  patch: { isRotated: !viewport.isRotated },
+                })
+              }
+            />
           )}
           {notice && (
             <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">

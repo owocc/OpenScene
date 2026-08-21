@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Code2, Eye, FileText, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
-import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
+import { IconTooltip, TooltipProvider } from "@/components/ui/tooltip";
+import type { Surface } from "@/core/editor-state";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 import { cn } from "@/lib/utils";
 
@@ -34,25 +36,20 @@ interface DesktopHeaderProps {
   locale: string;
   locales: string[];
   manifestVersion: string;
-  activeToolMode: ActiveToolMode;
-  viewport: Pick<ViewportState, "zoom" | "isRotated">;
   pastLength: number;
   futureLength: number;
   onSurfaceChange: (surface: Surface) => void;
   onLocaleChange: (locale: string) => void;
-  onToolChange: (mode: ActiveToolMode) => void;
-  onZoomChange: (zoom: number) => void;
-  onRotate: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onCopyJson: () => void;
   onSave: () => void;
 }
 
-const modeTabs: Array<{ value: Surface; label: string; shortcut: string }> = [
-  { value: "developer", label: "开发者模式", shortcut: "⌘1" },
-  { value: "preview", label: "预览模式", shortcut: "⌘2" },
-  { value: "text", label: "文本编辑模式", shortcut: "⌘3" },
+const modeTabs: Array<{ value: Surface; label: string; shortcut: string; icon: LucideIcon }> = [
+  { value: "developer", label: "开发者模式", shortcut: "⌘1", icon: Code2 },
+  { value: "preview", label: "预览模式", shortcut: "⌘2", icon: Eye },
+  { value: "text", label: "文档编辑模式", shortcut: "⌘3", icon: FileText },
 ];
 
 export function DesktopHeader({
@@ -63,15 +60,10 @@ export function DesktopHeader({
   locale,
   locales,
   manifestVersion,
-  activeToolMode,
-  viewport,
   pastLength,
   futureLength,
   onSurfaceChange,
   onLocaleChange,
-  onToolChange,
-  onZoomChange,
-  onRotate,
   onUndo,
   onRedo,
   onCopyJson,
@@ -80,7 +72,7 @@ export function DesktopHeader({
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
-    <>
+    <TooltipProvider>
       <header className="relative z-40 grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur">
         <div className="flex min-w-0 items-center gap-3">
           <DropdownMenu>
@@ -142,9 +134,11 @@ export function DesktopHeader({
         >
           <TabsList aria-label="Editor mode">
             {modeTabs.map((tab) => (
-              <TabsTab key={tab.value} value={tab.value}>
-                {tab.label}
-              </TabsTab>
+              <IconTooltip key={tab.value} label={tab.label}>
+                <TabsTab value={tab.value} aria-label={tab.label} className="size-7 px-2">
+                  <tab.icon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
+                </TabsTab>
+              </IconTooltip>
             ))}
           </TabsList>
         </Tabs>
@@ -185,45 +179,6 @@ export function DesktopHeader({
             重做
           </Button>
           <span className="mx-1 hidden h-4 w-px bg-border lg:block" />
-          <div className="hidden items-center gap-0.5 xl:flex">
-            {(["select", "interact", "hand"] as const).map((mode) => (
-              <button
-                key={mode}
-                className={cn(
-                  "h-7 whitespace-nowrap rounded-md px-2 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                  activeToolMode === mode && "bg-muted text-foreground",
-                )}
-                onClick={() => onToolChange(mode)}
-              >
-                {mode === "select" ? "选择" : mode === "interact" ? "交互" : "平移"}
-              </button>
-            ))}
-          </div>
-          <span className="mx-1 hidden h-4 w-px bg-border xl:block" />
-          <button
-            className="hidden h-7 rounded-md px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
-            onClick={() => onZoomChange(viewport.zoom - 0.1)}
-            aria-label="Zoom out"
-          >
-            −
-          </button>
-          <span className="hidden w-8 text-center text-[10px] text-muted-foreground xl:inline">
-            {Math.round(viewport.zoom * 100)}%
-          </span>
-          <button
-            className="hidden h-7 rounded-md px-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
-            onClick={() => onZoomChange(viewport.zoom + 0.1)}
-            aria-label="Zoom in"
-          >
-            +
-          </button>
-          <button
-            className="hidden h-7 whitespace-nowrap rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground xl:inline-flex"
-            onClick={onRotate}
-            aria-label="Rotate device"
-          >
-            旋转
-          </button>
           <span className="hidden text-[10px] text-muted-foreground 2xl:inline">
             {bootstrap.capabilities.saveDraft ? "Draft changes" : "Local session"}
           </span>
@@ -269,6 +224,6 @@ export function DesktopHeader({
           </DialogViewport>
         </DialogPortal>
       </Dialog>
-    </>
+    </TooltipProvider>
   );
 }
