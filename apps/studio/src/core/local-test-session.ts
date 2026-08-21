@@ -142,8 +142,8 @@ const localManifest: AppMaterialManifest = {
   },
 };
 
-export function createLocalTestBootstrap(origin = window.location.origin): StudioBootstrap {
-  const baseOrigin = origin.replace(/\/$/, "");
+export function createLocalTestBootstrap(origin = "http://localhost:5174"): StudioBootstrap {
+  const baseOrigin = (origin || "http://localhost:5174").replace(/\/$/, "");
   return {
     session: {
       id: LOCAL_TEST_SESSION_ID,
@@ -166,7 +166,7 @@ export function createLocalTestBootstrap(origin = window.location.origin): Studi
     },
     manifest: localManifest,
     preview: {
-      url: `${baseOrigin}/local-preview.html?resourceId=local-page`,
+      url: `${baseOrigin}/`,
       allowedOrigin: baseOrigin,
       profileId: "local-test",
     },
@@ -176,6 +176,6 @@ export function createLocalTestBootstrap(origin = window.location.origin): Studi
       publish: false,
       uploadAsset: false,
     },
-    returnUrl: baseOrigin,
+    returnUrl: `${baseOrigin}/`,
   };
 }

@@ -20,7 +20,7 @@ describe("Studio local test session", () => {
       "Input",
     ]);
     expect(bootstrap.preview).toEqual({
-      url: "http://127.0.0.1:5174/local-preview.html?resourceId=local-page",
+      url: "http://127.0.0.1:5174/",
       allowedOrigin: "http://127.0.0.1:5174",
       profileId: "local-test",
     });
