@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import type { ActiveToolMode, Surface } from "@/core/editor-state";
 import type { SidebarTab } from "@/components/studio/sidebar/types";
+import { loadServerSettings, saveServerSettings } from "./settings-storage";
 
 export interface StudioQueryParams {
   serverUrl: string | null;
@@ -189,6 +190,27 @@ function parseQueryFromUrl(): StudioQueryParams {
   return parseQueryParams(window.location.search, window.location.hash);
 }
 
+/**
+ * Initial params: per-server persisted settings as the base; launch
+ * credentials always come from the URL; explicitly present URL params
+ * override persisted values (absent params fall back to persistence).
+ */
+function initialQueryParams(): StudioQueryParams {
+  const url = parseQueryFromUrl();
+  if (typeof window === "undefined") return url;
+  const persisted = loadServerSettings();
+  const merged: StudioQueryParams = { ...DEFAULT_QUERY_PARAMS, ...persisted };
+  merged.serverUrl = url.serverUrl;
+  merged.sessionId = url.sessionId;
+  merged.token = url.token;
+  const present = new Set(new URLSearchParams(window.location.search).keys());
+  const overrides: Record<string, unknown> = {};
+  for (const key of Object.keys(url)) {
+    if (present.has(key)) overrides[key] = url[key as keyof StudioQueryParams];
+  }
+  return { ...merged, ...(overrides as Partial<StudioQueryParams>) };
+}
+
 function writeQueryToUrl(params: StudioQueryParams, push = false) {
   if (typeof window === "undefined") return;
 
@@ -217,7 +239,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
     window.addEventListener("hashchange", handlePopState);
   }
 
-  const initial = parseQueryFromUrl();
+  const initial = initialQueryParams();
 
   return {
     ...initial,
@@ -250,6 +272,18 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
       set(updated);
       writeQueryToUrl(updated, options?.push ?? false);
+      saveServerSettings({
+        surface: updated.surface,
+        locale: updated.locale ?? undefined,
+        tool: updated.tool,
+        zoom: updated.zoom ?? undefined,
+        panX: updated.panX ?? undefined,
+        panY: updated.panY ?? undefined,
+        rotated: updated.rotated,
+        panel: updated.panel,
+        sidebarCollapsed: updated.sidebarCollapsed,
+        propsCollapsed: updated.propsCollapsed,
+      });
     },
 
     setServerUrl: (serverUrl) => {

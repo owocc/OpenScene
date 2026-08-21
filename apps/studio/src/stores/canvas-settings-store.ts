@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { loadServerSettings, saveServerSettings } from "./settings-storage";
+
 /**
  * Canvas texture rendered behind the artboard when the pattern is shown.
  * Extend this union when adding new textures (e.g. "cross", "hex").
@@ -21,13 +23,21 @@ interface CanvasSettingsState {
   closeSettings: () => void;
 }
 
+const persisted = loadServerSettings();
+
 export const useCanvasSettingsStore = create<CanvasSettingsState>()((set) => ({
-  showBackgroundPattern: true,
-  backgroundTexture: "dots",
+  showBackgroundPattern: persisted.showBackgroundPattern ?? true,
+  backgroundTexture: persisted.backgroundTexture ?? "dots",
   isSettingsOpen: false,
 
-  setShowBackgroundPattern: (showBackgroundPattern) => set({ showBackgroundPattern }),
-  setBackgroundTexture: (backgroundTexture) => set({ backgroundTexture }),
+  setShowBackgroundPattern: (showBackgroundPattern) => {
+    set({ showBackgroundPattern });
+    saveServerSettings({ showBackgroundPattern });
+  },
+  setBackgroundTexture: (backgroundTexture) => {
+    set({ backgroundTexture });
+    saveServerSettings({ backgroundTexture });
+  },
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
 }));

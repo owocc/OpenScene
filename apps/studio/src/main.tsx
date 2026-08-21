@@ -6,12 +6,13 @@ import App from "./App.tsx";
 import { ThemeProvider } from "@/components/theme-provider.tsx";
 import { TypesafeI18n } from "@/i18n";
 import { setupPreventPageZoom } from "@/lib/prevent-page-zoom";
+import { getThemeStorageKey } from "@/stores/settings-storage";
 
 setupPreventPageZoom();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
+    <ThemeProvider storageKey={getThemeStorageKey()}>
       <TypesafeI18n>
         <App />
       </TypesafeI18n>
