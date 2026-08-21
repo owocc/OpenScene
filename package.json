@@ -3,17 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "packages/*",
+    "packages/**",
     "apps/*",
-    "tools/*"
+    "tools/*",
+    "playground/*"
   ],
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
-    "dev": "vp run website#dev",
+    "dev": "vp run studio#dev",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "bumpp": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },
@@ -34,6 +36,7 @@
     "@types/node": "24.13.3",
     "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.9",
-    "vite-plus": "0.2.9"
+    "vite-plus": "0.2.9",
+    "bumpp": "^11.1.0"
   }
 }
