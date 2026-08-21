@@ -90,8 +90,6 @@ export function PreviewFrame({
   const onSelectRef = useRef(onSelect);
   const interactionModeRef = useRef(interactionMode);
   const [status, setStatus] = useState<"waiting" | "connected" | "error">("waiting");
-  const [bridgeError, setBridgeError] = useState<string | undefined>();
-
   useEffect(() => {
     latestRef.current = { document, locale, revision };
   }, [document, locale, revision]);
@@ -128,7 +126,6 @@ export function PreviewFrame({
           (readyIdentity.type === "page" && identity.resourceKind !== "page"))
       ) {
         setStatus("error");
-        setBridgeError("Preview identity does not match the Studio session");
         return;
       }
 
@@ -141,11 +138,6 @@ export function PreviewFrame({
         }
         if (portEvent.data.type === "CANVAS_ERROR") {
           setStatus("error");
-          setBridgeError(
-            typeof portEvent.data.message === "string"
-              ? portEvent.data.message
-              : "Preview renderer reported an error",
-          );
         }
       };
       channel.port1.start();
@@ -168,7 +160,6 @@ export function PreviewFrame({
         { targetOrigin: allowedOrigin, transfer: [channel.port2] },
       );
       setStatus("connected");
-      setBridgeError(undefined);
     };
 
     window.addEventListener("message", handleWindowMessage);
@@ -199,30 +190,12 @@ export function PreviewFrame({
   }, [selectedId, status]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border bg-background/90 px-3 text-[10px] text-muted-foreground">
-        <span className="font-mono">iframe · {new URL(url, window.location.href).origin}</span>
-        <span
-          className={
-            status === "connected"
-              ? "text-emerald-600"
-              : status === "error"
-                ? "text-destructive"
-                : "text-amber-600"
-          }
-        >
-          {status === "connected"
-            ? "Preview Bridge connected"
-            : status === "error"
-              ? (bridgeError ?? "Preview error")
-              : "Waiting for BRIDGE_READY"}
-        </span>
-      </div>
+    <div className="relative h-full w-full overflow-hidden bg-background">
       <iframe
         ref={frameRef}
         title="Target App preview"
         src={url}
-        className="min-h-0 flex-1 border-0 bg-background"
+        className="h-full w-full border-0 bg-background"
         referrerPolicy="no-referrer"
       />
     </div>

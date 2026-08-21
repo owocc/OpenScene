@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { PanelRight, PanelRightClose } from "lucide-react";
 import { CanvasViewport } from "@/components/studio/canvas-viewport";
 import { CanvasToolbar } from "@/components/studio/canvas-toolbar";
-import { DesktopHeader } from "@/components/studio/desktop-header";
-import { OutlineTree } from "@/components/studio/outline-tree";
+import { StudioSidebar } from "@/components/studio/studio-sidebar";
 import { PreviewFrame } from "@/components/studio/preview-frame";
 import { PropertyEditor } from "@/components/studio/property-editor";
 import { IconTooltip } from "@/components/studio/icon-tooltip";
@@ -102,7 +99,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   } = editor;
   const selectedId = selectedNodeId ?? "";
   const [addType, setAddType] = useState("");
-  const [nodeTreeCollapsed, setNodeTreeCollapsed] = useState(false);
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const activeToolRef = useRef(activeToolMode);
   const temporaryToolRef = useRef<ActiveToolMode | null>(null);
@@ -199,12 +196,14 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       }
       if (modifier && (event.key === "+" || event.key === "=")) {
         event.preventDefault();
-        dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom + 0.1 } });
+        const nextZoom = Math.min(Number((viewport.zoom + 0.1).toFixed(2)), 5);
+        dispatch({ type: "viewport.patch", patch: { zoom: nextZoom } });
         return;
       }
-      if (modifier && event.key === "-") {
+      if (modifier && (event.key === "-" || event.key === "_")) {
         event.preventDefault();
-        dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom - 0.1 } });
+        const nextZoom = Math.max(Number((viewport.zoom - 0.1).toFixed(2)), 0.1);
+        dispatch({ type: "viewport.patch", patch: { zoom: nextZoom } });
         return;
       }
       if (modifier && event.key === "0") {
@@ -310,17 +309,81 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   );
 
   return (
-    <div className="flex h-svh min-h-[680px] flex-col overflow-hidden bg-muted/40 text-foreground">
-      <DesktopHeader
+    <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground select-none">
+      {/* 1. Full-screen Canvas Layer (Occupies 100% width and height, never changes size) */}
+      <main className="absolute inset-0 z-0 flex h-full w-full flex-col overflow-hidden">
+        {surface === "text" ? (
+          <div className="grid h-full w-full grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] bg-background">
+            <div className="min-h-0 min-w-0 overflow-hidden border-r border-border">
+              {previewFrame}
+            </div>
+            <aside className="min-h-0 overflow-auto bg-background">
+              <div className="border-b border-border px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold">Document editor</span>
+                  <span className="rounded-md bg-muted px-1.5 py-1 text-[9px] text-muted-foreground">
+                    placeholder
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                  在这里编辑文档文本。当前仅作为编辑器占位，不会回写 AppDocument。
+                </p>
+              </div>
+              <div className="grid gap-4 p-4">
+                <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
+                  Title
+                  <input
+                    className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    defaultValue={document.pageInfo.title}
+                    aria-label="Document title placeholder"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
+                  Body text
+                  <textarea
+                    className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    defaultValue={document.pageInfo.description}
+                    placeholder="开始输入文档内容…"
+                    aria-label="Document body text placeholder"
+                  />
+                </label>
+                <div className="rounded-lg border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">
+                  Revision {revision} · Text editing bridge will be connected in a later slice.
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : (
+          <CanvasViewport
+            viewport={viewport}
+            activeToolMode={activeToolMode}
+            onPatch={(patch) => dispatch({ type: "viewport.patch", patch })}
+          >
+            {previewFrame}
+          </CanvasViewport>
+        )}
+      </main>
+
+      {/* 2. Floating UI Layer: StudioSidebar (Docked on the left above canvas) */}
+      <StudioSidebar
         bootstrap={bootstrap}
+        document={document}
+        registry={registry}
+        selectedId={selectedId}
         surface={surface}
         revision={revision}
         valid={validation.valid}
         locale={locale}
         locales={locales}
         manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
+        components={components}
+        diagnostics={diagnostics}
         pastLength={past.length}
         futureLength={future.length}
+        addType={addType}
+        onSetAddType={setAddType}
+        onAddComponent={addComponent}
+        onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
         onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
         onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
         onUndo={undo}
@@ -329,182 +392,27 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         onSave={saveDocument}
       />
 
-      <div className="relative min-h-0 flex-1">
-        {surface === "developer" && (
-          <aside
-            className={cn(
-              "absolute inset-y-3 left-3 z-20 hidden flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur transition-[width] duration-150 lg:flex",
-              nodeTreeCollapsed ? "w-11" : "w-72",
-            )}
-          >
-            <div className="relative flex h-full w-72 flex-col [contain:layout_paint]">
-              <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-                <div
-                  className={cn(
-                    "flex min-w-0 flex-1 items-center justify-between gap-2",
-                    nodeTreeCollapsed && "invisible",
-                  )}
-                >
-                  <span className="text-xs font-semibold">Node tree</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {Object.keys(document.spec.elements).length} nodes
-                  </span>
-                </div>
-                {!nodeTreeCollapsed && (
-                  <IconTooltip label="折叠节点树" side="right">
-                    <button
-                      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                      onClick={() => setNodeTreeCollapsed(true)}
-                      aria-label="折叠节点树"
-                    >
-                      <PanelLeftClose aria-hidden="true" className="size-3.5" />
-                    </button>
-                  </IconTooltip>
-                )}
-              </div>
-              {!nodeTreeCollapsed && (
-                <>
-                  <div className="min-h-0 flex-1 overscroll-contain overflow-auto p-2">
-                    {document.spec.root ? (
-                      <OutlineTree
-                        document={document}
-                        registry={registry}
-                        selectedId={selectedId}
-                        onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
-                      />
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
-                        当前文档为空。添加第一个 App 节点后，它会成为 root。
-                      </div>
-                    )}
-                  </div>
-                  <div className="border-t border-border/80 p-3">
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      App material contract
-                    </div>
-                    <p className="text-[10px] leading-4 text-muted-foreground">
-                      {components.length} types from {bootstrap.app.key}. Studio keeps no local
-                      catalog.
-                    </p>
-                    <div className="mt-3 flex gap-1.5">
-                      <select
-                        className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                        value={addType}
-                        onChange={(event) => setAddType(event.target.value)}
-                        aria-label="Add App node"
-                      >
-                        <option value="">Add node…</option>
-                        {components.map((component) => (
-                          <option key={component.type} value={component.type}>
-                            {component.title}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={addComponent}
-                        disabled={!addType}
-                      >
-                        添加
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-              {nodeTreeCollapsed && (
-                <div className="absolute inset-0 flex w-11 items-start justify-center pt-2">
-                  <IconTooltip label="展开节点树" side="right">
-                    <button
-                      className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                      onClick={() => setNodeTreeCollapsed(false)}
-                      aria-label="展开节点树"
-                    >
-                      <PanelLeftOpen aria-hidden="true" className="size-3.5" />
-                    </button>
-                  </IconTooltip>
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-
-        <main className="relative flex h-full min-w-0 flex-col">
-          {surface === "text" ? (
-            <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] bg-background">
-              <div className="min-h-0 min-w-0 overflow-hidden border-r border-border">
-                {previewFrame}
-              </div>
-              <aside className="min-h-0 overflow-auto bg-background">
-                <div className="border-b border-border px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs font-semibold">Document editor</span>
-                    <span className="rounded-md bg-muted px-1.5 py-1 text-[9px] text-muted-foreground">
-                      placeholder
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                    在这里编辑文档文本。当前仅作为编辑器占位，不会回写 AppDocument。
-                  </p>
-                </div>
-                <div className="grid gap-4 p-4">
-                  <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
-                    Title
-                    <input
-                      className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                      defaultValue={document.pageInfo.title}
-                      aria-label="Document title placeholder"
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
-                    Body text
-                    <textarea
-                      className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                      defaultValue={document.pageInfo.description}
-                      placeholder="开始输入文档内容…"
-                      aria-label="Document body text placeholder"
-                    />
-                  </label>
-                  <div className="rounded-lg border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">
-                    Revision {revision} · Text editing bridge will be connected in a later slice.
-                  </div>
-                </div>
-              </aside>
-            </div>
-          ) : (
-            <CanvasViewport
-              viewport={viewport}
-              activeToolMode={activeToolMode}
-              onPatch={(patch) => dispatch({ type: "viewport.patch", patch })}
+      {/* Floating Collapsed Properties Pill (Minimal Figma style) */}
+      {surface === "developer" && propertiesCollapsed && (
+        <div className="fixed top-3 right-3 z-30 hidden xl:block">
+          <IconTooltip label="展开属性面板" side="bottom">
+            <button
+              className="flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+              onClick={() => setPropertiesCollapsed(false)}
+              aria-label="展开属性面板"
             >
-              {previewFrame}
-            </CanvasViewport>
-          )}
-          {surface === "developer" && (
-            <CanvasToolbar
-              activeToolMode={activeToolMode}
-              viewport={viewport}
-              onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-              onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
-              onRotate={() =>
-                dispatch({
-                  type: "viewport.patch",
-                  patch: { isRotated: !viewport.isRotated },
-                })
-              }
-            />
-          )}
-          {notice && (
-            <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
-              {notice}
-            </div>
-          )}
-        </main>
+              <span>属性</span>
+              <PanelRight aria-hidden="true" className="size-4 text-foreground/80" />
+            </button>
+          </IconTooltip>
+        </div>
+      )}
 
-        {surface === "developer" && (
-          <aside className="absolute inset-y-3 right-3 z-20 hidden w-80 flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur xl:flex">
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-              <span className="text-xs font-semibold">Properties</span>
+      {surface === "developer" && !propertiesCollapsed && (
+        <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
+          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+            <span className="text-xs font-semibold">属性</span>
+            <div className="flex items-center gap-1">
               <button
                 className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                 onClick={removeSelected}
@@ -513,79 +421,107 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
               >
                 删除
               </button>
+              <IconTooltip label="折叠属性面板" side="left">
+                <button
+                  className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={() => setPropertiesCollapsed(true)}
+                  aria-label="折叠属性面板"
+                >
+                  <PanelRightClose aria-hidden="true" className="size-4" />
+                </button>
+              </IconTooltip>
             </div>
-            <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
-              {selectedElement && selectedMeta ? (
-                <div className="p-3">
-                  <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {selectedElement.name || selectedMeta.title}
-                        </p>
-                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                          {selectedElement.type} · #{selectedId}
-                        </p>
-                      </div>
-                      <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
-                        {selectedMeta.category}
-                      </span>
-                    </div>
-                    <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
-                      Layer name
-                      <input
-                        className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
-                        value={selectedElement.name ?? ""}
-                        onChange={(event) =>
-                          updateElement(selectedId, (element) => ({
-                            ...element,
-                            name: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <PropertyEditor
-                    meta={selectedMeta}
-                    componentType={selectedElement.type}
-                    elementId={selectedId}
-                    props={selectedElement.props ?? {}}
-                    state={document.spec.state}
-                    onChange={updateProp}
-                  />
-                </div>
-              ) : (
-                <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                  <p>选择节点后编辑目标 App 提供的属性 Meta。</p>
-                </div>
-              )}
-            </div>
-            <div className="border-t border-border/80 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                App-owned runtime
-              </div>
-              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                Preview is rendered by the target App iframe. Studio only sends document snapshots
-                through Preview Bridge.
-              </p>
-            </div>
-          </aside>
-        )}
-
-        {(diagnostics.length > 0 || !validation.valid) && (
-          <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
-            <div className="font-semibold text-destructive">Contract diagnostics</div>
-            {[
-              ...diagnostics.map((issue) => issue.message),
-              ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
-            ].map((message) => (
-              <p key={message} className="mt-1 text-muted-foreground">
-                {message}
-              </p>
-            ))}
           </div>
-        )}
-      </div>
+          <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+            {selectedElement && selectedMeta ? (
+              <div className="p-3">
+                <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {selectedElement.name || selectedMeta.title}
+                      </p>
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        {selectedElement.type} · #{selectedId}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
+                      {selectedMeta.category}
+                    </span>
+                  </div>
+                  <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
+                    Layer name
+                    <input
+                      className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
+                      value={selectedElement.name ?? ""}
+                      onChange={(event) =>
+                        updateElement(selectedId, (element) => ({
+                          ...element,
+                          name: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <PropertyEditor
+                  meta={selectedMeta}
+                  componentType={selectedElement.type}
+                  elementId={selectedId}
+                  props={selectedElement.props ?? {}}
+                  state={document.spec.state}
+                  onChange={updateProp}
+                />
+              </div>
+            ) : (
+              <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
+                <p>选择节点后编辑目标 App 提供的属性 Meta。</p>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-border/80 p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              App-owned runtime
+            </div>
+            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+              Preview is rendered by the target App iframe. Studio only sends document snapshots
+              through Preview Bridge.
+            </p>
+          </div>
+        </aside>
+      )}
+      <CanvasToolbar
+        activeToolMode={activeToolMode}
+        viewport={viewport}
+        surface={surface}
+        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
+        onZoomChange={(zoom) => dispatch({ type: "viewport.patch", patch: { zoom } })}
+        onRotate={() =>
+          dispatch({
+            type: "viewport.patch",
+            patch: { isRotated: !viewport.isRotated },
+          })
+        }
+      />
+
+      {notice && (
+        <div className="absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
+          {notice}
+        </div>
+      )}
+      {(diagnostics.length > 0 || !validation.valid) && (
+        <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
+          <div className="font-semibold text-destructive">Contract diagnostics</div>
+          {[
+            ...diagnostics.map((issue) => issue.message),
+            ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
+          ].map((message) => (
+            <p key={message} className="mt-1 text-muted-foreground">
+              {message}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

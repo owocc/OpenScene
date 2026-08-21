@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
 
 import type { ActiveToolMode, ViewportState } from "@/core/editor-state";
 
@@ -15,23 +15,91 @@ export function CanvasViewport({
   activeToolMode,
   onPatch,
 }: CanvasViewportProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | undefined>(
     undefined,
   );
   const width = viewport.isRotated ? viewport.currentDeviceHeight : viewport.currentDeviceWidth;
   const height = viewport.isRotated ? viewport.currentDeviceWidth : viewport.currentDeviceHeight;
 
-  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (event.metaKey || event.ctrlKey) {
-      const delta = event.deltaY > 0 ? -0.1 : 0.1;
-      onPatch({ zoom: viewport.zoom + delta });
-      return;
-    }
-    if (event.shiftKey) return;
-    onPatch({ panX: viewport.panX - event.deltaX, panY: viewport.panY - event.deltaY });
-  };
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
+    const onWheelNative = (event: globalThis.WheelEvent) => {
+      event.preventDefault();
+      const isZoom = event.metaKey || event.ctrlKey;
+
+      if (isZoom) {
+        const rect = el.getBoundingClientRect();
+        const cursorX = event.clientX - rect.left - rect.width / 2;
+        const cursorY = event.clientY - rect.top - rect.height / 2;
+
+        const factor = Math.exp(-event.deltaY * 0.005);
+        const currentZoom = viewport.zoom;
+        const nextZoom = Math.min(Math.max(Number((currentZoom * factor).toFixed(3)), 0.1), 5.0);
+
+        const ratio = nextZoom / currentZoom;
+        const nextPanX = Number((cursorX - (cursorX - viewport.panX) * ratio).toFixed(1));
+        const nextPanY = Number((cursorY - (cursorY - viewport.panY) * ratio).toFixed(1));
+
+        onPatch({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
+        return;
+      }
+
+      const deltaX = event.shiftKey ? event.deltaY : event.deltaX;
+      const deltaY = event.shiftKey ? 0 : event.deltaY;
+      onPatch({
+        panX: Number((viewport.panX - deltaX).toFixed(1)),
+        panY: Number((viewport.panY - deltaY).toFixed(1)),
+      });
+    };
+
+    let gestureStartZoom = viewport.zoom;
+    let gestureStartPanX = viewport.panX;
+    let gestureStartPanY = viewport.panY;
+
+    const onGestureStart = (event: Event) => {
+      event.preventDefault();
+      gestureStartZoom = viewport.zoom;
+      gestureStartPanX = viewport.panX;
+      gestureStartPanY = viewport.panY;
+    };
+
+    const onGestureChange = (event: Event) => {
+      event.preventDefault();
+      const gestureEvent = event as Event & { scale?: number; clientX?: number; clientY?: number };
+      const scale = gestureEvent.scale ?? 1;
+      const rect = el.getBoundingClientRect();
+      const cursorX =
+        (gestureEvent.clientX ?? rect.left + rect.width / 2) - rect.left - rect.width / 2;
+      const cursorY =
+        (gestureEvent.clientY ?? rect.top + rect.height / 2) - rect.top - rect.height / 2;
+
+      const nextZoom = Math.min(Math.max(Number((gestureStartZoom * scale).toFixed(3)), 0.1), 5.0);
+      const ratio = nextZoom / gestureStartZoom;
+      const nextPanX = Number((cursorX - (cursorX - gestureStartPanX) * ratio).toFixed(1));
+      const nextPanY = Number((cursorY - (cursorY - gestureStartPanY) * ratio).toFixed(1));
+
+      onPatch({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
+    };
+
+    const onGestureEnd = (event: Event) => {
+      event.preventDefault();
+    };
+
+    el.addEventListener("wheel", onWheelNative, { passive: false });
+    el.addEventListener("gesturestart", onGestureStart, { passive: false });
+    el.addEventListener("gesturechange", onGestureChange, { passive: false });
+    el.addEventListener("gestureend", onGestureEnd, { passive: false });
+
+    return () => {
+      el.removeEventListener("wheel", onWheelNative);
+      el.removeEventListener("gesturestart", onGestureStart);
+      el.removeEventListener("gesturechange", onGestureChange);
+      el.removeEventListener("gestureend", onGestureEnd);
+    };
+  }, [viewport.zoom, viewport.panX, viewport.panY, onPatch]);
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (activeToolMode !== "hand" && event.button !== 1) return;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -58,12 +126,12 @@ export function CanvasViewport({
 
   return (
     <div
+      ref={containerRef}
       className="relative min-h-0 flex-1 overflow-hidden bg-[radial-gradient(circle,#cbd5e1_1px,transparent_1px)] [background-size:18px_18px]"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={stopPan}
       onPointerCancel={stopPan}
-      onWheel={onWheel}
     >
       <div className="absolute inset-0 grid place-items-center overflow-hidden">
         <div
@@ -74,7 +142,7 @@ export function CanvasViewport({
             transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
           }}
         >
-          <div className="h-full w-full overflow-hidden rounded-2xl border border-slate-300 bg-background shadow-2xl shadow-slate-900/20">
+          <div className="h-full w-full overflow-hidden border border-border/80 bg-background">
             {children}
           </div>
         </div>
