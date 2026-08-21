@@ -7,7 +7,6 @@ import {
   Hand,
   MousePointer2,
   MousePointerClick,
-  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -16,25 +15,20 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
 import { useI18n } from "@/i18n";
-import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
+import type { ActiveToolMode, Surface } from "@/core/editor-state";
 import { cn } from "@/lib/utils";
 
 interface CanvasToolbarProps {
   activeToolMode: ActiveToolMode;
-  viewport: Pick<ViewportState, "zoom" | "isRotated">;
   surface: Surface;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
-  onZoomChange: (zoom: number) => void;
-  onRotate: () => void;
 }
 
 const toolIcons: Record<ActiveToolMode, { shortcut: string; icon: LucideIcon }> = {
@@ -53,16 +47,11 @@ const modeIcons: Array<{
   { value: "text", shortcut: "⌘3", icon: FileText },
 ];
 
-const zoomLevels = [0.25, 0.5, 0.75, 0.85, 1, 1.25, 1.5, 2, 3];
-
 export function CanvasToolbar({
   activeToolMode,
-  viewport,
   surface,
   onSurfaceChange,
   onToolChange,
-  onZoomChange,
-  onRotate,
 }: CanvasToolbarProps) {
   const { LL } = useI18n();
 
@@ -142,55 +131,10 @@ export function CanvasToolbar({
             </DropdownMenu>
           </ButtonGroup>
 
-          {/* 2. Zoom Ratio Selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="h-7 min-w-12 rounded-xl border-0 px-2 text-[10px] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none"
-              aria-label={LL.toolbar.zoom()}
-            >
-              {Math.round(viewport.zoom * 100)}%
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="center" sideOffset={8} className="min-w-28">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{LL.toolbar.zoom()}</DropdownMenuLabel>
-                {zoomLevels.map((level) => {
-                  const isActive = Math.abs(level - viewport.zoom) < 0.001;
-                  return (
-                    <DropdownMenuItem
-                      key={level}
-                      onClick={() => onZoomChange(level)}
-                      className="justify-between"
-                    >
-                      <span>{Math.round(level * 100)}%</span>
-                      {isActive && <Check aria-hidden="true" className="size-3.5 text-primary" />}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* 3. Device Orientation Rotate */}
-          <IconTooltip
-            label={viewport.isRotated ? LL.toolbar.restoreOrientation() : LL.toolbar.rotate()}
-            side="top"
-          >
-            <Button
-              variant={viewport.isRotated ? "secondary" : "ghost"}
-              size="icon-sm"
-              aria-label={LL.toolbar.rotate()}
-              aria-pressed={viewport.isRotated}
-              onClick={onRotate}
-              className={cn("rounded-xl", viewport.isRotated && "text-foreground")}
-            >
-              <RotateCcw aria-hidden="true" className="size-3.5" />
-            </Button>
-          </IconTooltip>
-
-          {/* 4. Vertical Divider Line */}
+          {/* 2. Vertical Divider Line */}
           <div className="mx-0.5 h-4 w-px bg-border/80" />
 
-          {/* 5. Right Section: View Mode Switcher */}
+          {/* 3. Right Section: View Mode Switcher */}
           <div className="flex items-center gap-0.5 rounded-xl bg-muted/60 p-0.5">
             {modeIcons.map((mode) => {
               const Icon = mode.icon;

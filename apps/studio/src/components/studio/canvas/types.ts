@@ -39,7 +39,6 @@ export interface StudioCanvasProps {
   onPatchViewport: (patch: Partial<ViewportState>) => void;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
-  onRotate: () => void;
   onSelectNode: (id: string | null) => void;
   renderCustomPreview?: (props: CanvasRendererProps) => ReactNode;
 }

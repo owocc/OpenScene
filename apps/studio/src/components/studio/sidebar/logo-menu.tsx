@@ -1,4 +1,16 @@
-import { Laptop, Moon, PanelLeft, SquareDashedMousePointer, Sun } from "lucide-react";
+import {
+  Laptop,
+  Maximize2,
+  Moon,
+  PanelLeft,
+  RotateCcw,
+  Smartphone,
+  SquareDashedMousePointer,
+  Sun,
+  Tablet,
+  ZoomIn,
+  Languages,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,17 +29,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/theme-provider";
 import { useI18n } from "@/i18n";
-import type { Surface } from "@/core/editor-state";
-import type { StudioBootstrap } from "@/core/studio-bootstrap";
-import { modeTabs } from "./types";
+import { useQueryStore } from "@/stores";
+import type { Surface, ViewportState } from "@/core/editor-state";
+import { devicePresets, modeTabs } from "./types";
 
 interface LogoMenuProps {
-  bootstrap: StudioBootstrap;
   pastLength: number;
   futureLength: number;
+  viewport?: ViewportState;
   panelCollapsed: boolean;
   onTogglePanel: () => void;
   onSurfaceChange: (surface: Surface) => void;
+  onPatchViewport?: (patch: Partial<ViewportState>) => void;
   onOpenShortcuts: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -35,13 +48,16 @@ interface LogoMenuProps {
   onSave: () => void;
 }
 
+const zoomLevels = [0.25, 0.5, 0.75, 0.85, 1, 1.25, 1.5, 2, 3];
+
 export function LogoMenu({
-  bootstrap,
   pastLength,
   futureLength,
+  viewport,
   panelCollapsed,
   onTogglePanel,
   onSurfaceChange,
+  onPatchViewport,
   onOpenShortcuts,
   onUndo,
   onRedo,
@@ -49,7 +65,16 @@ export function LogoMenu({
   onSave,
 }: LogoMenuProps) {
   const { theme, setTheme } = useTheme();
-  const { LL } = useI18n();
+  const { LL, locale } = useI18n();
+
+  const currentZoom = viewport?.zoom ?? 0.85;
+  const isRotated = viewport?.isRotated ?? false;
+  const currentWidth = viewport?.currentDeviceWidth ?? 390;
+  const currentHeight = viewport?.currentDeviceHeight ?? 844;
+
+  const mobilePresets = devicePresets.filter((p) => p.category === "mobile");
+  const tabletPresets = devicePresets.filter((p) => p.category === "tablet");
+  const desktopPresets = devicePresets.filter((p) => p.category === "desktop");
 
   return (
     <DropdownMenu>
@@ -59,11 +84,6 @@ export function LogoMenu({
         <SquareDashedMousePointer />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start" side="bottom">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{bootstrap.resource.title}</DropdownMenuLabel>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-
         {/* File Submenu */}
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>{LL.menu.file()}</DropdownMenuSubTrigger>
@@ -102,7 +122,8 @@ export function LogoMenu({
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>{LL.menu.view()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
-            <DropdownMenuSubContent>
+            <DropdownMenuSubContent className="min-w-56">
+              {/* 1. Surface Modes */}
               {modeTabs.map((tab) => (
                 <DropdownMenuItem key={tab.value} onClick={() => onSurfaceChange(tab.value)}>
                   <tab.icon />
@@ -114,6 +135,168 @@ export function LogoMenu({
                   <DropdownMenuShortcut>{tab.shortcut}</DropdownMenuShortcut>
                 </DropdownMenuItem>
               ))}
+
+              <DropdownMenuSeparator />
+
+              {/* 2. Frame Size Submenu (Mobile & Desktop Sizes) */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Maximize2 />
+                  {LL.menu.frameSize()}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent className="min-w-56">
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>{LL.menu.mobileCategory()}</DropdownMenuLabel>
+                      {mobilePresets.map((preset) => {
+                        const isActive =
+                          currentWidth === preset.width && currentHeight === preset.height;
+                        return (
+                          <DropdownMenuItem
+                            key={preset.id}
+                            onClick={() =>
+                              onPatchViewport?.({
+                                selectedDeviceId: preset.id,
+                                currentDeviceWidth: preset.width,
+                                currentDeviceHeight: preset.height,
+                              })
+                            }
+                          >
+                            <Smartphone />
+                            <span>{preset.name}</span>
+                            <span className="ms-auto font-mono text-[10px] text-muted-foreground">
+                              {preset.width}×{preset.height}
+                            </span>
+                            {isActive && <span className="ms-1 text-xs">✓</span>}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuGroup>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>{LL.menu.tabletCategory()}</DropdownMenuLabel>
+                      {tabletPresets.map((preset) => {
+                        const isActive =
+                          currentWidth === preset.width && currentHeight === preset.height;
+                        return (
+                          <DropdownMenuItem
+                            key={preset.id}
+                            onClick={() =>
+                              onPatchViewport?.({
+                                selectedDeviceId: preset.id,
+                                currentDeviceWidth: preset.width,
+                                currentDeviceHeight: preset.height,
+                              })
+                            }
+                          >
+                            <Tablet />
+                            <span>{preset.name}</span>
+                            <span className="ms-auto font-mono text-[10px] text-muted-foreground">
+                              {preset.width}×{preset.height}
+                            </span>
+                            {isActive && <span className="ms-1 text-xs">✓</span>}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuGroup>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>{LL.menu.desktopCategory()}</DropdownMenuLabel>
+                      {desktopPresets.map((preset) => {
+                        const isActive =
+                          currentWidth === preset.width && currentHeight === preset.height;
+                        return (
+                          <DropdownMenuItem
+                            key={preset.id}
+                            onClick={() =>
+                              onPatchViewport?.({
+                                selectedDeviceId: preset.id,
+                                currentDeviceWidth: preset.width,
+                                currentDeviceHeight: preset.height,
+                              })
+                            }
+                          >
+                            <Laptop />
+                            <span>{preset.name}</span>
+                            <span className="ms-auto font-mono text-[10px] text-muted-foreground">
+                              {preset.width}×{preset.height}
+                            </span>
+                            {isActive && <span className="ms-1 text-xs">✓</span>}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
+              {/* 3. Orientation Submenu */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <RotateCcw />
+                  {LL.menu.orientation()}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent className="min-w-44">
+                    <DropdownMenuItem onClick={() => onPatchViewport?.({ isRotated: false })}>
+                      <span>{LL.menu.portrait()}</span>
+                      {!isRotated && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onPatchViewport?.({ isRotated: true })}>
+                      <span>{LL.menu.landscape()}</span>
+                      {isRotated && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onPatchViewport?.({ isRotated: !isRotated })}>
+                      {LL.menu.rotateOrientation()}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
+              {/* 4. Zoom Submenu */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <ZoomIn />
+                  {LL.menu.zoomRatio({ percent: Math.round(currentZoom * 100) })}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent className="min-w-44">
+                    <DropdownMenuItem
+                      onClick={() => onPatchViewport?.({ zoom: Math.min(currentZoom + 0.1, 5) })}
+                    >
+                      {LL.menu.zoomIn()}
+                      <DropdownMenuShortcut>⌘+</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onPatchViewport?.({ zoom: Math.max(currentZoom - 0.1, 0.1) })}
+                    >
+                      {LL.menu.zoomOut()}
+                      <DropdownMenuShortcut>⌘-</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onPatchViewport?.({ zoom: 1 })}>
+                      {LL.menu.zoom100()}
+                      <DropdownMenuShortcut>⌘0</DropdownMenuShortcut>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {zoomLevels.map((level) => {
+                      const isActive = Math.abs(level - currentZoom) < 0.001;
+                      return (
+                        <DropdownMenuItem
+                          key={level}
+                          onClick={() => onPatchViewport?.({ zoom: level })}
+                        >
+                          {Math.round(level * 100)}%
+                          {isActive && <span className="ms-auto text-xs">✓</span>}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onTogglePanel}>
                 <PanelLeft />
@@ -123,26 +306,57 @@ export function LogoMenu({
           </DropdownMenuPortal>
         </DropdownMenuSub>
 
-        {/* Theme Submenu */}
+        {/* Preferences Submenu (Figma style) */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>{LL.menu.theme()}</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{LL.menu.preferences()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem onClick={() => setTheme("light")}>
-                <Sun />
-                {LL.menu.light()}
-                {theme === "light" && <span className="ms-auto text-xs">✓</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")}>
-                <Moon />
-                {LL.menu.dark()}
-                {theme === "dark" && <span className="ms-auto text-xs">✓</span>}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")}>
-                <Laptop />
-                {LL.menu.system()}
-                {theme === "system" && <span className="ms-auto text-xs">✓</span>}
-              </DropdownMenuItem>
+            <DropdownMenuSubContent className="min-w-44">
+              {/* Theme Submenu */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Sun />
+                  {LL.menu.theme()}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => setTheme("light")}>
+                      <Sun />
+                      {LL.menu.light()}
+                      {theme === "light" && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme("dark")}>
+                      <Moon />
+                      {LL.menu.dark()}
+                      {theme === "dark" && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTheme("system")}>
+                      <Laptop />
+                      {LL.menu.system()}
+                      {theme === "system" && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
+              {/* Language Submenu */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Languages />
+                  {LL.menu.language()}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onClick={() => useQueryStore.getState().setLocale("zh-CN")}>
+                      {LL.menu.chinese()}
+                      {locale === "zh-CN" && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => useQueryStore.getState().setLocale("en-US")}>
+                      {LL.menu.english()}
+                      {locale === "en-US" && <span className="ms-auto text-xs">✓</span>}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>

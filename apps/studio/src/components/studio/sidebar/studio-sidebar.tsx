@@ -30,6 +30,8 @@ export function StudioSidebar({
   diagnostics,
   pastLength,
   futureLength,
+  viewport,
+  onPatchViewport,
   addType,
   onSetAddType,
   onAddComponent,
@@ -56,6 +58,21 @@ export function StudioSidebar({
     }
   };
 
+  const getTabLabel = (id: SidebarTab) => {
+    switch (id) {
+      case "file":
+        return LL.sidebar.file();
+      case "agents":
+        return LL.sidebar.agents();
+      case "assets":
+        return LL.sidebar.assets();
+      case "tools":
+        return LL.sidebar.tools();
+      case "variables":
+        return LL.sidebar.variables();
+    }
+  };
+
   const getTabTooltip = (id: SidebarTab) => {
     switch (id) {
       case "file":
@@ -70,7 +87,6 @@ export function StudioSidebar({
         return LL.sidebar.variablesTabTooltip();
     }
   };
-
   return (
     <StudioTooltipProvider>
       <aside
@@ -87,12 +103,13 @@ export function StudioSidebar({
             <div className="flex w-full flex-col items-center gap-1">
               {/* Logo Menu */}
               <LogoMenu
-                bootstrap={bootstrap}
                 pastLength={pastLength}
                 futureLength={futureLength}
+                viewport={viewport}
                 panelCollapsed={panelCollapsed}
                 onTogglePanel={() => useQueryStore.getState().setSidebarCollapsed(!panelCollapsed)}
                 onSurfaceChange={onSurfaceChange}
+                onPatchViewport={onPatchViewport}
                 onOpenShortcuts={() => setShortcutsOpen(true)}
                 onUndo={onUndo}
                 onRedo={onRedo}
@@ -121,7 +138,7 @@ export function StudioSidebar({
                           handleTabClick(item.id);
                         }
                       }}
-                      aria-label={item.label}
+                      aria-label={getTabLabel(item.id)}
                       aria-pressed={isActive}
                     >
                       <IconTooltip label={getTabTooltip(item.id)} side="right">
@@ -143,7 +160,7 @@ export function StudioSidebar({
                             : "text-muted-foreground group-hover:text-foreground",
                         )}
                       >
-                        {item.label}
+                        {getTabLabel(item.id)}
                       </span>
                     </div>
                   </div>

@@ -27,7 +27,6 @@ export function StudioCanvas({
   onPatchViewport,
   onSurfaceChange,
   onToolChange,
-  onRotate,
   onSelectNode,
   renderCustomPreview,
 }: StudioCanvasProps) {
@@ -115,12 +114,9 @@ export function StudioCanvas({
       {/* 2. Floating Bottom Canvas Toolbar */}
       <CanvasToolbar
         activeToolMode={activeToolMode}
-        viewport={viewport}
         surface={surface}
         onSurfaceChange={onSurfaceChange}
         onToolChange={onToolChange}
-        onZoomChange={(zoom) => onPatchViewport({ zoom })}
-        onRotate={onRotate}
       />
     </div>
   );

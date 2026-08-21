@@ -378,12 +378,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
         onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
         onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-        onRotate={() =>
-          dispatch({
-            type: "viewport.patch",
-            patch: { isRotated: !viewport.isRotated },
-          })
-        }
         onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
       />
 
@@ -403,6 +397,8 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         diagnostics={diagnostics}
         pastLength={past.length}
         futureLength={future.length}
+        viewport={viewport}
+        onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
         addType={addType}
         onSetAddType={setAddType}
         onAddComponent={addComponent}
