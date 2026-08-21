@@ -13,13 +13,12 @@ import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuPositioner,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconTooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
 import type { ActiveToolMode, ViewportState } from "@/core/editor-state";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +49,7 @@ export function CanvasToolbar({
   const CurrentIcon = currentTool.icon;
 
   return (
-    <TooltipProvider>
+    <StudioTooltipProvider>
       <div
         className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2"
         role="toolbar"
@@ -78,34 +77,30 @@ export function CanvasToolbar({
             >
               <ChevronDown aria-hidden="true" className="size-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuPositioner side="top" align="start" sideOffset={8}>
-                <DropdownMenuContent>
-                  {tools.map((tool) => {
-                    const Icon = tool.icon;
-                    const isActive = tool.mode === activeToolMode;
-                    return (
-                      <DropdownMenuItem
-                        key={tool.mode}
-                        onClick={() => onToolChange(tool.mode)}
-                        className="gap-8"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
-                          <span>{tool.label}</span>
-                        </span>
-                        <span className="flex items-center gap-2">
-                          {isActive && <Check aria-hidden="true" className="size-3.5" />}
-                          <kbd className="font-mono text-[10px] text-muted-foreground">
-                            {tool.shortcut}
-                          </kbd>
-                        </span>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenuPositioner>
-            </DropdownMenuPortal>
+            <DropdownMenuContent side="top" align="start" sideOffset={8}>
+              {tools.map((tool) => {
+                const Icon = tool.icon;
+                const isActive = tool.mode === activeToolMode;
+                return (
+                  <DropdownMenuItem
+                    key={tool.mode}
+                    onClick={() => onToolChange(tool.mode)}
+                    className="gap-8"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+                      <span>{tool.label}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {isActive && <Check aria-hidden="true" className="size-3.5" />}
+                      <kbd className="font-mono text-[10px] text-muted-foreground">
+                        {tool.shortcut}
+                      </kbd>
+                    </span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
           </DropdownMenu>
           <ButtonGroupSeparator className="mx-1 h-5" />
           <DropdownMenu>
@@ -115,26 +110,24 @@ export function CanvasToolbar({
             >
               {Math.round(viewport.zoom * 100)}%
             </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuPositioner side="top" align="center" sideOffset={8}>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>缩放比例</DropdownMenuLabel>
-                  {zoomLevels.map((level) => {
-                    const isActive = Math.abs(level - viewport.zoom) < 0.001;
-                    return (
-                      <DropdownMenuItem
-                        key={level}
-                        onClick={() => onZoomChange(level)}
-                        className="gap-8"
-                      >
-                        <span>{Math.round(level * 100)}%</span>
-                        {isActive && <Check aria-hidden="true" className="size-3.5" />}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenuPositioner>
-            </DropdownMenuPortal>
+            <DropdownMenuContent side="top" align="center" sideOffset={8}>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>缩放比例</DropdownMenuLabel>
+                {zoomLevels.map((level) => {
+                  const isActive = Math.abs(level - viewport.zoom) < 0.001;
+                  return (
+                    <DropdownMenuItem
+                      key={level}
+                      onClick={() => onZoomChange(level)}
+                      className="gap-8"
+                    >
+                      <span>{Math.round(level * 100)}%</span>
+                      {isActive && <Check aria-hidden="true" className="size-3.5" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
           </DropdownMenu>
           <ButtonGroupSeparator className="mx-1 h-5" />
           <IconTooltip label={viewport.isRotated ? "恢复设备方向" : "旋转设备"} side="top">
@@ -151,6 +144,6 @@ export function CanvasToolbar({
           </IconTooltip>
         </ButtonGroup>
       </div>
-    </TooltipProvider>
+    </StudioTooltipProvider>
   );
 }

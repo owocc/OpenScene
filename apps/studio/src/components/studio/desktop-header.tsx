@@ -2,28 +2,19 @@ import { useState } from "react";
 import { Code2, Eye, FileText, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogBackdrop,
-  DialogDescription,
-  DialogPopup,
-  DialogPortal,
-  DialogTitle,
-  DialogViewport,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuPositioner,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
-import { IconTooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
 import type { Surface } from "@/core/editor-state";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 import { cn } from "@/lib/utils";
@@ -72,7 +63,7 @@ export function DesktopHeader({
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
-    <TooltipProvider>
+    <StudioTooltipProvider>
       <header className="relative z-40 grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-border/80 bg-background/95 px-3 backdrop-blur">
         <div className="flex min-w-0 items-center gap-3">
           <DropdownMenu>
@@ -85,34 +76,34 @@ export function DesktopHeader({
                 {bootstrap.resource.kind} · {bootstrap.app.name}
               </span>
             </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuPositioner side="bottom" align="start" sideOffset={6}>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>File</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={onCopyJson}>
-                    <span>Copy JSON snapshot</span>
-                    <kbd>⌘C</kbd>
+            <DropdownMenuContent side="bottom" align="start" sideOffset={6}>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>File</DropdownMenuLabel>
+                <DropdownMenuItem onClick={onCopyJson}>
+                  <span>Copy JSON snapshot</span>
+                  <kbd>⌘C</kbd>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onSave}>
+                  <span>Save document</span>
+                  <kbd>⌘S</kbd>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>View</DropdownMenuLabel>
+                {modeTabs.map((tab) => (
+                  <DropdownMenuItem key={tab.value} onClick={() => onSurfaceChange(tab.value)}>
+                    <span>{tab.label}</span>
+                    <kbd>{tab.shortcut}</kbd>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onSave}>
-                    <span>Save document</span>
-                    <kbd>⌘S</kbd>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>View</DropdownMenuLabel>
-                  {modeTabs.map((tab) => (
-                    <DropdownMenuItem key={tab.value} onClick={() => onSurfaceChange(tab.value)}>
-                      <span>{tab.label}</span>
-                      <kbd>{tab.shortcut}</kbd>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
-                    <span>Keyboard shortcuts</span>
-                    <kbd>⌘/</kbd>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenuPositioner>
-            </DropdownMenuPortal>
+                ))}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
+                <span>Keyboard shortcuts</span>
+                <kbd>⌘/</kbd>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
           <Separator orientation="vertical" className="h-6" />
           <span className="hidden text-[10px] uppercase tracking-[0.16em] text-muted-foreground md:inline">
@@ -135,9 +126,9 @@ export function DesktopHeader({
           <TabsList aria-label="Editor mode">
             {modeTabs.map((tab) => (
               <IconTooltip key={tab.value} label={tab.label}>
-                <TabsTab value={tab.value} aria-label={tab.label} className="size-7 px-2">
+                <TabsTrigger value={tab.value} aria-label={tab.label} className="size-7 px-2">
                   <tab.icon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
-                </TabsTab>
+                </TabsTrigger>
               </IconTooltip>
             ))}
           </TabsList>
@@ -189,41 +180,34 @@ export function DesktopHeader({
       </header>
 
       <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-        <DialogPortal>
-          <DialogBackdrop />
-          <DialogViewport>
-            <DialogPopup>
-              <DialogTitle>Keyboard shortcuts</DialogTitle>
-              <DialogDescription>快速切换模式和管理当前编辑会话。</DialogDescription>
-              <div className="mt-5 grid gap-1.5">
-                {[
-                  ["开发者模式", "⌘1"],
-                  ["预览模式", "⌘2"],
-                  ["文本编辑模式", "⌘3"],
-                  ["撤销 / 重做", "⌘Z / ⇧⌘Z"],
-                  ["保存", "⌘S"],
-                  ["关闭菜单或弹窗", "Esc"],
-                ].map(([label, shortcut]) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-xs"
-                  >
-                    <span>{label}</span>
-                    <kbd className={cn("font-mono text-[10px] text-muted-foreground")}>
-                      {shortcut}
-                    </kbd>
-                  </div>
-                ))}
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription>快速切换模式和管理当前编辑会话。</DialogDescription>
+          <div className="mt-5 grid gap-1.5">
+            {[
+              ["开发者模式", "⌘1"],
+              ["预览模式", "⌘2"],
+              ["文档编辑模式", "⌘3"],
+              ["撤销 / 重做", "⌘Z / ⇧⌘Z"],
+              ["保存", "⌘S"],
+              ["关闭菜单或弹窗", "Esc"],
+            ].map(([label, shortcut]) => (
+              <div
+                key={label}
+                className="flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2 text-xs"
+              >
+                <span>{label}</span>
+                <kbd className={cn("font-mono text-[10px] text-muted-foreground")}>{shortcut}</kbd>
               </div>
-              <div className="mt-5 flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => setShortcutsOpen(false)}>
-                  完成
-                </Button>
-              </div>
-            </DialogPopup>
-          </DialogViewport>
-        </DialogPortal>
+            ))}
+          </div>
+          <div className="mt-5 flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setShortcutsOpen(false)}>
+              完成
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
-    </TooltipProvider>
+    </StudioTooltipProvider>
   );
 }

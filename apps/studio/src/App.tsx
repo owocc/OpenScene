@@ -8,7 +8,7 @@ import { DesktopHeader } from "@/components/studio/desktop-header";
 import { OutlineTree } from "@/components/studio/outline-tree";
 import { PreviewFrame } from "@/components/studio/preview-frame";
 import { PropertyEditor } from "@/components/studio/property-editor";
-import { IconTooltip } from "@/components/ui/tooltip";
+import { IconTooltip } from "@/components/studio/icon-tooltip";
 import {
   normalizeAppDocument,
   type AppDocument,

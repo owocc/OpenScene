@@ -53,6 +53,4 @@ function Button({
   );
 }
 
-// The variant helper is intentionally co-located with its component for shadcn imports.
-// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants };
