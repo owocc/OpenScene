@@ -181,7 +181,7 @@ export function ShortcutsPanel() {
                         className={cn(
                           "inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 font-mono text-[11px] font-semibold select-none",
                           isSingleChar
-                            ? "bg-[#0c8ce9] text-white shadow-xs"
+                            ? "bg-primary text-primary-foreground shadow-xs"
                             : "border border-border bg-muted text-foreground/80 shadow-xs",
                         )}
                       >
