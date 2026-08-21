@@ -1,6 +1,8 @@
 import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
 
 import type { ActiveToolMode, ViewportState } from "@/core/editor-state";
+import { useCanvasSettingsStore, type BackgroundTexture } from "@/stores/canvas-settings-store";
+import { cn } from "@/lib/utils";
 
 interface CanvasViewportProps {
   children: ReactNode;
@@ -15,8 +17,12 @@ interface CanvasViewportProps {
  * 1. Figma-style focal-point zoom (zooming towards mouse cursor)
  * 2. Two-finger trackpad panning / Shift horizontal scrolling
  * 3. Spacebar / Middle-click / Hand tool drag panning
- * 4. Dark mode adaptive dot grid background
+ * 4. Theme-adaptive background texture (dots / grid, toggleable)
  */
+const TEXTURE_CLASSES: Record<BackgroundTexture, string> = {
+  dots: "bg-background bg-[radial-gradient(circle,rgba(100,116,139,0.25)_1px,transparent_1px)] dark:bg-[radial-gradient(circle,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]",
+  grid: "bg-background [background-image:linear-gradient(to_right,rgba(100,116,139,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(100,116,139,0.18)_1px,transparent_1px)] dark:[background-image:linear-gradient(to_right,rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]",
+};
 export function CanvasViewport({
   children,
   viewport,
@@ -27,6 +33,8 @@ export function CanvasViewport({
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | undefined>(
     undefined,
   );
+  const showBackgroundPattern = useCanvasSettingsStore((s) => s.showBackgroundPattern);
+  const backgroundTexture = useCanvasSettingsStore((s) => s.backgroundTexture);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -134,7 +142,10 @@ export function CanvasViewport({
   return (
     <div
       ref={containerRef}
-      className="relative min-h-0 flex-1 overflow-hidden bg-background bg-[radial-gradient(circle,rgba(100,116,139,0.25)_1px,transparent_1px)] dark:bg-[radial-gradient(circle,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]"
+      className={cn(
+        "relative min-h-0 flex-1 overflow-hidden",
+        showBackgroundPattern ? TEXTURE_CLASSES[backgroundTexture] : "bg-background",
+      )}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={stopPan}

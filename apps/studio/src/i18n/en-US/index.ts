@@ -103,6 +103,17 @@ const en_US: Translation = {
     system: "System",
     expandSidebar: "Expand sidebar panel",
     collapseSidebar: "Collapse sidebar panel",
+    backgroundPattern: "Background Pattern",
+    canvasSettings: "Canvas Settings…",
+  },
+  canvasSettings: {
+    title: "Canvas Settings",
+    description: "Configure how the canvas is displayed and interacted with.",
+    background: "Background",
+    backgroundDescription: "Control the background texture of the canvas editing area.",
+    texture: "Texture",
+    dots: "Dots",
+    grid: "Grid",
   },
   properties: {
     title: "Properties",

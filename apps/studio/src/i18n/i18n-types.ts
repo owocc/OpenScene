@@ -108,6 +108,17 @@ export type TranslationFunctions = {
     system: () => string;
     expandSidebar: () => string;
     collapseSidebar: () => string;
+    backgroundPattern: () => string;
+    canvasSettings: () => string;
+  };
+  canvasSettings: {
+    title: () => string;
+    description: () => string;
+    background: () => string;
+    backgroundDescription: () => string;
+    texture: () => string;
+    dots: () => string;
+    grid: () => string;
   };
   properties: {
     title: () => string;

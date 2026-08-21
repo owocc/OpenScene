@@ -1,20 +1,22 @@
 import {
   Laptop,
+  Languages,
   Maximize2,
   Moon,
   PanelLeft,
   RotateCcw,
+  SlidersHorizontal,
   Smartphone,
   SquareDashedMousePointer,
   Sun,
   Tablet,
   ZoomIn,
-  Languages,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -29,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/theme-provider";
 import { useI18n } from "@/i18n";
-import { useQueryStore } from "@/stores";
+import { useCanvasSettingsStore, useQueryStore } from "@/stores";
 import type { Surface, ViewportState } from "@/core/editor-state";
 import { devicePresets, modeTabs } from "./types";
 
@@ -75,6 +77,7 @@ export function LogoMenu({
 }: LogoMenuProps) {
   const { theme, setTheme } = useTheme();
   const { LL, locale } = useI18n();
+  const showBackgroundPattern = useCanvasSettingsStore((s) => s.showBackgroundPattern);
 
   const currentZoom = viewport?.zoom ?? 0.85;
   const isRotated = viewport?.isRotated ?? false;
@@ -372,6 +375,20 @@ export function LogoMenu({
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>
               </DropdownMenuSub>
+
+              <DropdownMenuCheckboxItem
+                checked={showBackgroundPattern}
+                onCheckedChange={(checked) =>
+                  useCanvasSettingsStore.getState().setShowBackgroundPattern(checked ?? false)
+                }
+              >
+                {LL.menu.backgroundPattern()}
+              </DropdownMenuCheckboxItem>
+
+              <DropdownMenuItem onClick={() => useCanvasSettingsStore.getState().openSettings()}>
+                <SlidersHorizontal />
+                {LL.menu.canvasSettings()}
+              </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>

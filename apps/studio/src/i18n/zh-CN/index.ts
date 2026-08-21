@@ -102,6 +102,17 @@ const zh_CN: BaseTranslation = {
     system: "跟随系统",
     expandSidebar: "展开大纲面板",
     collapseSidebar: "折叠大纲面板",
+    backgroundPattern: "显示背景图案",
+    canvasSettings: "画布设置…",
+  },
+  canvasSettings: {
+    title: "画布设置",
+    description: "配置画布的显示与交互行为。",
+    background: "背景",
+    backgroundDescription: "控制画布编辑区域的背景纹理显示与样式。",
+    texture: "纹理",
+    dots: "波点",
+    grid: "网格",
   },
   properties: {
     title: "属性",

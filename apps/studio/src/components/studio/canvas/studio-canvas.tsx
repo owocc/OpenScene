@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { CanvasArtboard } from "./canvas-artboard";
+import { CanvasSettingsDialog } from "./canvas-settings-dialog";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { CanvasViewport } from "./canvas-viewport";
 import { ShortcutsPanel } from "@/components/studio/shortcuts";
@@ -157,6 +158,9 @@ export function StudioCanvas({
           <ShortcutsPanel />
         </div>
       </div>
+
+      {/* 3. Canvas Settings Dialog (modal overlay) */}
+      <CanvasSettingsDialog />
     </div>
   );
 }
