@@ -48,6 +48,7 @@ describe("Studio editor state", () => {
     );
     expect(zoomed.viewport.zoom).toBe(3);
     expect(hand.selectedNodeId).toBeNull();
+    expect(state.surface).toBe("developer");
   });
 
   it("keeps the preview locale in sync with the document locale", () => {

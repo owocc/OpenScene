@@ -16,6 +16,12 @@ The editor core follows the React migration boundary from the original Admin edi
 - `material-manifest.ts` adapts only the current App manifest in memory, including `anyOf`/`oneOf`, enum and `x-editor` metadata; it is not a Studio catalog.
 - `canvas-viewport.tsx` owns device size, rotation, zoom and pan around the target App iframe.
 
+The desktop workspace has three surfaces: `开发者模式` keeps the node tree and property inspector
+as floating panels around the iframe canvas, `预览模式` clears those editor panels, and
+`文本编辑模式` shows the current document snapshot. The file name in the menu bar opens file/view
+actions and the keyboard shortcut dialog; the center tabs and save action are intentionally plain
+text controls so the shell stays compact and app-like.
+
 Studio drafts are currently session-local. The Admin document draft/version APIs remain the persistence boundary; a session-scoped save command can be added once that API is exposed to the Studio session token.
 
 An empty draft is supported: `spec.root` may be an empty string while `spec.elements` is empty. A template or the first App-provided component creates the root; Studio never inserts a hidden root node.

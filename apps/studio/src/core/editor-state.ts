@@ -6,7 +6,7 @@ import {
   isSlotNodeId,
 } from "./slot-tree";
 
-export type Surface = "preview" | "json";
+export type Surface = "developer" | "preview" | "text";
 export type ActiveToolMode = "select" | "interact" | "hand";
 
 export interface ViewportState {
@@ -56,7 +56,7 @@ export function createEditorState(document: AppDocument, revision: number): Edit
     future: [],
     revision,
     locale: document.pageInfo.locale || "en-US",
-    surface: "preview",
+    surface: "developer",
     activeToolMode: "select",
     viewport: {
       selectedDeviceId: "mobile",

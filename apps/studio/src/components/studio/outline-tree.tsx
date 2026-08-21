@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, CircleDot, Layers3, PanelsTopLeft } from "lucide-react";
 
 import type { AppDocument } from "@/core/document";
 import type { AdapterRegistry } from "@/core/registry";
@@ -37,20 +36,17 @@ function TreeNode({
             aria-label={expanded ? "Collapse slot" : "Expand slot"}
           >
             {node.children.length > 0 ? (
-              expanded ? (
-                <ChevronDown className="size-3.5" />
-              ) : (
-                <ChevronRight className="size-3.5" />
-              )
+              <span aria-hidden>{expanded ? "⌄" : "›"}</span>
             ) : (
-              <span className="size-3.5" />
+              <span aria-hidden className="text-muted-foreground/40">
+                ·
+              </span>
             )}
           </button>
           <button
             className="flex min-w-0 flex-1 items-center gap-2 text-left"
             onClick={() => onSelect(node.id)}
           >
-            <PanelsTopLeft className="size-3.5 shrink-0" />
             <span className="truncate">slot: {node.label}</span>
             <span className="ml-auto font-mono text-[9px]">{node.children.length}</span>
           </button>
@@ -89,24 +85,17 @@ function TreeNode({
           aria-label={expanded ? "Collapse" : "Expand"}
         >
           {hasChildren ? (
-            expanded ? (
-              <ChevronDown className="size-3.5" />
-            ) : (
-              <ChevronRight className="size-3.5" />
-            )
+            <span aria-hidden>{expanded ? "⌄" : "›"}</span>
           ) : (
-            <span className="size-3.5" />
+            <span aria-hidden className="text-muted-foreground/40">
+              ·
+            </span>
           )}
         </button>
         <button
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           onClick={() => onSelect(node.id)}
         >
-          {node.type === "Container" ? (
-            <Layers3 className="size-3.5 shrink-0 text-blue-500" />
-          ) : (
-            <CircleDot className="size-3 shrink-0 text-muted-foreground" />
-          )}
           <span className="truncate font-medium">{node.label}</span>
           <span className="ml-auto shrink-0 font-mono text-[9px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
             {node.type}

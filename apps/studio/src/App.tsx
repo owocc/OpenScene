@@ -1,29 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  Check,
-  Code2,
-  Copy,
-  Eye,
-  FileJson,
-  Hand,
-  Layers3,
-  MousePointer2,
-  PanelLeft,
-  PanelRight,
-  Plus,
-  RotateCw,
-  Redo2,
-  Settings2,
-  Sparkles,
-  Trash2,
-  Undo2,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CanvasViewport } from "@/components/studio/canvas-viewport";
+import { DesktopHeader } from "@/components/studio/desktop-header";
 import { OutlineTree } from "@/components/studio/outline-tree";
 import { PreviewFrame } from "@/components/studio/preview-frame";
 import { PropertyEditor } from "@/components/studio/property-editor";
@@ -63,22 +42,14 @@ function StatusScreen({
   tone?: "neutral" | "error";
 }) {
   return (
-    <div className="grid min-h-svh place-items-center bg-[#f7f8fa] p-6 text-foreground">
+    <div className="grid min-h-svh place-items-center bg-muted/40 p-6 text-foreground">
       <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-xl shadow-slate-900/5">
         <div
           className={cn(
-            "mb-4 grid size-9 place-items-center rounded-xl",
-            tone === "error"
-              ? "bg-destructive/10 text-destructive"
-              : "bg-primary text-primary-foreground",
+            "mb-4 h-1.5 w-12 rounded-full",
+            tone === "error" ? "bg-destructive" : "bg-primary",
           )}
-        >
-          {tone === "error" ? (
-            <AlertTriangle className="size-4" />
-          ) : (
-            <Sparkles className="size-4" />
-          )}
-        </div>
+        />
         <h1 className="text-base font-semibold">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
@@ -155,6 +126,24 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       : [document.pageInfo.locale || "en-US"];
   }, [document.pageInfo.locale, document.spec.state]);
 
+  const showNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(undefined), 1800);
+  };
+
+  const copyJson = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify(document, null, 2));
+    showNotice("JSON snapshot copied");
+  };
+
+  const saveDocument = () => {
+    showNotice(
+      bootstrap.capabilities.saveDraft
+        ? "Save command sent to the target App"
+        : "Local session changes are not persisted",
+    );
+  };
+
   useEffect(() => {
     activeToolRef.current = activeToolMode;
   }, [activeToolMode]);
@@ -165,10 +154,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       return target.matches("input, textarea, select, [contenteditable='true']");
     };
     const resetViewport = () =>
-      dispatch({
-        type: "viewport.patch",
-        patch: { zoom: 1, panX: 0, panY: 0 },
-      });
+      dispatch({ type: "viewport.patch", patch: { zoom: 1, panX: 0, panY: 0 } });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isEditorField(event.target)) return;
       const modifier = event.metaKey || event.ctrlKey;
@@ -180,6 +166,31 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       if (modifier && event.key.toLowerCase() === "y") {
         event.preventDefault();
         dispatch({ type: "history.redo" });
+        return;
+      }
+      if (modifier && event.key === "1") {
+        event.preventDefault();
+        dispatch({ type: "surface.set", surface: "developer" });
+        return;
+      }
+      if (modifier && event.key === "2") {
+        event.preventDefault();
+        dispatch({ type: "surface.set", surface: "preview" });
+        return;
+      }
+      if (modifier && event.key === "3") {
+        event.preventDefault();
+        dispatch({ type: "surface.set", surface: "text" });
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        saveDocument();
+        return;
+      }
+      if (modifier && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        void copyJson();
         return;
       }
       if (modifier && (event.key === "+" || event.key === "=")) {
@@ -278,154 +289,92 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     dispatch({ type: "node.delete", elementId: selectedId });
   };
 
-  const undo = () => {
-    dispatch({ type: "history.undo" });
-  };
-
-  const redo = () => {
-    dispatch({ type: "history.redo" });
-  };
-
-  const copyJson = async () => {
-    await navigator.clipboard?.writeText(JSON.stringify(document, null, 2));
-    setNotice("JSON snapshot copied");
-    window.setTimeout(() => setNotice(undefined), 1800);
-  };
+  const undo = () => dispatch({ type: "history.undo" });
+  const redo = () => dispatch({ type: "history.redo" });
 
   return (
-    <div className="flex h-svh min-h-[680px] flex-col overflow-hidden bg-[#f7f8fa] text-foreground">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Sparkles className="size-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{bootstrap.app.name}</span>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
-                Headless Studio
+    <div className="flex h-svh min-h-[680px] flex-col overflow-hidden bg-muted/40 text-foreground">
+      <DesktopHeader
+        bootstrap={bootstrap}
+        surface={surface}
+        revision={revision}
+        valid={validation.valid}
+        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+        onCopyJson={() => void copyJson()}
+        onSave={saveDocument}
+      />
+
+      <div className="relative min-h-0 flex-1">
+        {surface === "developer" && (
+          <aside className="absolute inset-y-3 left-3 z-20 hidden w-72 flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur lg:flex">
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+              <span className="text-xs font-semibold">Node tree</span>
+              <span className="text-[10px] text-muted-foreground">
+                {Object.keys(document.spec.elements).length} nodes
               </span>
             </div>
-            <p className="truncate text-[10px] text-muted-foreground">
-              {bootstrap.resource.title} · {bootstrap.resource.kind} · App-owned materials
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="mr-2 hidden items-center gap-1.5 text-[10px] text-muted-foreground md:flex">
-            {validation.valid ? (
-              <Check className="size-3.5 text-emerald-600" />
-            ) : (
-              <AlertTriangle className="size-3.5 text-destructive" />
-            )}
-            {validation.valid
-              ? `Valid · rev ${revision}`
-              : `${validation.issues.length} schema issues`}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Undo"
-            onClick={undo}
-            disabled={past.length === 0}
-          >
-            <Undo2 />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Redo"
-            onClick={redo}
-            disabled={future.length === 0}
-          >
-            <Redo2 />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void copyJson()}>
-            <Copy />
-            <span className="hidden sm:inline">Copy JSON</span>
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-background lg:flex">
-          <div className="flex h-12 items-center gap-2 border-b border-border px-4 text-xs font-semibold">
-            <PanelLeft className="size-3.5 text-muted-foreground" /> Node tree
-          </div>
-          <div className="min-h-0 flex-1 overscroll-contain overflow-auto p-3">
-            {document.spec.root ? (
-              <OutlineTree
-                document={document}
-                registry={registry}
-                selectedId={selectedId}
-                onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
-              />
-            ) : (
-              <div className="rounded-xl border border-dashed border-border p-4 text-xs leading-5 text-muted-foreground">
-                当前文档为空。可以从模板系统或 App material contract 添加第一个 root 节点。
+            <div className="min-h-0 flex-1 overscroll-contain overflow-auto p-2">
+              {document.spec.root ? (
+                <OutlineTree
+                  document={document}
+                  registry={registry}
+                  selectedId={selectedId}
+                  onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
+                />
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
+                  当前文档为空。添加第一个 App 节点后，它会成为 root。
+                </div>
+              )}
+            </div>
+            <div className="border-t border-border/80 p-3">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                App material contract
               </div>
-            )}
-          </div>
-          <div className="border-t border-border p-3">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              <Layers3 className="size-3" /> App material contract
+              <p className="text-[10px] leading-4 text-muted-foreground">
+                {components.length} types from {bootstrap.app.key}. Studio keeps no local catalog.
+              </p>
+              <div className="mt-3 flex gap-1.5">
+                <select
+                  className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                  value={addType}
+                  onChange={(event) => setAddType(event.target.value)}
+                  aria-label="Add App node"
+                >
+                  <option value="">Add node…</option>
+                  {components.map((component) => (
+                    <option key={component.type} value={component.type}>
+                      {component.title}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="outline" size="sm" onClick={addComponent} disabled={!addType}>
+                  添加
+                </Button>
+              </div>
             </div>
-            <p className="text-[10px] leading-4 text-muted-foreground">
-              {components.length} types loaded from {bootstrap.app.key}. Studio keeps no local
-              material catalog.
-            </p>
-            <div className="mt-3 flex gap-1.5">
-              <select
-                className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px]"
-                value={addType}
-                onChange={(event) => setAddType(event.target.value)}
-                aria-label="Add App node"
-              >
-                <option value="">Add node…</option>
-                {components.map((component) => (
-                  <option key={component.type} value={component.type}>
-                    {component.title}
-                  </option>
-                ))}
-              </select>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="Add node"
-                onClick={addComponent}
-                disabled={!addType}
-              >
-                <Plus />
-              </Button>
-            </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        <main className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background/80 px-3 backdrop-blur">
-            <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
-              <button
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium",
-                  surface === "preview" && "bg-background shadow-sm",
-                )}
-                onClick={() => dispatch({ type: "surface.set", surface: "preview" })}
-              >
-                <Eye className="size-3.5" /> Preview iframe
-              </button>
-              <button
-                className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-medium",
-                  surface === "json" && "bg-background shadow-sm",
-                )}
-                onClick={() => dispatch({ type: "surface.set", surface: "json" })}
-              >
-                <Code2 className="size-3.5" /> JSON
-              </button>
+        <main className="flex h-full min-w-0 flex-col">
+          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/70 bg-background/80 px-4 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {surface === "developer"
+                  ? "Canvas"
+                  : surface === "preview"
+                    ? "Preview"
+                    : "Text editor"}
+              </span>
+              {surface !== "text" && (
+                <span className="text-[10px] text-muted-foreground">
+                  iframe · {bootstrap.preview.profileId}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
               <select
-                className="h-7 rounded-lg border border-input bg-background px-2 text-[11px]"
+                className="h-7 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                 value={locale}
                 onChange={(event) =>
                   dispatch({ type: "locale.switch", locale: event.target.value })
@@ -441,68 +390,83 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
               <span className="hidden text-[10px] text-muted-foreground sm:inline">
                 manifest {bootstrap.manifest?.protocolVersion ?? "none"}
               </span>
-              <div className="hidden items-center gap-1 sm:flex">
-                {(
-                  [
-                    ["select", "Select", MousePointer2],
-                    ["interact", "Interact", Eye],
-                    ["hand", "Hand", Hand],
-                  ] as const
-                ).map(([mode, label, Icon]) => (
+              <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+              <Button variant="ghost" size="xs" onClick={undo} disabled={past.length === 0}>
+                撤销
+              </Button>
+              <Button variant="ghost" size="xs" onClick={redo} disabled={future.length === 0}>
+                重做
+              </Button>
+              {surface !== "text" && (
+                <>
+                  <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
+                  {(["select", "interact", "hand"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      className={cn(
+                        "hidden h-7 rounded-md px-2 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex sm:items-center",
+                        activeToolMode === mode && "bg-muted text-foreground",
+                      )}
+                      onClick={() => dispatch({ type: "tool.set", mode })}
+                    >
+                      {mode === "select" ? "选择" : mode === "interact" ? "交互" : "平移"}
+                    </button>
+                  ))}
+                  <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
                   <button
-                    key={mode}
-                    className={cn(
-                      "grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted",
-                      activeToolMode === mode && "bg-muted text-foreground",
-                    )}
-                    title={label}
-                    aria-label={label}
-                    onClick={() => dispatch({ type: "tool.set", mode: mode as ActiveToolMode })}
+                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() =>
+                      dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom - 0.1 } })
+                    }
+                    aria-label="Zoom out"
                   >
-                    <Icon className="size-3.5" />
+                    −
                   </button>
-                ))}
-                <span className="mx-1 h-4 w-px bg-border" />
-                <button
-                  className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                  title="Zoom out"
-                  aria-label="Zoom out"
-                  onClick={() =>
-                    dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom - 0.1 } })
-                  }
-                >
-                  <ZoomOut className="size-3.5" />
-                </button>
-                <span className="w-9 text-center text-[10px] text-muted-foreground">
-                  {Math.round(viewport.zoom * 100)}%
-                </span>
-                <button
-                  className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                  title="Zoom in"
-                  aria-label="Zoom in"
-                  onClick={() =>
-                    dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom + 0.1 } })
-                  }
-                >
-                  <ZoomIn className="size-3.5" />
-                </button>
-                <button
-                  className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-                  title="Rotate device"
-                  aria-label="Rotate device"
-                  onClick={() =>
-                    dispatch({
-                      type: "viewport.patch",
-                      patch: { isRotated: !viewport.isRotated },
-                    })
-                  }
-                >
-                  <RotateCw className="size-3.5" />
-                </button>
-              </div>
+                  <span className="w-9 text-center text-[10px] text-muted-foreground">
+                    {Math.round(viewport.zoom * 100)}%
+                  </span>
+                  <button
+                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() =>
+                      dispatch({ type: "viewport.patch", patch: { zoom: viewport.zoom + 0.1 } })
+                    }
+                    aria-label="Zoom in"
+                  >
+                    +
+                  </button>
+                  <button
+                    className="h-7 rounded-md px-2 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() =>
+                      dispatch({
+                        type: "viewport.patch",
+                        patch: { isRotated: !viewport.isRotated },
+                      })
+                    }
+                    aria-label="Rotate device"
+                  >
+                    旋转
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          {surface === "preview" ? (
+
+          {surface === "text" ? (
+            <div className="min-h-0 flex-1 overflow-auto bg-[#101114] p-4 text-xs text-slate-200 sm:p-8">
+              <div className="mx-auto flex h-full max-w-4xl flex-col">
+                <div className="mb-3 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Draft document · revision {revision}</span>
+                  <span>read-only snapshot</span>
+                </div>
+                <textarea
+                  className="min-h-0 flex-1 resize-none rounded-xl border border-white/10 bg-black/20 p-4 font-mono text-[11px] leading-5 text-slate-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  value={JSON.stringify(document, null, 2)}
+                  readOnly
+                  aria-label="Document JSON"
+                />
+              </div>
+            </div>
+          ) : (
             <CanvasViewport
               viewport={viewport}
               activeToolMode={activeToolMode}
@@ -520,113 +484,99 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                 onSelect={(nodeId) => dispatch({ type: "node.select", nodeId })}
               />
             </CanvasViewport>
-          ) : (
-            <div className="min-h-0 flex-1 overflow-auto bg-[#111827] p-4 text-xs text-slate-200 sm:p-8">
-              <div className="mx-auto max-w-4xl">
-                <div className="mb-3 flex items-center gap-2 text-[11px] text-slate-400">
-                  <FileJson className="size-3.5" /> Draft snapshot · revision {revision}
-                </div>
-                <pre className="whitespace-pre-wrap font-mono text-[11px] leading-5">
-                  {JSON.stringify(document, null, 2)}
-                </pre>
-              </div>
-            </div>
           )}
           {notice && (
-            <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
+            <div className="absolute bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
               {notice}
             </div>
           )}
         </main>
 
-        <aside className="hidden w-80 shrink-0 flex-col border-l border-border bg-background xl:flex">
-          <div className="flex h-12 items-center justify-between border-b border-border px-4">
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <PanelRight className="size-3.5 text-muted-foreground" /> Properties
+        {surface === "developer" && (
+          <aside className="absolute inset-y-3 right-3 z-20 hidden w-80 flex-col overflow-hidden rounded-2xl border border-border/80 bg-background/95 shadow-xl shadow-slate-950/10 backdrop-blur xl:flex">
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+              <span className="text-xs font-semibold">Properties</span>
+              <button
+                className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                onClick={removeSelected}
+                disabled={!selectedId || isSlotNodeId(selectedId)}
+                aria-label="Delete selected node"
+              >
+                删除
+              </button>
             </div>
-            <button
-              className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-muted"
-              onClick={removeSelected}
-              disabled={!selectedId || isSlotNodeId(selectedId)}
-              aria-label="Delete selected node"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
-            {selectedElement && selectedMeta ? (
-              <div className="p-4">
-                <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {selectedElement.name || selectedMeta.title}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        {selectedElement.type} · #{selectedId}
-                      </p>
+            <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+              {selectedElement && selectedMeta ? (
+                <div className="p-3">
+                  <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {selectedElement.name || selectedMeta.title}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                          {selectedElement.type} · #{selectedId}
+                        </p>
+                      </div>
+                      <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
+                        {selectedMeta.category}
+                      </span>
                     </div>
-                    <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
-                      {selectedMeta.category}
-                    </span>
+                    <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
+                      Layer name
+                      <input
+                        className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
+                        value={selectedElement.name ?? ""}
+                        onChange={(event) =>
+                          updateElement(selectedId, (element) => ({
+                            ...element,
+                            name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
                   </div>
-                  <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
-                    Layer name
-                    <input
-                      className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
-                      value={selectedElement.name ?? ""}
-                      onChange={(event) =>
-                        updateElement(selectedId, (element) => ({
-                          ...element,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                  <PropertyEditor
+                    meta={selectedMeta}
+                    componentType={selectedElement.type}
+                    elementId={selectedId}
+                    props={selectedElement.props ?? {}}
+                    state={document.spec.state}
+                    onChange={updateProp}
+                  />
                 </div>
-                <PropertyEditor
-                  meta={selectedMeta}
-                  componentType={selectedElement.type}
-                  elementId={selectedId}
-                  props={selectedElement.props ?? {}}
-                  state={document.spec.state}
-                  onChange={updateProp}
-                />
-              </div>
-            ) : (
-              <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                <Settings2 className="mb-2 size-5" />
-                <p>选择节点后编辑目标 App 提供的属性 Meta。</p>
-              </div>
-            )}
-          </div>
-          <div className="border-t border-border p-3">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              <PanelRight className="size-3" /> App-owned runtime
+              ) : (
+                <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
+                  <p>选择节点后编辑目标 App 提供的属性 Meta。</p>
+                </div>
+              )}
             </div>
-            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-              Preview is rendered by the target App iframe. Studio only sends document snapshots
-              through Preview Bridge.
-            </p>
-          </div>
-        </aside>
-      </div>
+            <div className="border-t border-border/80 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                App-owned runtime
+              </div>
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                Preview is rendered by the target App iframe. Studio only sends document snapshots
+                through Preview Bridge.
+              </p>
+            </div>
+          </aside>
+        )}
 
-      {(diagnostics.length > 0 || !validation.valid) && (
-        <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
-          <div className="flex items-center gap-1.5 font-semibold text-destructive">
-            <AlertTriangle className="size-3.5" /> Contract diagnostics
+        {(diagnostics.length > 0 || !validation.valid) && (
+          <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
+            <div className="font-semibold text-destructive">Contract diagnostics</div>
+            {[
+              ...diagnostics.map((issue) => issue.message),
+              ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
+            ].map((message) => (
+              <p key={message} className="mt-1 text-muted-foreground">
+                {message}
+              </p>
+            ))}
           </div>
-          {[
-            ...diagnostics.map((issue) => issue.message),
-            ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
-          ].map((message) => (
-            <p key={message} className="mt-1 text-muted-foreground">
-              {message}
-            </p>
-          ))}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -650,10 +600,11 @@ export function App() {
 
   if (state.status === "loading") return <LoadingScreen />;
   if (state.status === "standalone") return <StandaloneScreen />;
-  if (state.status === "error")
+  if (state.status === "error") {
     return (
       <StatusScreen title="Studio session unavailable" description={state.message} tone="error" />
     );
+  }
   return <StudioEditor bootstrap={state.value} />;
 }
 
