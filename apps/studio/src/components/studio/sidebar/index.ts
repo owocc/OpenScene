@@ -1,7 +1,6 @@
 export * from "./studio-sidebar";
 export * from "./types";
 export * from "./logo-menu";
-export * from "./shortcuts-dialog";
 export * from "./panels/file-panel";
 export * from "./panels/agents-panel";
 export * from "./panels/assets-panel";

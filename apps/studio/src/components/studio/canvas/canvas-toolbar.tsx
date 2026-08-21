@@ -29,6 +29,7 @@ interface CanvasToolbarProps {
   surface: Surface;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
+  children?: React.ReactNode;
 }
 
 const toolIcons: Record<ActiveToolMode, { shortcut: string; icon: LucideIcon }> = {
@@ -52,6 +53,7 @@ export function CanvasToolbar({
   surface,
   onSurfaceChange,
   onToolChange,
+  children,
 }: CanvasToolbarProps) {
   const { LL } = useI18n();
 
@@ -74,13 +76,19 @@ export function CanvasToolbar({
 
   return (
     <StudioTooltipProvider>
+      {/*
+        Outermost flex-col wrapper:
+        - Transparent and ignores mouse events by default (pointer-events-none)
+        - Uses flex-col layout to easily extend top/bottom content without manual positioning calculations
+      */}
       <div
-        className="pointer-events-auto absolute bottom-4 left-1/2 z-30 -translate-x-1/2 select-none"
+        className="pointer-events-none flex flex-col items-center gap-2 select-none"
         role="toolbar"
         aria-label="Canvas tools and modes"
       >
+        {/* Main Toolbar Floating Bar (pointer-events-auto) */}
         <div
-          className="flex items-center gap-1.5 rounded-2xl border border-border/80 bg-background/95 p-1 shadow-xl shadow-slate-950/15 backdrop-blur"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-border/80 bg-background/95 p-1 shadow-xl shadow-slate-950/15 backdrop-blur"
           role="group"
           aria-label="Canvas tools"
         >
@@ -166,6 +174,9 @@ export function CanvasToolbar({
             })}
           </div>
         </div>
+
+        {/* Optional Extensible Children (Stacked in column flow) */}
+        {children}
       </div>
     </StudioTooltipProvider>
   );

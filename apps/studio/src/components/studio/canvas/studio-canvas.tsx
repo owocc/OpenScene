@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { CanvasArtboard } from "./canvas-artboard";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { CanvasViewport } from "./canvas-viewport";
+import { ShortcutsPanel } from "@/components/studio/shortcuts";
 import { WebIframeRenderer } from "./renderers/web-iframe-renderer";
 import type { CanvasRendererProps, StudioCanvasProps } from "./types";
 
@@ -111,13 +112,20 @@ export function StudioCanvas({
         </CanvasViewport>
       )}
 
-      {/* 2. Floating Bottom Canvas Toolbar */}
-      <CanvasToolbar
-        activeToolMode={activeToolMode}
-        surface={surface}
-        onSurfaceChange={onSurfaceChange}
-        onToolChange={onToolChange}
-      />
+      {/* 2. Floating Bottom Dock Container (Fixed z-40 elevated above sidebars and panels) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end">
+        <div className="pointer-events-auto pb-4">
+          <CanvasToolbar
+            activeToolMode={activeToolMode}
+            surface={surface}
+            onSurfaceChange={onSurfaceChange}
+            onToolChange={onToolChange}
+          />
+        </div>
+        <div className="pointer-events-auto w-full">
+          <ShortcutsPanel />
+        </div>
+      </div>
     </div>
   );
 }

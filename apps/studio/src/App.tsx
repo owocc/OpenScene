@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { PanelRight, PanelRightClose } from "lucide-react";
+
 import { StudioCanvas } from "@/components/studio/canvas";
 import { StudioSidebar } from "@/components/studio/sidebar";
+import { ShortcutsProvider } from "@/components/studio/shortcuts";
 import { PropertyEditor } from "@/components/studio/property-editor";
 import { IconTooltip } from "@/components/studio/icon-tooltip";
 import { useQueryStore } from "@/stores";
@@ -13,7 +15,7 @@ import {
   type JsonValue,
   validateAppDocument,
 } from "@/core/document";
-import { createEditorState, editorReducer, type ActiveToolMode } from "@/core/editor-state";
+import { createEditorState, editorReducer } from "@/core/editor-state";
 import { defaultProps } from "@/core/meta";
 import { materialManifestToAdapterMeta } from "@/core/material-manifest";
 import { AdapterRegistry } from "@/core/registry";
@@ -124,13 +126,21 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const [addType, setAddType] = useState("");
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
-  const activeToolRef = useRef(activeToolMode);
-  const temporaryToolRef = useRef<ActiveToolMode | null>(null);
 
   const validation = useMemo(() => validateAppDocument(document), [document]);
   const selectedElement = document.spec.elements[selectedId];
   const selectedMeta = selectedElement ? registry.getComponent(selectedElement.type) : undefined;
   const components = registry.getAllComponents();
+  const diagnostics = registry.diagnostics();
+  const locales = useMemo(() => {
+    const dictionaries = document.spec.state?.i18n;
+    return dictionaries &&
+      typeof dictionaries === "object" &&
+      !Array.isArray(dictionaries) &&
+      Object.keys(dictionaries).length > 0
+      ? Object.keys(dictionaries)
+      : [document.pageInfo.locale || "en-US"];
+  }, [document.pageInfo.locale, document.spec.state]);
 
   const showNotice = (message: string) => {
     setNotice(message);
@@ -147,19 +157,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       bootstrap.capabilities.saveDraft ? LL.notices.saveSent() : LL.notices.saveNotPersisted(),
     );
   };
-  const diagnostics = registry.diagnostics();
-  const locales = useMemo(() => {
-    const dictionaries = document.spec.state?.i18n;
-    return dictionaries &&
-      typeof dictionaries === "object" &&
-      !Array.isArray(dictionaries) &&
-      Object.keys(dictionaries).length > 0
-      ? Object.keys(dictionaries)
-      : [document.pageInfo.locale || "en-US"];
-  }, [document.pageInfo.locale, document.spec.state]);
-  useEffect(() => {
-    activeToolRef.current = activeToolMode;
-  }, [activeToolMode]);
 
   // Synchronize editor state to URL query parameters
   useEffect(() => {
@@ -216,99 +213,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     });
     return unsub;
   }, []);
-  useEffect(() => {
-    const isEditorField = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false;
-      return target.matches("input, textarea, select, [contenteditable='true']");
-    };
-    const resetViewport = () =>
-      dispatch({ type: "viewport.patch", patch: { zoom: 1, panX: 0, panY: 0 } });
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditorField(event.target)) return;
-      const modifier = event.metaKey || event.ctrlKey;
-      if (modifier && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        dispatch({ type: event.shiftKey ? "history.redo" : "history.undo" });
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "y") {
-        event.preventDefault();
-        dispatch({ type: "history.redo" });
-        return;
-      }
-      if (modifier && event.key === "1") {
-        event.preventDefault();
-        dispatch({ type: "surface.set", surface: "developer" });
-        return;
-      }
-      if (modifier && event.key === "2") {
-        event.preventDefault();
-        dispatch({ type: "surface.set", surface: "preview" });
-        return;
-      }
-      if (modifier && event.key === "3") {
-        event.preventDefault();
-        dispatch({ type: "surface.set", surface: "text" });
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        saveDocument();
-        return;
-      }
-      if (modifier && event.key.toLowerCase() === "c") {
-        event.preventDefault();
-        void copyJson();
-        return;
-      }
-      if (modifier && (event.key === "+" || event.key === "=")) {
-        event.preventDefault();
-        const nextZoom = Math.min(Number((viewport.zoom + 0.1).toFixed(2)), 5);
-        dispatch({ type: "viewport.patch", patch: { zoom: nextZoom } });
-        return;
-      }
-      if (modifier && (event.key === "-" || event.key === "_")) {
-        event.preventDefault();
-        const nextZoom = Math.max(Number((viewport.zoom - 0.1).toFixed(2)), 0.1);
-        dispatch({ type: "viewport.patch", patch: { zoom: nextZoom } });
-        return;
-      }
-      if (modifier && event.key === "0") {
-        event.preventDefault();
-        resetViewport();
-        return;
-      }
-      if (event.code === "Space" && !event.repeat) {
-        event.preventDefault();
-        temporaryToolRef.current = activeToolRef.current;
-        dispatch({ type: "tool.set", mode: "hand" });
-        return;
-      }
-      if (event.key.toLowerCase() === "v") dispatch({ type: "tool.set", mode: "select" });
-      if (event.key.toLowerCase() === "i") dispatch({ type: "tool.set", mode: "interact" });
-      if (event.key.toLowerCase() === "h") dispatch({ type: "tool.set", mode: "hand" });
-      if (event.key === "0") resetViewport();
-      if (event.key === "Escape") dispatch({ type: "node.select", nodeId: null });
-    };
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || !temporaryToolRef.current) return;
-      dispatch({ type: "tool.set", mode: temporaryToolRef.current });
-      temporaryToolRef.current = null;
-    };
-    const handleBlur = () => {
-      if (!temporaryToolRef.current) return;
-      dispatch({ type: "tool.set", mode: temporaryToolRef.current });
-      temporaryToolRef.current = null;
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, [viewport.zoom]);
 
   const updateElement = (id: string, updater: (element: AppElement) => AppElement) => {
     const element = document.spec.elements[id];
@@ -363,170 +267,190 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const redo = () => dispatch({ type: "history.redo" });
 
   return (
-    <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground select-none">
-      {/* 1. Full-screen StudioCanvas Subsystem */}
-      <StudioCanvas
-        kind="web-iframe"
-        surface={surface}
-        bootstrap={bootstrap}
-        document={document}
-        locale={locale}
-        revision={revision}
-        selectedId={selectedId}
-        viewport={viewport}
-        activeToolMode={activeToolMode}
-        onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
-        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
-        onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-        onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
-      />
+    <ShortcutsProvider
+      onSave={saveDocument}
+      onCopyJson={() => void copyJson()}
+      onUndo={undo}
+      onRedo={redo}
+      onDeselect={() => dispatch({ type: "node.select", nodeId: null })}
+      onZoomIn={() =>
+        dispatch({ type: "viewport.patch", patch: { zoom: Math.min(viewport.zoom + 0.1, 5) } })
+      }
+      onZoomOut={() =>
+        dispatch({ type: "viewport.patch", patch: { zoom: Math.max(viewport.zoom - 0.1, 0.1) } })
+      }
+      onZoom100={() => dispatch({ type: "viewport.patch", patch: { zoom: 1 } })}
+      onResetViewport={() =>
+        dispatch({ type: "viewport.patch", patch: { zoom: 1, panX: 0, panY: 0 } })
+      }
+    >
+      <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground select-none">
+        {/* 1. Full-screen StudioCanvas Subsystem */}
+        <StudioCanvas
+          kind="web-iframe"
+          surface={surface}
+          bootstrap={bootstrap}
+          document={document}
+          locale={locale}
+          revision={revision}
+          selectedId={selectedId}
+          viewport={viewport}
+          activeToolMode={activeToolMode}
+          onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
+          onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+          onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
+          onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
+        />
 
-      {/* 2. Floating UI Layer: StudioSidebar (Docked on the left above canvas) */}
-      <StudioSidebar
-        bootstrap={bootstrap}
-        document={document}
-        registry={registry}
-        selectedId={selectedId}
-        surface={surface}
-        revision={revision}
-        valid={validation.valid}
-        locale={locale}
-        locales={locales}
-        manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
-        components={components}
-        diagnostics={diagnostics}
-        pastLength={past.length}
-        futureLength={future.length}
-        viewport={viewport}
-        onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
-        addType={addType}
-        onSetAddType={setAddType}
-        onAddComponent={addComponent}
-        onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
-        onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
-        onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
-        onUndo={undo}
-        onRedo={redo}
-        onCopyJson={() => void copyJson()}
-        onSave={saveDocument}
-      />
+        {/* 2. Floating UI Layer: StudioSidebar (Docked on the left above canvas) */}
+        <StudioSidebar
+          bootstrap={bootstrap}
+          document={document}
+          registry={registry}
+          selectedId={selectedId}
+          surface={surface}
+          revision={revision}
+          valid={validation.valid}
+          locale={locale}
+          locales={locales}
+          manifestVersion={bootstrap.manifest?.protocolVersion ?? "none"}
+          components={components}
+          diagnostics={diagnostics}
+          pastLength={past.length}
+          futureLength={future.length}
+          viewport={viewport}
+          onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
+          addType={addType}
+          onSetAddType={setAddType}
+          onAddComponent={addComponent}
+          onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
+          onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
+          onLocaleChange={(nextLocale) => dispatch({ type: "locale.switch", locale: nextLocale })}
+          onUndo={undo}
+          onRedo={redo}
+          onCopyJson={() => void copyJson()}
+          onSave={saveDocument}
+        />
 
-      {/* Floating Collapsed Properties Pill (Minimal Figma style) */}
-      {surface === "developer" && propertiesCollapsed && (
-        <div className="fixed top-3 right-3 z-30 hidden xl:block">
-          <IconTooltip label="展开属性面板" side="bottom">
-            <button
-              className="flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-              onClick={() => setPropertiesCollapsed(false)}
-              aria-label="展开属性面板"
-            >
-              <span>属性</span>
-              <PanelRight aria-hidden="true" className="size-4 text-foreground/80" />
-            </button>
-          </IconTooltip>
-        </div>
-      )}
-
-      {surface === "developer" && !propertiesCollapsed && (
-        <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
-          <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-            <span className="text-xs font-semibold">{LL.properties.title()}</span>
-            <div className="flex items-center gap-1">
+        {/* 3. Floating Collapsed Properties Pill (Minimal Figma style) */}
+        {surface === "developer" && propertiesCollapsed && (
+          <div className="fixed top-3 right-3 z-30 hidden xl:block">
+            <IconTooltip label={LL.sidebar.expandProperties()} side="bottom">
               <button
-                className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                onClick={removeSelected}
-                disabled={!selectedId || isSlotNodeId(selectedId)}
-                aria-label="Delete selected node"
+                className="flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
+                onClick={() => setPropertiesCollapsed(false)}
+                aria-label={LL.sidebar.expandProperties()}
               >
-                {LL.common.delete()}
+                <span>{LL.properties.title()}</span>
+                <PanelRight aria-hidden="true" className="size-4 text-foreground/80" />
               </button>
-              <IconTooltip label="折叠属性面板" side="left">
+            </IconTooltip>
+          </div>
+        )}
+
+        {/* 4. Right Properties Panel */}
+        {surface === "developer" && !propertiesCollapsed && (
+          <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+              <span className="text-xs font-semibold">{LL.properties.title()}</span>
+              <div className="flex items-center gap-1">
                 <button
-                  className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  onClick={() => setPropertiesCollapsed(true)}
-                  aria-label="折叠属性面板"
+                  className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  onClick={removeSelected}
+                  disabled={!selectedId || isSlotNodeId(selectedId)}
+                  aria-label="Delete selected node"
                 >
-                  <PanelRightClose aria-hidden="true" className="size-4" />
+                  {LL.common.delete()}
                 </button>
-              </IconTooltip>
+                <IconTooltip label={LL.sidebar.collapse()} side="left">
+                  <button
+                    className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => setPropertiesCollapsed(true)}
+                    aria-label={LL.sidebar.collapse()}
+                  >
+                    <PanelRightClose aria-hidden="true" className="size-4" />
+                  </button>
+                </IconTooltip>
+              </div>
             </div>
-          </div>
-          <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
-            {selectedElement && selectedMeta ? (
-              <div className="p-3">
-                <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold">
-                        {selectedElement.name || selectedMeta.title}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        {selectedElement.type} · #{selectedId}
-                      </p>
+            <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+              {selectedElement && selectedMeta ? (
+                <div className="p-3">
+                  <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {selectedElement.name || selectedMeta.title}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                          {selectedElement.type} · #{selectedId}
+                        </p>
+                      </div>
+                      <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
+                        {selectedMeta.category}
+                      </span>
                     </div>
-                    <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
-                      {selectedMeta.category}
-                    </span>
+                    <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
+                      {LL.properties.layerName()}
+                      <input
+                        className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
+                        value={selectedElement.name ?? ""}
+                        onChange={(event) =>
+                          updateElement(selectedId, (element) => ({
+                            ...element,
+                            name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
                   </div>
-                  <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
-                    Layer name
-                    <input
-                      className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
-                      value={selectedElement.name ?? ""}
-                      onChange={(event) =>
-                        updateElement(selectedId, (element) => ({
-                          ...element,
-                          name: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
+                  <PropertyEditor
+                    meta={selectedMeta}
+                    componentType={selectedElement.type}
+                    elementId={selectedId}
+                    props={selectedElement.props ?? {}}
+                    state={document.spec.state}
+                    onChange={updateProp}
+                  />
                 </div>
-                <PropertyEditor
-                  meta={selectedMeta}
-                  componentType={selectedElement.type}
-                  elementId={selectedId}
-                  props={selectedElement.props ?? {}}
-                  state={document.spec.state}
-                  onChange={updateProp}
-                />
-              </div>
-            ) : (
-              <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                <p>{LL.properties.empty()}</p>
-              </div>
-            )}
-          </div>
-          <div className="border-t border-border/80 p-3">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              App-owned runtime
+              ) : (
+                <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
+                  <p>{LL.properties.empty()}</p>
+                </div>
+              )}
             </div>
-            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-              Preview is rendered by the target App iframe. Studio only sends document snapshots
-              through Preview Bridge.
-            </p>
+            <div className="border-t border-border/80 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {LL.properties.runtimeTitle()}
+              </div>
+              <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                {LL.properties.runtimeDesc()}
+              </p>
+            </div>
+          </aside>
+        )}
+
+        {notice && (
+          <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
+            {notice}
           </div>
-        </aside>
-      )}
-      {notice && (
-        <div className="absolute bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
-          {notice}
-        </div>
-      )}
-      {(diagnostics.length > 0 || !validation.valid) && (
-        <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
-          <div className="font-semibold text-destructive">Contract diagnostics</div>
-          {[
-            ...diagnostics.map((issue) => issue.message),
-            ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
-          ].map((message) => (
-            <p key={message} className="mt-1 text-muted-foreground">
-              {message}
-            </p>
-          ))}
-        </div>
-      )}
-    </div>
+        )}
+
+        {(diagnostics.length > 0 || !validation.valid) && (
+          <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
+            <div className="font-semibold text-destructive">{LL.panels.agents.diagnostics()}</div>
+            {[
+              ...diagnostics.map((issue) => issue.message),
+              ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
+            ].map((message) => (
+              <p key={message} className="mt-1 text-muted-foreground">
+                {message}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+    </ShortcutsProvider>
   );
 }
 

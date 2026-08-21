@@ -1,13 +1,11 @@
-import { useState } from "react";
 import { PanelLeftClose } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
 import { useI18n } from "@/i18n";
-import { useQueryStore } from "@/stores";
+import { useQueryStore, useShortcutsStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { LogoMenu } from "./logo-menu";
-import { ShortcutsDialog } from "./shortcuts-dialog";
 import { AgentsPanel } from "./panels/agents-panel";
 import { AssetsPanel } from "./panels/assets-panel";
 import { FilePanel } from "./panels/file-panel";
@@ -48,7 +46,6 @@ export function StudioSidebar({
   const querySidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const activeTab: SidebarTab = queryPanel || "file";
   const panelCollapsed = querySidebarCollapsed;
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const handleTabClick = (tab: SidebarTab) => {
     if (activeTab === tab && !panelCollapsed) {
@@ -87,6 +84,7 @@ export function StudioSidebar({
         return LL.sidebar.variablesTabTooltip();
     }
   };
+
   return (
     <StudioTooltipProvider>
       <aside
@@ -110,7 +108,7 @@ export function StudioSidebar({
                 onTogglePanel={() => useQueryStore.getState().setSidebarCollapsed(!panelCollapsed)}
                 onSurfaceChange={onSurfaceChange}
                 onPatchViewport={onPatchViewport}
-                onOpenShortcuts={() => setShortcutsOpen(true)}
+                onOpenShortcuts={() => useShortcutsStore.getState().openPanel()}
                 onUndo={onUndo}
                 onRedo={onRedo}
                 onCopyJson={onCopyJson}
@@ -237,9 +235,6 @@ export function StudioSidebar({
           </div>
         </div>
       </aside>
-
-      {/* Shortcuts Dialog */}
-      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </StudioTooltipProvider>
   );
 }
