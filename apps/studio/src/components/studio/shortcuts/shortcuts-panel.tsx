@@ -117,12 +117,12 @@ export function ShortcutsPanel() {
 
   return (
     <div
-      className="flex h-[420px] w-full flex-col select-none border-t border-border/80 bg-[#1e1e1e] text-zinc-100 shadow-2xl dark:bg-[#141416]"
+      className="flex h-[420px] w-full flex-col select-none border-t border-border/80 bg-background text-foreground shadow-2xl"
       role="dialog"
       aria-label="Figma Keyboard Shortcuts Panel"
     >
       {/* 1. Top Horizontal Category Tabs */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-zinc-800 px-4">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-4">
         <div className="flex min-w-0 items-center gap-1 overflow-x-auto no-scrollbar">
           {SHORTCUT_CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat;
@@ -130,10 +130,10 @@ export function ShortcutsPanel() {
               <button
                 key={cat}
                 className={cn(
-                  "relative h-9 px-3 text-xs font-medium transition-colors hover:text-white focus-visible:outline-none",
+                  "relative h-9 px-3 text-xs font-medium transition-colors hover:text-foreground focus-visible:outline-none",
                   isActive
-                    ? "border-b-2 border-primary font-semibold text-white"
-                    : "text-zinc-400 hover:text-zinc-200",
+                    ? "border-b-2 border-primary font-semibold text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setActiveCategory(cat)}
               >
@@ -147,7 +147,7 @@ export function ShortcutsPanel() {
         <Button
           variant="ghost"
           size="icon-xs"
-          className="size-7 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          className="size-7 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={closePanel}
           aria-label="Close shortcuts panel"
         >
@@ -164,8 +164,8 @@ export function ShortcutsPanel() {
 
             return (
               <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
-                <div className="flex min-w-0 items-center gap-2 text-zinc-300">
-                  <Icon className="size-4 shrink-0 text-zinc-400" />
+                <div className="flex min-w-0 items-center gap-2 text-foreground/90">
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{itemName}</span>
                 </div>
 
@@ -182,7 +182,7 @@ export function ShortcutsPanel() {
                           "inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 font-mono text-[11px] font-semibold select-none",
                           isSingleChar
                             ? "bg-[#0c8ce9] text-white shadow-xs"
-                            : "border border-zinc-700 bg-zinc-800/90 text-zinc-200 shadow-xs",
+                            : "border border-border bg-muted text-foreground/80 shadow-xs",
                         )}
                       >
                         {formatted}
