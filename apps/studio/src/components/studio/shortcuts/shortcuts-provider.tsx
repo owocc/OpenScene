@@ -56,8 +56,8 @@ export function ShortcutsProvider({
         }
       }
 
-      // 2. Toggle Shortcuts Panel (Cmd + /)
-      if (modifier && event.key === "/") {
+      // 2. Toggle Shortcuts Panel (? key, ignored while typing)
+      if (!isEditing && !modifier && !event.repeat && event.key === "?") {
         event.preventDefault();
         useShortcutsStore.getState().togglePanel();
         return;

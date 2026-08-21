@@ -60,7 +60,7 @@ export const REGISTERED_SHORTCUTS: ShortcutItem[] = [
     category: "Essential",
     name: "打开/关闭快捷键面板",
     nameEn: "Toggle shortcuts panel",
-    keys: ["Mod", "/"],
+    keys: ["?"],
   },
   {
     id: "theme.toggle",

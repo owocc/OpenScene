@@ -396,7 +396,7 @@ export function LogoMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenShortcuts}>
           {LL.menu.shortcuts()}
-          <DropdownMenuShortcut>⌘/</DropdownMenuShortcut>
+          <DropdownMenuShortcut>?</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
