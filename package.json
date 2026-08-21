@@ -31,6 +31,8 @@
     "node": ">=22.18.0"
   },
   "catalog": {
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.2.9",
     "vite-plus": "0.2.9"
   }
