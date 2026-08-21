@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 import type { ActiveToolMode, ViewportState } from "@/core/editor-state";
 import { useCanvasSettingsStore, type BackgroundTexture } from "@/stores/canvas-settings-store";
@@ -33,6 +33,7 @@ export function CanvasViewport({
   const panRef = useRef<{ x: number; y: number; startX: number; startY: number } | undefined>(
     undefined,
   );
+  const [isPanning, setIsPanning] = useState(false);
   const showBackgroundPattern = useCanvasSettingsStore((s) => s.showBackgroundPattern);
   const backgroundTexture = useCanvasSettingsStore((s) => s.backgroundTexture);
 
@@ -124,6 +125,7 @@ export function CanvasViewport({
       startX: event.clientX,
       startY: event.clientY,
     };
+    setIsPanning(true);
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -137,6 +139,7 @@ export function CanvasViewport({
 
   const stopPan = () => {
     panRef.current = undefined;
+    setIsPanning(false);
   };
 
   return (
@@ -151,7 +154,16 @@ export function CanvasViewport({
       onPointerUp={stopPan}
       onPointerCancel={stopPan}
     >
-      <div className="absolute inset-0 grid place-items-center overflow-hidden">{children}</div>
+      {/* Children (artboard + iframe) ignore pointer events while panning so the
+          drag is not swallowed when the cursor moves over the iframe. */}
+      <div
+        className={cn(
+          "absolute inset-0 grid place-items-center overflow-hidden",
+          isPanning && "pointer-events-none",
+        )}
+      >
+        {children}
+      </div>
       {activeToolMode === "hand" && (
         <div
           className="absolute inset-0 z-10 cursor-grab active:cursor-grabbing"
