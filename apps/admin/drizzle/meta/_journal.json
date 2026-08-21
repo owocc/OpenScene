@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787286449165,
+      "tag": "0000_white_carmella_unuscione",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787287023146,
+      "tag": "0001_resource_document_foreign_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787287128815,
+      "tag": "0002_document_app_unique",
+      "breakpoints": true
+    }
+  ]
+}

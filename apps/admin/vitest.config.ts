@@ -1,0 +1,10 @@
+import { defineConfig } from "vite-plus";
+
+export default defineConfig({
+  test: {
+    include: ["tests/**/*.test.ts"],
+    environment: "node",
+    restoreMocks: true,
+    testTimeout: 15_000,
+  },
+});

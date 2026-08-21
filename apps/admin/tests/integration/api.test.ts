@@ -1,0 +1,267 @@
+import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { NextRequest } from "next/server";
+import { DELETE, GET, PATCH, POST } from "../../app/api/v1/[...path]/route";
+import { resetConfigForTests } from "../../server/config/env";
+import { resetDatabaseForTests } from "../../server/db/client";
+import { resetStorageForTests } from "../../server/storage";
+import { createOpenApiDocument } from "../../server/openapi/document";
+
+type PathContext = { params: Promise<{ path: string[] }> };
+
+let tempDir: string;
+let appA: { id: string; appKey: string; runtimeKey: string };
+let appB: { id: string; appKey: string; runtimeKey: string };
+let pageA: { id: string; documentId: string };
+let profileA: { id: string };
+
+beforeAll(async () => {
+  tempDir = mkdtempSync(path.join(tmpdir(), "openscene-api-"));
+  process.env.OPENSCENE_DATABASE_URL = `file:${path.join(tempDir, "test.db")}`;
+  process.env.OPENSCENE_AUTH_MODE = "disabled";
+  process.env.OPENSCENE_STORAGE_DRIVER = "memory";
+  process.env.OPENSCENE_STUDIO_PUBLIC_BASE_URL = "http://localhost:5173";
+  resetConfigForTests();
+  resetStorageForTests();
+  await resetDatabaseForTests();
+
+  const responseA = await call("POST", ["apps"], { key: "app-a", name: "App A" });
+  expect(responseA.status).toBe(201);
+  const bodyA = await responseA.json();
+  appA = {
+    id: bodyA.id,
+    appKey: bodyA.credentials.appKey,
+    runtimeKey: bodyA.credentials.runtimeKey,
+  };
+  const responseB = await call("POST", ["apps"], { key: "app-b", name: "App B" });
+  expect(responseB.status).toBe(201);
+  const bodyB = await responseB.json();
+  appB = {
+    id: bodyB.id,
+    appKey: bodyB.credentials.appKey,
+    runtimeKey: bodyB.credentials.runtimeKey,
+  };
+});
+
+afterAll(async () => {
+  await resetDatabaseForTests();
+  resetStorageForTests();
+  resetConfigForTests();
+});
+
+describe("Admin API HTTP flow", () => {
+  test("creates an isolated page and preview profile", async () => {
+    const profile = await call("POST", ["apps", appA.id, "preview-profiles"], {
+      name: "local",
+      url: "http://localhost:4000/preview",
+      allowedOrigins: ["http://localhost:4000", "http://localhost:4000"],
+      isDefault: true,
+    });
+    expect(profile.status).toBe(201);
+    const profileBody = await profile.json();
+    profileA = { id: profileBody.id };
+    expect(profileBody.allowedOrigins).toEqual(["http://localhost:4000"]);
+
+    const page = await call("POST", ["apps", appA.id, "pages"], { key: "home", title: "Home" });
+    expect(page.status).toBe(201);
+    pageA = await page.json();
+    const foreign = await call("GET", ["apps", appB.id, "pages", pageA.id]);
+    expect(foreign.status).toBe(404);
+  });
+
+  test("creates a short-lived Studio Session and Bootstrap", async () => {
+    const session = await call("POST", ["apps", appA.id, "studio-sessions"], {
+      resourceKind: "page",
+      resourceId: pageA.id,
+      previewProfileId: profileA.id,
+      returnUrl: "http://localhost:3000/pages",
+    });
+    expect(session.status).toBe(201);
+    const sessionBody = await session.json();
+    expect(sessionBody.launchUrl).toMatch(
+      new RegExp(`^http://localhost:5173\\?sessionId=${sessionBody.id}#token=`),
+    );
+    const bootstrap = await call(
+      "GET",
+      ["studio-sessions", sessionBody.id, "bootstrap"],
+      undefined,
+      {
+        "x-openscene-session-token": sessionBody.token,
+      },
+    );
+    expect(bootstrap.status).toBe(200);
+    const bootstrapBody = await bootstrap.json();
+    expect(bootstrapBody.resource.documentId).toBe(pageA.documentId);
+    expect(bootstrapBody.preview.allowedOrigin).toBe("http://localhost:4000");
+    expect(JSON.stringify(bootstrapBody)).not.toContain("encryptedHeaders");
+  });
+
+  test("protects Draft updates with ETag/revision", async () => {
+    const draft = await call("GET", ["apps", appA.id, "documents", pageA.documentId, "draft"]);
+    expect(draft.status).toBe(200);
+    expect(draft.headers.get("etag")).toBe('"0"');
+    const updated = await call("PATCH", ["apps", appA.id, "documents", pageA.documentId, "draft"], {
+      baseRevision: 0,
+      document: { schemaVersion: "1.0.0", spec: { title: "Updated" } },
+    });
+    expect(updated.status).toBe(200);
+    expect((await updated.json()).revision).toBe(1);
+    const conflict = await call(
+      "PATCH",
+      ["apps", appA.id, "documents", pageA.documentId, "draft"],
+      { baseRevision: 0, document: { schemaVersion: "1.0.0", spec: {} } },
+    );
+    expect(conflict.status).toBe(409);
+    expect((await conflict.json()).errors[0].path).toBe("currentRevision");
+  });
+
+  test("creates immutable Version and Runtime Release", async () => {
+    const version = await call(
+      "POST",
+      ["apps", appA.id, "documents", pageA.documentId, "versions"],
+      { message: "Initial" },
+    );
+    expect(version.status).toBe(201);
+    const versionBody = await version.json();
+    const page = await call("PATCH", ["apps", appA.id, "pages", pageA.id], { status: "published" });
+    expect(page.status).toBe(200);
+    const release = await call(
+      "POST",
+      ["apps", appA.id, "documents", pageA.documentId, "releases"],
+      { versionId: versionBody.id },
+    );
+    expect(release.status).toBe(201);
+    const runtime = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
+      "x-openscene-runtime-key": appA.runtimeKey,
+    });
+    expect(runtime.status).toBe(200);
+    expect((await runtime.json()).document.spec.title).toBe("Updated");
+    const crossApp = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
+      "x-openscene-runtime-key": appB.runtimeKey,
+    });
+    expect(crossApp.status).toBe(404);
+  });
+
+  test("App Key cannot push a Manifest into another App", async () => {
+    const response = await call(
+      "POST",
+      ["apps", appB.id, "manifest", "push"],
+      { protocolVersion: "1.0", app: { key: "app-b" }, components: {} },
+      { "x-openscene-app-key": appA.appKey },
+    );
+    expect(response.status).toBe(404);
+  });
+
+  test("deletes an empty App together with its generated defaults", async () => {
+    const response = await call("DELETE", ["apps", appB.id]);
+    expect(response.status).toBe(204);
+    const missing = await call("GET", ["apps", appB.id]);
+    expect(missing.status).toBe(404);
+  });
+
+  test("supports token and trusted-proxy deployment authentication", async () => {
+    process.env.OPENSCENE_AUTH_MODE = "token";
+    process.env.OPENSCENE_MANAGEMENT_TOKEN = "management-test-token";
+    resetConfigForTests();
+    const missingToken = await call("GET", ["apps"]);
+    expect(missingToken.status).toBe(401);
+    const validToken = await call("GET", ["apps"], undefined, {
+      authorization: "Bearer management-test-token",
+    });
+    expect(validToken.status).toBe(200);
+
+    const login = await call("POST", ["auth", "session"], { token: "management-test-token" });
+    expect(login.status).toBe(200);
+    const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+    expect(cookie).toMatch(/^openscene_admin_session=/);
+    const cookieRead = await call("GET", ["apps"], undefined, { cookie: cookie ?? "" });
+    expect(cookieRead.status).toBe(200);
+    const csrfRejected = await call(
+      "PATCH",
+      ["apps", appA.id],
+      { description: "cookie write" },
+      { cookie: cookie ?? "" },
+    );
+    expect(csrfRejected.status).toBe(403);
+    const csrfAccepted = await call(
+      "PATCH",
+      ["apps", appA.id],
+      { description: "cookie write" },
+      { cookie: cookie ?? "", origin: "http://localhost" },
+    );
+    expect(csrfAccepted.status).toBe(200);
+    const tamperedCookie = `${cookie?.slice(0, -1)}x`;
+    const tampered = await call("GET", ["apps"], undefined, { cookie: tamperedCookie });
+    expect(tampered.status).toBe(401);
+    const logout = await call("DELETE", ["auth", "session"], undefined, { cookie: cookie ?? "" });
+    expect(logout.status).toBe(204);
+
+    process.env.OPENSCENE_AUTH_MODE = "proxy";
+    process.env.OPENSCENE_TRUSTED_PROXY_HEADER = "x-authenticated-user";
+    process.env.OPENSCENE_TRUSTED_PROXY_VALUE = "admin@example.test";
+    resetConfigForTests();
+    const forgedProxy = await call("GET", ["apps"], undefined, {
+      "x-authenticated-user": "attacker@example.test",
+    });
+    expect(forgedProxy.status).toBe(401);
+    const trustedProxy = await call("GET", ["apps"], undefined, {
+      "x-authenticated-user": "admin@example.test",
+    });
+    expect(trustedProxy.status).toBe(200);
+
+    process.env.OPENSCENE_AUTH_MODE = "disabled";
+    resetConfigForTests();
+  });
+
+  test("generates deterministic OpenAPI coverage", () => {
+    const document = createOpenApiDocument();
+    expect(document.openapi).toBe("3.0.3");
+    const paths = document.paths as Record<string, unknown>;
+    expect(paths["/api/v1/apps/{appId}/documents/{documentId}/draft"]).toBeDefined();
+    expect(paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"]).toBeDefined();
+    const runtimeOperation = paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"] as {
+      get: { parameters: Array<{ name: string }> };
+    };
+    expect(runtimeOperation.get.parameters.map((parameter) => parameter.name)).toEqual([
+      "appKey",
+      "pageKey",
+    ]);
+    const authOperation = paths["/api/v1/auth/session"] as {
+      get: { responses: Record<string, { content?: Record<string, { schema?: unknown }> }> };
+      post: { requestBody: unknown };
+      delete: { responses: Record<string, unknown> };
+    };
+    expect(authOperation.get).toBeDefined();
+    expect(authOperation.post.requestBody).toBeDefined();
+    expect(authOperation.delete.responses["204"]).toBeDefined();
+    const listPreview = paths["/api/v1/apps/{appId}/preview-profiles"] as {
+      get: {
+        responses: Record<string, { content?: Record<string, { schema?: { type?: string } }> }>;
+      };
+    };
+    expect(listPreview.get.responses["200"].content?.["application/json"].schema).toMatchObject({
+      type: "array",
+    });
+  });
+});
+
+async function call(
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  segments: string[],
+  payload?: unknown,
+  extraHeaders: Record<string, string> = {},
+): Promise<Response> {
+  const headers = new Headers(extraHeaders);
+  if (payload !== undefined) headers.set("content-type", "application/json");
+  const request = new NextRequest(
+    `http://localhost${segments.length ? `/api/v1/${segments.join("/")}` : "/api/v1"}`,
+    { method, headers, body: payload === undefined ? undefined : JSON.stringify(payload) },
+  );
+  const context: PathContext = { params: Promise.resolve({ path: segments }) };
+  if (method === "GET") return GET(request, context);
+  if (method === "POST") return POST(request, context);
+  if (method === "PATCH") return PATCH(request, context);
+  return DELETE(request, context);
+}
