@@ -27,3 +27,13 @@ VITE_OPENSCENE_ADMIN_API_BASE_URL=https://admin.example.com
 ```
 
 Launch Studio using the `launchUrl` returned by `POST /api/v1/apps/{appId}/studio-sessions`.
+
+For local UI and iframe-bridge testing, use the development-only session fixture:
+
+```text
+http://127.0.0.1:5173/?sessionId=local-test
+```
+
+Use the port printed by the Studio dev server if `5173` is already occupied. This fixture has no
+token or persistence: it starts with an empty `spec.root`, exposes a small in-memory App material
+manifest, and renders through `public/local-preview.html` as a separate target-App iframe.

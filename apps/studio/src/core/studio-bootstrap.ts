@@ -1,4 +1,5 @@
 import { normalizeAppDocument, type AppDocument } from "./document";
+import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
 import type { AppMaterialManifest } from "./material-manifest";
 
 export interface StudioBootstrap {
@@ -42,6 +43,19 @@ function isBootstrap(value: unknown): value is Record<string, unknown> {
 
 export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioBootstrapState> {
   const { sessionId, token } = sessionCredentials();
+  if (sessionId === LOCAL_TEST_SESSION_ID) {
+    if (!import.meta.env.DEV) {
+      return { status: "error", message: "local-test session is only available in development" };
+    }
+
+    const value = createLocalTestBootstrap();
+    window.history.replaceState(
+      {},
+      document.title,
+      `${window.location.pathname}${window.location.search}`,
+    );
+    return { status: "ready", value };
+  }
   if (!sessionId || !token) return { status: "standalone" };
 
   try {

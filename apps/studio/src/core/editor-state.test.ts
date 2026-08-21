@@ -49,4 +49,13 @@ describe("Studio editor state", () => {
     expect(zoomed.viewport.zoom).toBe(3);
     expect(hand.selectedNodeId).toBeNull();
   });
+
+  it("keeps the preview locale in sync with the document locale", () => {
+    const state = createEditorState(emptyDocument, 0);
+    const next = editorReducer(state, { type: "locale.switch", locale: "zh-CN" });
+
+    expect(next.locale).toBe("zh-CN");
+    expect(next.document.pageInfo.locale).toBe("zh-CN");
+    expect(next.document.spec.state?.lang).toBe("zh-CN");
+  });
 });

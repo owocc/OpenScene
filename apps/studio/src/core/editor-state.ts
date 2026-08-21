@@ -116,17 +116,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case "node.select":
       return { ...state, selectedNodeId: action.nodeId };
     case "locale.switch":
-      return commit(state, {
-        ...state.document,
-        pageInfo: { ...state.document.pageInfo, locale: action.locale },
-        spec: {
-          ...state.document.spec,
-          state: {
-            ...state.document.spec.state,
-            lang: action.locale,
+      return {
+        ...commit(state, {
+          ...state.document,
+          pageInfo: { ...state.document.pageInfo, locale: action.locale },
+          spec: {
+            ...state.document.spec,
+            state: {
+              ...state.document.spec.state,
+              lang: action.locale,
+            },
           },
-        },
-      });
+        }),
+        locale: action.locale,
+      };
     case "surface.set":
       return { ...state, surface: action.surface };
     case "tool.set":
@@ -151,6 +154,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         document: previous,
         selectedNodeId: previous.spec.root || null,
+        locale: previous.pageInfo.locale || "en-US",
         past: state.past.slice(0, -1),
         future: [state.document, ...state.future],
         revision: state.revision + 1,
@@ -163,6 +167,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         document: next,
         selectedNodeId: next.spec.root || null,
+        locale: next.pageInfo.locale || "en-US",
         past: [...state.past, state.document],
         future: state.future.slice(1),
         revision: state.revision + 1,
