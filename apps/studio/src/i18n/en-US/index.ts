@@ -1,0 +1,125 @@
+import type { Translation } from "../i18n-types";
+
+const en_US: Translation = {
+  common: {
+    save: "Save",
+    undo: "Undo",
+    redo: "Redo",
+    delete: "Delete",
+    done: "Done",
+    add: "Add",
+    selectComponent: "Select component…",
+    searchComponent: "Search components…",
+    placeholder: "Placeholder",
+  },
+  sidebar: {
+    file: "File",
+    agents: "Agents",
+    assets: "Assets",
+    tools: "Tools",
+    variables: "Variables",
+    collapse: "Collapse panel",
+    expand: "Expand outline",
+    expandProperties: "Expand properties",
+    fileTabTooltip: "Pages & Layers (File)",
+    agentsTabTooltip: "Material Contract (Agents)",
+    assetsTabTooltip: "Component Library (Assets)",
+    toolsTabTooltip: "Modes & Tools (Tools)",
+    variablesTabTooltip: "Variables & i18n (Variables)",
+  },
+  panels: {
+    file: {
+      pages: "Pages",
+      layers: "Layers",
+      nodeCount: "{count} nodes",
+      emptyDoc: "Current document is empty. Add the first App node to make it root.",
+      addComponent: "Add Component",
+    },
+    agents: {
+      title: "App Material Contract",
+      description:
+        "Studio is contract-driven and does not maintain a local fixed component catalog.",
+      appKey: "App Key",
+      manifestVersion: "Protocol Version",
+      componentTypes: "Component Types",
+      componentCount: "{count} types",
+      status: "Contract Status",
+      valid: "Valid",
+      needsReview: "Needs review",
+      rev: "rev {rev}",
+      diagnostics: "Contract Diagnostics",
+    },
+    assets: {
+      title: "Component Library (Assets)",
+      description: "Loaded {count} preset App material components.",
+    },
+    tools: {
+      modes: "Editor Modes",
+      developer: "Developer mode",
+      preview: "Preview mode",
+      text: "Document edit mode",
+    },
+    variables: {
+      locales: "Preview Languages (i18n)",
+    },
+  },
+  toolbar: {
+    select: "Select",
+    interact: "Interact",
+    pan: "Pan",
+    zoom: "Zoom",
+    rotate: "Rotate device",
+    restoreOrientation: "Restore orientation",
+  },
+  menu: {
+    file: "File",
+    edit: "Edit",
+    view: "View",
+    theme: "Theme",
+    saveDocument: "Save document",
+    copyJson: "Copy JSON snapshot",
+    shortcuts: "Keyboard shortcuts",
+    light: "Light",
+    dark: "Dark",
+    system: "System",
+    expandSidebar: "Expand sidebar panel",
+    collapseSidebar: "Collapse sidebar panel",
+  },
+  properties: {
+    title: "Properties",
+    empty: "Select a node to edit meta properties provided by target App.",
+    layerName: "Layer name",
+    runtimeTitle: "App-owned runtime",
+    runtimeDesc:
+      "Preview is rendered by the target App iframe. Studio only sends document snapshots through Preview Bridge.",
+  },
+  status: {
+    loadingTitle: "Loading App session",
+    loadingDesc: "Studio is waiting for the target App bootstrap and its material contract.",
+    standaloneTitle: "Open Studio from an App",
+    standaloneDesc:
+      "Studio is headless by design. Launch it from the target App through an OpenScene Studio Session so the App can provide its document, material manifest and iframe preview.",
+    missingServerUrlTitle: "Missing server-url parameter",
+    missingServerUrlDesc:
+      "Studio adopts a stateless architecture and does not embed a default backend URL. You must explicitly provide the server URL via the 'server-url' query parameter (e.g. ?server-url=http://localhost:3000&sessionId=...#token=...).",
+    sessionUnavailableTitle: "Studio session unavailable",
+  },
+  notices: {
+    jsonCopied: "JSON snapshot copied",
+    saveSent: "Save command sent to the target App",
+    saveNotPersisted: "Local session changes are not persisted",
+  },
+  shortcuts: {
+    title: "Keyboard shortcuts",
+    description: "Quickly switch modes and manage the current editing session.",
+    developerMode: "Developer mode",
+    previewMode: "Preview mode",
+    textMode: "Document edit mode",
+    undoRedo: "Undo / Redo",
+    save: "Save",
+    copyJson: "Copy JSON snapshot",
+    close: "Close menu or dialog",
+  },
+};
+
+export default en_US;

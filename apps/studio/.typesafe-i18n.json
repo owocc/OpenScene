@@ -1,0 +1,5 @@
+{
+  "baseLocale": "zh-CN",
+  "adapter": "react",
+  "outputPath": "./src/i18n/"
+}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 
+import { useI18n } from "@/i18n";
 import type { ComponentItem } from "../types";
 
 interface AssetsPanelProps {
@@ -9,6 +10,7 @@ interface AssetsPanelProps {
 }
 
 export function AssetsPanel({ components, onSelectComponent }: AssetsPanelProps) {
+  const { LL } = useI18n();
   const [search, setSearch] = useState("");
 
   const filtered = components.filter(
@@ -24,7 +26,7 @@ export function AssetsPanel({ components, onSelectComponent }: AssetsPanelProps)
           <Search className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
           <input
             className="h-8 w-full rounded-lg border border-input bg-background pr-3 pl-8 text-xs outline-none focus-visible:border-ring"
-            placeholder="搜索物料组件…"
+            placeholder={LL.common.searchComponent()}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

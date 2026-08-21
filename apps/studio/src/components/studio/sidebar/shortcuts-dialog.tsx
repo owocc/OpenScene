@@ -1,27 +1,30 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { useI18n } from "@/i18n";
 
 interface ShortcutsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const shortcuts = [
-  ["开发者模式", "⌘1"],
-  ["预览模式", "⌘2"],
-  ["文档编辑模式", "⌘3"],
-  ["撤销 / 重做", "⌘Z / ⇧⌘Z"],
-  ["保存", "⌘S"],
-  ["复制 JSON 快照", "⌘C"],
-  ["关闭菜单或弹窗", "Esc"],
-];
-
 export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
+  const { LL } = useI18n();
+
+  const shortcuts = [
+    [LL.shortcuts.developerMode(), "⌘1"],
+    [LL.shortcuts.previewMode(), "⌘2"],
+    [LL.shortcuts.textMode(), "⌘3"],
+    [LL.shortcuts.undoRedo(), "⌘Z / ⇧⌘Z"],
+    [LL.shortcuts.save(), "⌘S"],
+    [LL.shortcuts.copyJson(), "⌘C"],
+    [LL.shortcuts.close(), "Esc"],
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false}>
-        <DialogTitle>Keyboard shortcuts</DialogTitle>
-        <DialogDescription>快速切换模式和管理当前编辑会话。</DialogDescription>
+        <DialogTitle>{LL.shortcuts.title()}</DialogTitle>
+        <DialogDescription>{LL.shortcuts.description()}</DialogDescription>
         <div className="mt-5 grid gap-1.5">
           {shortcuts.map(([label, shortcut]) => (
             <div
@@ -35,7 +38,7 @@ export function ShortcutsDialog({ open, onOpenChange }: ShortcutsDialogProps) {
         </div>
         <div className="mt-5 flex justify-end">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            完成
+            {LL.common.done()}
           </Button>
         </div>
       </DialogContent>

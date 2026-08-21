@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface VariablesPanelProps {
@@ -9,10 +10,14 @@ interface VariablesPanelProps {
 }
 
 export function VariablesPanel({ locale, locales, onLocaleChange }: VariablesPanelProps) {
+  const { LL } = useI18n();
+
   return (
     <div className="flex flex-col gap-3 p-3">
       <div>
-        <div className="mb-1 text-xs font-semibold text-foreground">预览语言 (i18n)</div>
+        <div className="mb-1 text-xs font-semibold text-foreground">
+          {LL.panels.variables.locales()}
+        </div>
         <div className="grid gap-1">
           {locales.map((item) => (
             <button

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/components/theme-provider";
+import { useI18n } from "@/i18n";
 import type { Surface } from "@/core/editor-state";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 import { modeTabs } from "./types";
@@ -48,6 +49,7 @@ export function LogoMenu({
   onSave,
 }: LogoMenuProps) {
   const { theme, setTheme } = useTheme();
+  const { LL } = useI18n();
 
   return (
     <DropdownMenu>
@@ -64,15 +66,15 @@ export function LogoMenu({
 
         {/* File Submenu */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>File</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{LL.menu.file()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={onSave}>
-                Save document
+                {LL.menu.saveDocument()}
                 <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onCopyJson}>
-                Copy JSON snapshot
+                {LL.menu.copyJson()}
                 <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -81,15 +83,15 @@ export function LogoMenu({
 
         {/* Edit Submenu */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Edit</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{LL.menu.edit()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={onUndo} disabled={pastLength === 0}>
-                Undo
+                {LL.common.undo()}
                 <DropdownMenuShortcut>⌘Z</DropdownMenuShortcut>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onRedo} disabled={futureLength === 0}>
-                Redo
+                {LL.common.redo()}
                 <DropdownMenuShortcut>⇧⌘Z</DropdownMenuShortcut>
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -98,20 +100,24 @@ export function LogoMenu({
 
         {/* View Submenu */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>View</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{LL.menu.view()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
               {modeTabs.map((tab) => (
                 <DropdownMenuItem key={tab.value} onClick={() => onSurfaceChange(tab.value)}>
                   <tab.icon />
-                  {tab.label}
+                  {tab.value === "developer"
+                    ? LL.panels.tools.developer()
+                    : tab.value === "preview"
+                      ? LL.panels.tools.preview()
+                      : LL.panels.tools.text()}
                   <DropdownMenuShortcut>{tab.shortcut}</DropdownMenuShortcut>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onTogglePanel}>
                 <PanelLeft />
-                {panelCollapsed ? "Expand sidebar panel" : "Collapse sidebar panel"}
+                {panelCollapsed ? LL.menu.expandSidebar() : LL.menu.collapseSidebar()}
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
@@ -119,22 +125,22 @@ export function LogoMenu({
 
         {/* Theme Submenu */}
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Theme</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>{LL.menu.theme()}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={() => setTheme("light")}>
                 <Sun />
-                Light
+                {LL.menu.light()}
                 {theme === "light" && <span className="ms-auto text-xs">✓</span>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme("dark")}>
                 <Moon />
-                Dark
+                {LL.menu.dark()}
                 {theme === "dark" && <span className="ms-auto text-xs">✓</span>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTheme("system")}>
                 <Laptop />
-                System
+                {LL.menu.system()}
                 {theme === "system" && <span className="ms-auto text-xs">✓</span>}
               </DropdownMenuItem>
             </DropdownMenuSubContent>
@@ -143,7 +149,7 @@ export function LogoMenu({
 
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenShortcuts}>
-          Keyboard shortcuts
+          {LL.menu.shortcuts()}
           <DropdownMenuShortcut>⌘/</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>

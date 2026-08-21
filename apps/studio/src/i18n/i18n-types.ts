@@ -1,0 +1,127 @@
+import type zh_CN from "./zh-CN";
+
+export type BaseLocale = "zh-CN";
+
+export type Locales = "zh-CN" | "en-US";
+
+export type Translation = typeof zh_CN;
+
+export type TranslationFunctions = {
+  common: {
+    save: () => string;
+    undo: () => string;
+    redo: () => string;
+    delete: () => string;
+    done: () => string;
+    add: () => string;
+    selectComponent: () => string;
+    searchComponent: () => string;
+    placeholder: () => string;
+  };
+  sidebar: {
+    file: () => string;
+    agents: () => string;
+    assets: () => string;
+    tools: () => string;
+    variables: () => string;
+    collapse: () => string;
+    expand: () => string;
+    expandProperties: () => string;
+    fileTabTooltip: () => string;
+    agentsTabTooltip: () => string;
+    assetsTabTooltip: () => string;
+    toolsTabTooltip: () => string;
+    variablesTabTooltip: () => string;
+  };
+  panels: {
+    file: {
+      pages: () => string;
+      layers: () => string;
+      nodeCount: (arg: { count: number }) => string;
+      emptyDoc: () => string;
+      addComponent: () => string;
+    };
+    agents: {
+      title: () => string;
+      description: () => string;
+      appKey: () => string;
+      manifestVersion: () => string;
+      componentTypes: () => string;
+      componentCount: (arg: { count: number }) => string;
+      status: () => string;
+      valid: () => string;
+      needsReview: () => string;
+      rev: (arg: { rev: number }) => string;
+      diagnostics: () => string;
+    };
+    assets: {
+      title: () => string;
+      description: (arg: { count: number }) => string;
+    };
+    tools: {
+      modes: () => string;
+      developer: () => string;
+      preview: () => string;
+      text: () => string;
+    };
+    variables: {
+      locales: () => string;
+    };
+  };
+  toolbar: {
+    select: () => string;
+    interact: () => string;
+    pan: () => string;
+    zoom: () => string;
+    rotate: () => string;
+    restoreOrientation: () => string;
+  };
+  menu: {
+    file: () => string;
+    edit: () => string;
+    view: () => string;
+    theme: () => string;
+    saveDocument: () => string;
+    copyJson: () => string;
+    shortcuts: () => string;
+    light: () => string;
+    dark: () => string;
+    system: () => string;
+    expandSidebar: () => string;
+    collapseSidebar: () => string;
+  };
+  properties: {
+    title: () => string;
+    empty: () => string;
+    layerName: () => string;
+    runtimeTitle: () => string;
+    runtimeDesc: () => string;
+  };
+  status: {
+    loadingTitle: () => string;
+    loadingDesc: () => string;
+    standaloneTitle: () => string;
+    standaloneDesc: () => string;
+    missingServerUrlTitle: () => string;
+    missingServerUrlDesc: () => string;
+    sessionUnavailableTitle: () => string;
+  };
+  notices: {
+    jsonCopied: () => string;
+    saveSent: () => string;
+    saveNotPersisted: () => string;
+  };
+  shortcuts: {
+    title: () => string;
+    description: () => string;
+    developerMode: () => string;
+    previewMode: () => string;
+    textMode: () => string;
+    undoRedo: () => string;
+    save: () => string;
+    copyJson: () => string;
+    close: () => string;
+  };
+};
+
+export type Formatters = Record<string, never>;

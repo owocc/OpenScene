@@ -3,6 +3,7 @@ import { PanelLeftClose } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
+import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { LogoMenu } from "./logo-menu";
@@ -40,6 +41,7 @@ export function StudioSidebar({
   onCopyJson,
   onSave,
 }: StudioSidebarProps) {
+  const { LL } = useI18n();
   const queryPanel = useQueryStore((s) => s.panel);
   const querySidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const activeTab: SidebarTab = queryPanel || "file";
@@ -53,6 +55,22 @@ export function StudioSidebar({
       useQueryStore.getState().setQuery({ panel: tab, sidebarCollapsed: false });
     }
   };
+
+  const getTabTooltip = (id: SidebarTab) => {
+    switch (id) {
+      case "file":
+        return LL.sidebar.fileTabTooltip();
+      case "agents":
+        return LL.sidebar.agentsTabTooltip();
+      case "assets":
+        return LL.sidebar.assetsTabTooltip();
+      case "tools":
+        return LL.sidebar.toolsTabTooltip();
+      case "variables":
+        return LL.sidebar.variablesTabTooltip();
+    }
+  };
+
   return (
     <StudioTooltipProvider>
       <aside
@@ -106,7 +124,7 @@ export function StudioSidebar({
                       aria-label={item.label}
                       aria-pressed={isActive}
                     >
-                      <IconTooltip label={item.label} side="right">
+                      <IconTooltip label={getTabTooltip(item.id)} side="right">
                         <Button
                           variant={isActive ? "secondary" : "ghost"}
                           size="icon"
@@ -141,13 +159,13 @@ export function StudioSidebar({
               <span className="truncate text-xs font-semibold text-foreground">
                 {bootstrap.resource.title}
               </span>
-              <IconTooltip label="收起面板" side="right">
+              <IconTooltip label={LL.sidebar.collapse()} side="right">
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   className="rounded-lg text-muted-foreground"
                   onClick={() => useQueryStore.getState().setSidebarCollapsed(true)}
-                  aria-label="收起面板"
+                  aria-label={LL.sidebar.collapse()}
                 >
                   <PanelLeftClose className="size-4" />
                 </Button>

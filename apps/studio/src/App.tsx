@@ -5,6 +5,7 @@ import { StudioSidebar } from "@/components/studio/sidebar";
 import { PropertyEditor } from "@/components/studio/property-editor";
 import { IconTooltip } from "@/components/studio/icon-tooltip";
 import { useQueryStore } from "@/stores";
+import { useI18n } from "@/i18n";
 import {
   normalizeAppDocument,
   type AppDocument,
@@ -57,28 +58,23 @@ function StatusScreen({
 }
 
 function LoadingScreen() {
-  return (
-    <StatusScreen
-      title="Loading App session"
-      description="Studio is waiting for the target App bootstrap and its material contract."
-    />
-  );
+  const { LL } = useI18n();
+  return <StatusScreen title={LL.status.loadingTitle()} description={LL.status.loadingDesc()} />;
 }
 
 function StandaloneScreen() {
+  const { LL } = useI18n();
   return (
-    <StatusScreen
-      title="Open Studio from an App"
-      description="Studio is headless by design. Launch it from the target App through an OpenScene Studio Session so the App can provide its document, material manifest and iframe preview."
-    />
+    <StatusScreen title={LL.status.standaloneTitle()} description={LL.status.standaloneDesc()} />
   );
 }
 
 function MissingServerUrlScreen() {
+  const { LL } = useI18n();
   return (
     <StatusScreen
-      title="缺少必要参数 server-url"
-      description="Studio 遵循无本地存储架构，不内置任何默认后端地址。必须通过 URL query 参数显式提供目标后端服务地址，例如：?server-url=http://localhost:3000&sessionId=...#token=..."
+      title={LL.status.missingServerUrlTitle()}
+      description={LL.status.missingServerUrlDesc()}
       tone="error"
     />
   );
@@ -123,6 +119,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     activeToolMode,
     viewport,
   } = editor;
+  const { LL } = useI18n();
   const selectedId = selectedNodeId ?? "";
   const [addType, setAddType] = useState("");
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
@@ -134,6 +131,22 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const selectedElement = document.spec.elements[selectedId];
   const selectedMeta = selectedElement ? registry.getComponent(selectedElement.type) : undefined;
   const components = registry.getAllComponents();
+
+  const showNotice = (message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(undefined), 1800);
+  };
+
+  const copyJson = async () => {
+    await navigator.clipboard?.writeText(JSON.stringify(document, null, 2));
+    showNotice(LL.notices.jsonCopied());
+  };
+
+  const saveDocument = () => {
+    showNotice(
+      bootstrap.capabilities.saveDraft ? LL.notices.saveSent() : LL.notices.saveNotPersisted(),
+    );
+  };
   const diagnostics = registry.diagnostics();
   const locales = useMemo(() => {
     const dictionaries = document.spec.state?.i18n;
@@ -144,25 +157,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       ? Object.keys(dictionaries)
       : [document.pageInfo.locale || "en-US"];
   }, [document.pageInfo.locale, document.spec.state]);
-
-  const showNotice = (message: string) => {
-    setNotice(message);
-    window.setTimeout(() => setNotice(undefined), 1800);
-  };
-
-  const copyJson = async () => {
-    await navigator.clipboard?.writeText(JSON.stringify(document, null, 2));
-    showNotice("JSON snapshot copied");
-  };
-
-  const saveDocument = () => {
-    showNotice(
-      bootstrap.capabilities.saveDraft
-        ? "Save command sent to the target App"
-        : "Local session changes are not persisted",
-    );
-  };
-
   useEffect(() => {
     activeToolRef.current = activeToolMode;
   }, [activeToolMode]);
@@ -440,7 +434,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       {surface === "developer" && !propertiesCollapsed && (
         <aside className="fixed inset-y-0 right-0 z-30 hidden w-80 flex-col overflow-hidden border-l border-border/80 bg-background/95 backdrop-blur xl:flex">
           <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-            <span className="text-xs font-semibold">属性</span>
+            <span className="text-xs font-semibold">{LL.properties.title()}</span>
             <div className="flex items-center gap-1">
               <button
                 className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
@@ -448,7 +442,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                 disabled={!selectedId || isSlotNodeId(selectedId)}
                 aria-label="Delete selected node"
               >
-                删除
+                {LL.common.delete()}
               </button>
               <IconTooltip label="折叠属性面板" side="left">
                 <button
@@ -503,7 +497,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
               </div>
             ) : (
               <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                <p>选择节点后编辑目标 App 提供的属性 Meta。</p>
+                <p>{LL.properties.empty()}</p>
               </div>
             )}
           </div>

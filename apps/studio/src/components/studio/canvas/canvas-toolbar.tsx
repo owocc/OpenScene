@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { IconTooltip, StudioTooltipProvider } from "@/components/studio/icon-tooltip";
+import { useI18n } from "@/i18n";
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
 import { cn } from "@/lib/utils";
 
@@ -36,21 +37,20 @@ interface CanvasToolbarProps {
   onRotate: () => void;
 }
 
-const tools: Array<{ mode: ActiveToolMode; label: string; shortcut: string; icon: LucideIcon }> = [
-  { mode: "select", label: "选择", shortcut: "V", icon: MousePointer2 },
-  { mode: "interact", label: "交互", shortcut: "I", icon: MousePointerClick },
-  { mode: "hand", label: "平移", shortcut: "H", icon: Hand },
-];
+const toolIcons: Record<ActiveToolMode, { shortcut: string; icon: LucideIcon }> = {
+  select: { shortcut: "V", icon: MousePointer2 },
+  interact: { shortcut: "I", icon: MousePointerClick },
+  hand: { shortcut: "H", icon: Hand },
+};
 
-const surfaceModes: Array<{
+const modeIcons: Array<{
   value: Surface;
-  label: string;
   shortcut: string;
   icon: LucideIcon;
 }> = [
-  { value: "developer", label: "开发者模式", shortcut: "⌘1", icon: Code2 },
-  { value: "preview", label: "预览模式", shortcut: "⌘2", icon: Eye },
-  { value: "text", label: "文档编辑模式", shortcut: "⌘3", icon: FileText },
+  { value: "developer", shortcut: "⌘1", icon: Code2 },
+  { value: "preview", shortcut: "⌘2", icon: Eye },
+  { value: "text", shortcut: "⌘3", icon: FileText },
 ];
 
 const zoomLevels = [0.25, 0.5, 0.75, 0.85, 1, 1.25, 1.5, 2, 3];
@@ -64,8 +64,24 @@ export function CanvasToolbar({
   onZoomChange,
   onRotate,
 }: CanvasToolbarProps) {
-  const currentTool = tools.find((tool) => tool.mode === activeToolMode) ?? tools[0];
-  const CurrentIcon = currentTool.icon;
+  const { LL } = useI18n();
+
+  const toolLabels: Record<ActiveToolMode, string> = {
+    select: LL.toolbar.select(),
+    interact: LL.toolbar.interact(),
+    hand: LL.toolbar.pan(),
+  };
+
+  const currentIconData = toolIcons[activeToolMode] ?? toolIcons.select;
+  const CurrentIcon = currentIconData.icon;
+  const currentLabel = toolLabels[activeToolMode] ?? toolLabels.select;
+
+  const tools: Array<{ mode: ActiveToolMode; label: string; shortcut: string; icon: LucideIcon }> =
+    [
+      { mode: "select", label: toolLabels.select, shortcut: "V", icon: MousePointer2 },
+      { mode: "interact", label: toolLabels.interact, shortcut: "I", icon: MousePointerClick },
+      { mode: "hand", label: toolLabels.hand, shortcut: "H", icon: Hand },
+    ];
 
   return (
     <StudioTooltipProvider>
@@ -81,12 +97,12 @@ export function CanvasToolbar({
         >
           {/* 1. Tool Selection Split Button */}
           <ButtonGroup className="overflow-hidden rounded-xl border border-border/50 bg-secondary/80">
-            <IconTooltip label={currentTool.label} side="top">
+            <IconTooltip label={currentLabel} side="top">
               <Button
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-none border-0 text-secondary-foreground hover:bg-secondary"
-                aria-label={currentTool.label}
+                aria-label={currentLabel}
                 aria-pressed={true}
               >
                 <CurrentIcon aria-hidden="true" className="size-4" />
@@ -95,7 +111,7 @@ export function CanvasToolbar({
             <DropdownMenu>
               <DropdownMenuTrigger
                 className="grid size-7 shrink-0 place-items-center border-0 border-l border-border/50 px-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none"
-                aria-label="选择画布工具"
+                aria-label={LL.toolbar.select()}
               >
                 <ChevronDown aria-hidden="true" className="size-3.5" />
               </DropdownMenuTrigger>
@@ -130,13 +146,13 @@ export function CanvasToolbar({
           <DropdownMenu>
             <DropdownMenuTrigger
               className="h-7 min-w-12 rounded-xl border-0 px-2 text-[10px] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none"
-              aria-label="选择缩放比例"
+              aria-label={LL.toolbar.zoom()}
             >
               {Math.round(viewport.zoom * 100)}%
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="center" sideOffset={8} className="min-w-28">
               <DropdownMenuGroup>
-                <DropdownMenuLabel>缩放比例</DropdownMenuLabel>
+                <DropdownMenuLabel>{LL.toolbar.zoom()}</DropdownMenuLabel>
                 {zoomLevels.map((level) => {
                   const isActive = Math.abs(level - viewport.zoom) < 0.001;
                   return (
@@ -155,11 +171,14 @@ export function CanvasToolbar({
           </DropdownMenu>
 
           {/* 3. Device Orientation Rotate */}
-          <IconTooltip label={viewport.isRotated ? "恢复设备方向" : "旋转设备"} side="top">
+          <IconTooltip
+            label={viewport.isRotated ? LL.toolbar.restoreOrientation() : LL.toolbar.rotate()}
+            side="top"
+          >
             <Button
               variant={viewport.isRotated ? "secondary" : "ghost"}
               size="icon-sm"
-              aria-label="Rotate device"
+              aria-label={LL.toolbar.rotate()}
               aria-pressed={viewport.isRotated}
               onClick={onRotate}
               className={cn("rounded-xl", viewport.isRotated && "text-foreground")}
@@ -173,11 +192,18 @@ export function CanvasToolbar({
 
           {/* 5. Right Section: View Mode Switcher */}
           <div className="flex items-center gap-0.5 rounded-xl bg-muted/60 p-0.5">
-            {surfaceModes.map((mode) => {
+            {modeIcons.map((mode) => {
               const Icon = mode.icon;
               const isActive = surface === mode.value;
+              const modeLabel =
+                mode.value === "developer"
+                  ? LL.panels.tools.developer()
+                  : mode.value === "preview"
+                    ? LL.panels.tools.preview()
+                    : LL.panels.tools.text();
+
               return (
-                <IconTooltip key={mode.value} label={`${mode.label} (${mode.shortcut})`} side="top">
+                <IconTooltip key={mode.value} label={`${modeLabel} (${mode.shortcut})`} side="top">
                   <button
                     className={cn(
                       "flex size-7 items-center justify-center rounded-lg transition-all focus-visible:outline-none",
@@ -186,7 +212,7 @@ export function CanvasToolbar({
                         : "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
                     )}
                     onClick={() => onSurfaceChange(mode.value)}
-                    aria-label={mode.label}
+                    aria-label={modeLabel}
                     aria-pressed={isActive}
                   >
                     <Icon className="size-3.5" strokeWidth={isActive ? 2 : 1.8} />
