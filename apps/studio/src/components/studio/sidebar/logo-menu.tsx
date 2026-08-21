@@ -389,15 +389,14 @@ export function LogoMenu({
                 <SlidersHorizontal />
                 {LL.menu.canvasSettings()}
               </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={onOpenShortcuts}>
+                {LL.menu.shortcuts()}
+                <DropdownMenuShortcut>?</DropdownMenuShortcut>
+              </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>
-
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onOpenShortcuts}>
-          {LL.menu.shortcuts()}
-          <DropdownMenuShortcut>?</DropdownMenuShortcut>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
