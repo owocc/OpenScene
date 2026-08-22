@@ -6,15 +6,16 @@
     "packages/**",
     "apps/*",
     "tools/*",
-    "playground/*"
+    "examples/*"
   ],
   "type": "module",
   "scripts": {
-    "ready": "vp check && vp run -r test && vp run -r build",
-    "dev": "vp run studio#dev",
+    "build": "vp run -r build",
+    "ready": "vp check && vp run -r test && vp run build",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260605.1",
     "bumpp": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

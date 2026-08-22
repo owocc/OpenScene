@@ -1,0 +1,206 @@
+---
+title: Studio bridge protocol
+description: Generated TypeScript reference for the versioned Studio-to-renderer bridge.
+sidebar:
+  order: 2
+---
+
+This module is generated from `packages/protocol/src/index.ts`. Run `bun run generate:protocol` after changing the protocol source; do not edit this page by hand.
+
+[中文](/zh-cn/protocol/)
+
+## Transport lifecycle
+
+1. Studio adds the editor query parameters to the iframe URL.
+2. The renderer validates them and posts `SCENE_READY` to the configured Studio origin.
+3. Studio validates origin and session, then transfers a `MessageChannel` port with `SCENE_CONNECT`.
+4. The renderer sends `SCENE_DOCUMENT` and subsequent `SCENE_NODE_SELECTED` messages through that port.
+5. Studio sends `SCENE_SELECT` when its node tree selection changes.
+
+## Public API
+
+## STUDIO_BRIDGE_PROTOCOL
+
+Stable browser protocol identifier shared by Studio and renderer SDKs.
+
+**Kind:** Constant
+
+```ts
+const STUDIO_BRIDGE_PROTOCOL = "openscene-studio";
+```
+
+## STUDIO_BRIDGE_VERSION
+
+Increment when either side introduces a breaking message change.
+
+**Kind:** Constant
+
+```ts
+const STUDIO_BRIDGE_VERSION = 1;
+```
+
+## editorQueryKeys
+
+Query parameters that opt an iframe into Studio inspection mode.
+
+**Kind:** Constant
+
+```ts
+const editorQueryKeys = {
+  enabled: "openscene-editor",
+  studioOrigin: "openscene-studio-origin",
+  sessionId: "openscene-editor-session",
+} as const;
+```
+
+## EditorConnection
+
+Origin and opaque session token negotiated through the iframe URL.
+
+**Kind:** Interface
+
+```ts
+interface EditorConnection {
+  studioOrigin: string;
+  sessionId: string;
+}
+```
+
+## StudioBridgeEnvelope
+
+Versioned envelope transported through window.postMessage and MessagePort.
+
+**Kind:** Interface
+
+```ts
+interface StudioBridgeEnvelope<TType extends string = string, TPayload = unknown> {
+  protocol: typeof STUDIO_BRIDGE_PROTOCOL;
+  version: typeof STUDIO_BRIDGE_VERSION;
+  sessionId: string;
+  type: TType;
+  payload: TPayload;
+}
+```
+
+## SceneNodeSnapshot
+
+Serializable runtime node detail shown by Studio's tree and property panel.
+
+**Kind:** Interface
+
+```ts
+interface SceneNodeSnapshot {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  children: string[];
+  slots: Record<string, string[]>;
+}
+```
+
+## SceneDocumentSnapshot
+
+Serializable JSON-render tree snapshot sent when a renderer connects.
+
+**Kind:** Interface
+
+```ts
+interface SceneDocumentSnapshot {
+  root: string;
+  elements: Record<string, SceneNodeSnapshot>;
+  state: Record<string, unknown>;
+}
+```
+
+## StudioPortMessage
+
+Messages emitted by the renderer to Studio after the port is connected.
+
+**Kind:** Type
+
+```ts
+type StudioPortMessage =
+  | StudioBridgeEnvelope<"SCENE_DOCUMENT", SceneDocumentSnapshot>
+  | StudioBridgeEnvelope<"SCENE_NODE_SELECTED", SceneNodeSnapshot>
+  | StudioBridgeEnvelope<"SCENE_ERROR", { message: string }>;
+```
+
+## RendererPortMessage
+
+Messages emitted by Studio to a connected renderer.
+
+**Kind:** Type
+
+```ts
+type RendererPortMessage =
+  | StudioBridgeEnvelope<"SCENE_CONNECT", undefined>
+  | StudioBridgeEnvelope<"SCENE_SELECT", { elementId: string | null }>;
+```
+
+## createBridgeEnvelope
+
+Creates a protocol envelope without exposing mutable shared state.
+
+**Kind:** Function
+
+```ts
+function createBridgeEnvelope<TType extends string, TPayload>(
+  sessionId: string,
+  type: TType,
+  payload: TPayload,
+): StudioBridgeEnvelope<TType, TPayload> {
+  return { protocol: STUDIO_BRIDGE_PROTOCOL, version: STUDIO_BRIDGE_VERSION, sessionId, type, payload };
+}
+```
+
+## isBridgeEnvelope
+
+Validates the stable envelope fields before a message is processed.
+
+**Kind:** Function
+
+```ts
+function isBridgeEnvelope(value: unknown): value is StudioBridgeEnvelope {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.protocol === STUDIO_BRIDGE_PROTOCOL && candidate.version === STUDIO_BRIDGE_VERSION && typeof candidate.sessionId === "string" && typeof candidate.type === "string";
+}
+```
+
+## getEditorConnection
+
+Reads and validates editor-mode connection values from a URL query string.
+
+**Kind:** Function
+
+```ts
+function getEditorConnection(search: string): EditorConnection | null {
+  const params = new URLSearchParams(search);
+  const enabled = params.get(editorQueryKeys.enabled) === "1";
+  const studioOrigin = params.get(editorQueryKeys.studioOrigin);
+  const sessionId = params.get(editorQueryKeys.sessionId);
+  if (!enabled || !studioOrigin || !sessionId) return null;
+  try {
+    const origin = new URL(studioOrigin).origin;
+    return origin === studioOrigin ? { studioOrigin: origin, sessionId } : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+## withEditorConnection
+
+Appends a validated Studio connection to a target iframe URL.
+
+**Kind:** Function
+
+```ts
+function withEditorConnection(url: string, connection: EditorConnection): string {
+  const target = new URL(url, window.location.href);
+  target.searchParams.set(editorQueryKeys.enabled, "1");
+  target.searchParams.set(editorQueryKeys.studioOrigin, connection.studioOrigin);
+  target.searchParams.set(editorQueryKeys.sessionId, connection.sessionId);
+  return target.toString();
+}
+```

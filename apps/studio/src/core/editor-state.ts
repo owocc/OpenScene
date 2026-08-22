@@ -41,6 +41,7 @@ export type EditorAction =
     }
   | { type: "node.delete"; elementId: string }
   | { type: "node.select"; nodeId: string | null }
+  | { type: "document.replace"; document: AppDocument }
   | { type: "locale.switch"; locale: string }
   | { type: "surface.set"; surface: Surface }
   | { type: "tool.set"; mode: ActiveToolMode }
@@ -115,6 +116,16 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
     case "node.select":
       return { ...state, selectedNodeId: action.nodeId };
+    case "document.replace":
+      return {
+        ...state,
+        document: action.document,
+        selectedNodeId: action.document.spec.root || null,
+        locale: action.document.pageInfo.locale || "en-US",
+        past: [],
+        future: [],
+        revision: state.revision + 1,
+      };
     case "locale.switch":
       return {
         ...commit(state, {

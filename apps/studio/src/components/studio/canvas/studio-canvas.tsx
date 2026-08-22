@@ -32,6 +32,7 @@ export function StudioCanvas({
   onSurfaceChange,
   onToolChange,
   onSelectNode,
+  onRemoteDocument,
   onUndo,
   onRedo,
   onCopyJson,
@@ -57,6 +58,7 @@ export function StudioCanvas({
     selectedId,
     interactionMode: activeToolMode === "select" ? "select" : "preview",
     onSelect: onSelectNode,
+    onRemoteDocument,
   };
 
   const previewElement = renderCustomPreview ? (

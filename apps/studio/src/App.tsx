@@ -20,6 +20,7 @@ import { defaultProps } from "@/core/meta";
 import { materialManifestToAdapterMeta } from "@/core/material-manifest";
 import { AdapterRegistry } from "@/core/registry";
 import { getElementLocation, isSlotNodeId, parseSlotNodeId } from "@/core/slot-tree";
+import { applyRemoteScene } from "@/core/remote-scene";
 import {
   loadStudioBootstrap,
   type StudioBootstrap,
@@ -309,6 +310,9 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
           onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
           onSelectNode={(nodeId) => dispatch({ type: "node.select", nodeId })}
+          onRemoteDocument={(scene) =>
+            dispatch({ type: "document.replace", document: applyRemoteScene(document, scene) })
+          }
           onUndo={undo}
           onRedo={redo}
           onCopyJson={() => void copyJson()}
@@ -445,6 +449,18 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                       state={document.spec.state}
                       onChange={updateProp}
                     />
+                  </div>
+                ) : selectedElement ? (
+                  <div className="p-3">
+                    <div className="mb-3 rounded-xl border border-border bg-muted/30 p-3">
+                      <p className="text-sm font-semibold">{selectedElement.type}</p>
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        #{selectedId}
+                      </p>
+                    </div>
+                    <pre className="overflow-auto rounded-lg border border-border bg-muted/20 p-3 font-mono text-[10px] leading-4 text-foreground">
+                      {JSON.stringify(selectedElement, null, 2)}
+                    </pre>
                   </div>
                 ) : (
                   <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">

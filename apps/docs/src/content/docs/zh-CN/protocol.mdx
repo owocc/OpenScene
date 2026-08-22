@@ -1,0 +1,206 @@
+---
+title: Studio 桥接协议
+description: Studio 与渲染器之间版本化桥接协议的自动 TypeScript 参考。
+sidebar:
+  order: 2
+---
+
+本模块由 `packages/protocol/src/index.ts` 自动生成。修改协议源码后运行 `bun run generate:protocol`；不要手动编辑此页面。
+
+[English](/en/protocol/)
+
+## 传输生命周期
+
+1. Studio 将编辑器 query 参数加入 iframe URL。
+2. 渲染器校验参数后，向配置的 Studio origin 发送 `SCENE_READY`。
+3. Studio 校验 origin 与 session 后，通过 `SCENE_CONNECT` 移交 `MessageChannel` 端口。
+4. 渲染器通过端口发送 `SCENE_DOCUMENT` 与后续 `SCENE_NODE_SELECTED` 消息。
+5. Studio 节点树选择变化时发送 `SCENE_SELECT`。
+
+## 公开 API
+
+## STUDIO_BRIDGE_PROTOCOL
+
+Studio 与渲染器 SDK 共用的稳定浏览器协议标识符。
+
+**类型:** Constant
+
+```ts
+const STUDIO_BRIDGE_PROTOCOL = "openscene-studio";
+```
+
+## STUDIO_BRIDGE_VERSION
+
+任一端引入破坏性消息变更时递增。
+
+**类型:** Constant
+
+```ts
+const STUDIO_BRIDGE_VERSION = 1;
+```
+
+## editorQueryKeys
+
+使 iframe 进入 Studio 检查模式的 query 参数。
+
+**类型:** Constant
+
+```ts
+const editorQueryKeys = {
+  enabled: "openscene-editor",
+  studioOrigin: "openscene-studio-origin",
+  sessionId: "openscene-editor-session",
+} as const;
+```
+
+## EditorConnection
+
+通过 iframe URL 协商的 origin 与不透明 session token。
+
+**类型:** Interface
+
+```ts
+interface EditorConnection {
+  studioOrigin: string;
+  sessionId: string;
+}
+```
+
+## StudioBridgeEnvelope
+
+通过 window.postMessage 与 MessagePort 传输的版本化信封。
+
+**类型:** Interface
+
+```ts
+interface StudioBridgeEnvelope<TType extends string = string, TPayload = unknown> {
+  protocol: typeof STUDIO_BRIDGE_PROTOCOL;
+  version: typeof STUDIO_BRIDGE_VERSION;
+  sessionId: string;
+  type: TType;
+  payload: TPayload;
+}
+```
+
+## SceneNodeSnapshot
+
+Studio 节点树与属性面板展示的可序列化运行时节点详情。
+
+**类型:** Interface
+
+```ts
+interface SceneNodeSnapshot {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  children: string[];
+  slots: Record<string, string[]>;
+}
+```
+
+## SceneDocumentSnapshot
+
+渲染器建立连接时发送的可序列化 JSON-render 树快照。
+
+**类型:** Interface
+
+```ts
+interface SceneDocumentSnapshot {
+  root: string;
+  elements: Record<string, SceneNodeSnapshot>;
+  state: Record<string, unknown>;
+}
+```
+
+## StudioPortMessage
+
+端口连接后由渲染器发送给 Studio 的消息。
+
+**类型:** Type
+
+```ts
+type StudioPortMessage =
+  | StudioBridgeEnvelope<"SCENE_DOCUMENT", SceneDocumentSnapshot>
+  | StudioBridgeEnvelope<"SCENE_NODE_SELECTED", SceneNodeSnapshot>
+  | StudioBridgeEnvelope<"SCENE_ERROR", { message: string }>;
+```
+
+## RendererPortMessage
+
+Studio 发送给已连接渲染器的消息。
+
+**类型:** Type
+
+```ts
+type RendererPortMessage =
+  | StudioBridgeEnvelope<"SCENE_CONNECT", undefined>
+  | StudioBridgeEnvelope<"SCENE_SELECT", { elementId: string | null }>;
+```
+
+## createBridgeEnvelope
+
+创建协议信封，不暴露可变共享状态。
+
+**类型:** Function
+
+```ts
+function createBridgeEnvelope<TType extends string, TPayload>(
+  sessionId: string,
+  type: TType,
+  payload: TPayload,
+): StudioBridgeEnvelope<TType, TPayload> {
+  return { protocol: STUDIO_BRIDGE_PROTOCOL, version: STUDIO_BRIDGE_VERSION, sessionId, type, payload };
+}
+```
+
+## isBridgeEnvelope
+
+在处理消息前校验稳定的信封字段。
+
+**类型:** Function
+
+```ts
+function isBridgeEnvelope(value: unknown): value is StudioBridgeEnvelope {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.protocol === STUDIO_BRIDGE_PROTOCOL && candidate.version === STUDIO_BRIDGE_VERSION && typeof candidate.sessionId === "string" && typeof candidate.type === "string";
+}
+```
+
+## getEditorConnection
+
+从 URL query string 读取并校验编辑模式连接参数。
+
+**类型:** Function
+
+```ts
+function getEditorConnection(search: string): EditorConnection | null {
+  const params = new URLSearchParams(search);
+  const enabled = params.get(editorQueryKeys.enabled) === "1";
+  const studioOrigin = params.get(editorQueryKeys.studioOrigin);
+  const sessionId = params.get(editorQueryKeys.sessionId);
+  if (!enabled || !studioOrigin || !sessionId) return null;
+  try {
+    const origin = new URL(studioOrigin).origin;
+    return origin === studioOrigin ? { studioOrigin: origin, sessionId } : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+## withEditorConnection
+
+将已校验的 Studio 连接参数追加到目标 iframe URL。
+
+**类型:** Function
+
+```ts
+function withEditorConnection(url: string, connection: EditorConnection): string {
+  const target = new URL(url, window.location.href);
+  target.searchParams.set(editorQueryKeys.enabled, "1");
+  target.searchParams.set(editorQueryKeys.studioOrigin, connection.studioOrigin);
+  target.searchParams.set(editorQueryKeys.sessionId, connection.sessionId);
+  return target.toString();
+}
+```

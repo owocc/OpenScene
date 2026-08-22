@@ -33,6 +33,7 @@ export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioB
   const sessionId = query.sessionId;
   const token = query.token;
   const serverUrl = query.serverUrl;
+  const previewUrl = query.previewUrl;
 
   // 1. Local test session (development only)
   if (sessionId === LOCAL_TEST_SESSION_ID) {
@@ -40,7 +41,7 @@ export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioB
       return { status: "error", message: "local-test session is only available in development" };
     }
 
-    const value = createLocalTestBootstrap();
+    const value = createLocalTestBootstrap(previewUrl ?? undefined);
     return { status: "ready", value };
   }
 

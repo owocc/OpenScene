@@ -1,3 +1,4 @@
+import type { SceneDocumentSnapshot } from "@openscene/protocol";
 import type { ReactNode } from "react";
 
 import type { AppDocument } from "@/core/document";
@@ -24,6 +25,7 @@ export interface CanvasRendererProps {
   selectedId: string;
   interactionMode: PreviewInteractionMode;
   onSelect: (id: string) => void;
+  onRemoteDocument?: (document: SceneDocumentSnapshot) => void;
 }
 
 export interface StudioCanvasProps {
@@ -42,6 +44,7 @@ export interface StudioCanvasProps {
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
   onSelectNode: (id: string | null) => void;
+  onRemoteDocument?: (document: SceneDocumentSnapshot) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onCopyJson?: () => void;

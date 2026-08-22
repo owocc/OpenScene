@@ -18,21 +18,31 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
+    "./solid": "./dist/solid.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
-    "dev": "vp pack --watch",
+    "build": "vp pack --from-vite",
+    "dev": "vp pack --from-vite --watch",
     "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
+  "dependencies": {
+    "@openscene/protocol": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
+    "jsdom": "^27.0.0",
+    "solid-js": "^1.9.14",
     "typescript": "catalog:",
+    "vite-plugin-solid": "^2.11.13",
     "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.14"
   }
 }

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "base": "/",
+  "knownRoutes": [
+    "/",
+    "/404",
+    "/en",
+    "/en/components",
+    "/en/getting-started",
+    "/en/protocol",
+    "/zh-cn",
+    "/zh-cn/components",
+    "/zh-cn/getting-started",
+    "/zh-cn/protocol"
+  ],
+  "opaqueNamespaces": []
+}

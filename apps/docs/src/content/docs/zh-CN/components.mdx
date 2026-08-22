@@ -1,0 +1,159 @@
+---
+title: 文档组件
+description: Starter 自带的是视觉组件集合，不属于 Nimbus 框架本体。
+sidebar:
+  order: 2
+---
+
+Starter 内置了一组常用组件，可在任意 MDX 文件中直接使用，无需 `import`：
+
+- `<Aside>`：提示、建议、注意和危险调用框
+- `<Card>` + `<CardGrid>`：落地页和功能列表
+- `<Tabs>` + `<TabItem>`：多变体内容
+- `<Steps>` + `<Step>`：编号步骤
+- `<PackageManagers>`：生成 npm、pnpm、yarn 和 bun 安装命令
+
+## Aside
+
+<Aside type="note" title="构建时校验">
+  Aside 是文档站中最常用的组件之一。Starter 默认提供四种变体。
+</Aside>
+
+<Aside type="tip">
+  标题是可选的；省略时使用变体名称。
+</Aside>
+
+<Aside type="caution" title="注意">
+  对不会造成灾难性后果的风险使用 caution 变体。
+</Aside>
+
+<Aside type="danger" title="停止">
+  对确实危险的操作使用 danger 变体。
+</Aside>
+
+## 卡片
+
+<CardGrid>
+  <Card title="步骤" icon="ph:arrow-right">
+    用于教程和演练的编号流程。
+  </Card>
+  <Card title="标签页">
+    用于代码示例、操作系统说明或其他拥有多个变体的内容。
+  </Card>
+</CardGrid>
+
+## 步骤
+
+<Steps>
+  <Step title="安装 Nimbus">
+    使用 `pnpm create @cloudflare/nimbus-docs my-app` 创建项目。
+  </Step>
+  <Step title="编辑内容">
+    在 `src/content/docs/` 中编写 MDX 文件。
+  </Step>
+  <Step title="发布">
+    运行 `astro build`，并将静态产物部署到任意位置。
+  </Step>
+</Steps>
+
+## 包管理器
+
+对于安装命令，优先使用 `<PackageManagers>`，而非 `<Tabs>`。它从单一来源生成四种包管理器命令，并会在页面之间记住读者的选择。
+
+<PackageManagers pkg="@cloudflare/nimbus-docs" />
+
+开发依赖：
+
+<PackageManagers pkg="tailwindcss" dev />
+
+非安装命令（`run`、`exec`、`dlx`）：
+
+<PackageManagers type="run" args="build" />
+
+## 标签页
+
+`<Tabs>` 适用于不是安装命令的多变体内容，例如配置片段、操作系统说明和多语言示例。
+
+<Tabs>
+  <TabItem label="TypeScript">
+    ```ts
+    import nimbus from "@cloudflare/nimbus-docs";
+
+    export default {
+      integrations: [nimbus({ /* … */ })],
+    };
+    ```
+  </TabItem>
+  <TabItem label="JavaScript">
+    ```js
+    import nimbus from "@cloudflare/nimbus-docs";
+
+    export default {
+      integrations: [nimbus({ /* … */ })],
+    };
+    ```
+  </TabItem>
+</Tabs>
+
+## 代码块
+
+围栏代码块使用 Shiki 的双主题调色板渲染。文件名框、行 / diff / focus 高亮和词高亮均由 meta 字符串与行内标记驱动。
+
+### 文件名
+
+````mdx
+```ts title="src/lib/cn.ts"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+````
+
+### 行高亮
+
+使用 `{1,3-5}` meta 语法突出特定行，或者加入 `// [!code highlight]` 行内标记。
+
+```ts {2,4-5}
+function add(a: number, b: number) {
+  const sum = a + b;
+  // not this line
+  console.log(sum);
+  return sum;
+}
+```
+
+### Diff
+
+使用 `// [!code ++]` 与 `// [!code --]` 标记新增和移除的行。
+
+```ts
+function greet(name: string) {
+  console.log("Hello"); // [!code --]
+  console.log(`Hello, ${name}!`); // [!code ++]
+}
+```
+
+### 聚焦
+
+`// [!code focus]` 会淡化周围代码；悬停代码块即可显示。
+
+### 错误和警告
+
+`// [!code error]` 和 `// [!code warning]` 分别为对应行添加错误或警告颜色。
+
+### 词高亮
+
+`// [!code word:foo]` 会高亮 `foo` 的每次出现；也可直接在 meta 中传入 `/pattern/`。
+
+## Partials
+
+用 `<Render>` 在多个页面中复用一段 MDX。partials 位于 `src/content/partials/`，以不带扩展名的路径作为 id：
+
+<Render file="example" />
+
+## 为什么内置组件不多？
+
+其他组件（Accordion、FileTree、LinkCard、Embed、Frame 等）都可以按需通过 `nimbus-docs add <name>` 从注册表安装，让 Starter 保持精简。

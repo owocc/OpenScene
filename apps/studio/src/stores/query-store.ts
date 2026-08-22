@@ -8,6 +8,7 @@ export interface StudioQueryParams {
   serverUrl: string | null;
   sessionId: string | null;
   token?: string | null;
+  previewUrl: string | null;
   surface: Surface;
   nodeId: string | null;
   locale: string | null;
@@ -32,6 +33,7 @@ export interface QueryStoreState extends StudioQueryParams {
   // Granular Actions
   setServerUrl: (serverUrl: string | null) => void;
   setSessionId: (sessionId: string | null, token?: string | null) => void;
+  setPreviewUrl: (previewUrl: string | null) => void;
   setSurface: (surface: Surface) => void;
   setSelectedNodeId: (nodeId: string | null) => void;
   setLocale: (locale: string) => void;
@@ -49,6 +51,7 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   serverUrl: null,
   sessionId: null,
   token: null,
+  previewUrl: null,
   surface: "visual",
   nodeId: null,
   locale: null,
@@ -81,6 +84,7 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
   } else if (searchParams.has("token")) {
     token = searchParams.get("token");
   }
+  const previewUrl = searchParams.get("preview-url") || searchParams.get("previewUrl") || null;
 
   // 4. Surface Mode
   const surfaceRaw = searchParams.get("surface");
@@ -133,6 +137,7 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
     serverUrl,
     sessionId,
     token,
+    previewUrl,
     surface,
     nodeId,
     locale,
@@ -159,6 +164,7 @@ export function formatQueryParams(params: StudioQueryParams): { search: string; 
   // Session ID
   if (params.sessionId) searchParams.set("sessionId", params.sessionId);
 
+  if (params.previewUrl) searchParams.set("preview-url", params.previewUrl);
   // Surface (omit if default "visual")
   if (params.surface && params.surface !== "visual") searchParams.set("surface", params.surface);
 
@@ -202,6 +208,7 @@ function initialQueryParams(): StudioQueryParams {
   merged.serverUrl = url.serverUrl;
   merged.sessionId = url.sessionId;
   merged.token = url.token;
+  merged.previewUrl = url.previewUrl;
   const present = new Set(new URLSearchParams(window.location.search).keys());
   const overrides: Record<string, unknown> = {};
   for (const key of Object.keys(url)) {
@@ -254,6 +261,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
         serverUrl: patch.serverUrl !== undefined ? patch.serverUrl : current.serverUrl,
         sessionId: patch.sessionId !== undefined ? patch.sessionId : current.sessionId,
         token: patch.token !== undefined ? patch.token : current.token,
+        previewUrl: patch.previewUrl !== undefined ? patch.previewUrl : current.previewUrl,
         surface: patch.surface !== undefined ? patch.surface : current.surface,
         nodeId: patch.nodeId !== undefined ? patch.nodeId : current.nodeId,
         locale: patch.locale !== undefined ? patch.locale : current.locale,
@@ -304,6 +312,9 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
     setSessionId: (sessionId, token) => {
       get().setQuery({ sessionId, ...(token !== undefined ? { token } : {}) }, { push: true });
+    },
+    setPreviewUrl: (previewUrl) => {
+      get().setQuery({ previewUrl }, { push: false });
     },
 
     setSurface: (surface) => {
