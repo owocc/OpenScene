@@ -1,59 +1,47 @@
-# OpenScene Minimal Solid Runtime (`examples/solid-v1`)
+# OpenScene Solid integration example
 
-基于 **Solid.js** 的极简动态 JSON 渲染运行时，**零 Tailwind 依赖**、**零外部 UI 组件库**、**零庞杂依赖**，完全采用原生 DOM 与现代 CSS 驱动。
+`examples/solid-v1` is a real two-package OpenScene app. The browser uses the framework-neutral `@openscene/javascript` client and renders through `@openscene/solid`.
 
----
+This example deliberately contains **no page JSON**. Admin is the source of published page documents, and Studio sends a draft document to an editor iframe over the OpenScene bridge. The app source only declares the component/action catalog and the manifest used by both runtime and build tooling.
 
-## 目录结构
+## Source layout
 
 ```text
 src/
-├── runtime/
-│   ├── types.ts          # 核心契约与类型定义 (Spec, Element, SceneDocument, Style, Binding)
-│   ├── evaluate.ts       # 表达式与动态绑定求值 ($state, $bindState, $t, $page, $template)
-│   ├── styles.ts         # 样式转换器 (commonStyleToCss, toCssValue, applyBodyConfig, design 单位)
-│   ├── context.tsx       # 响应式状态与 Action 动作上下文 (RuntimeProvider, useRuntime)
-│   ├── renderer.tsx      # 核心递归渲染器 (JsonRenderer, ElementRenderer, normalizeSlots)
-│   ├── components/       # 精简基础原子组件
-│   │   ├── utils.ts      # 组件通用属性/插槽辅助
-│   │   ├── View.tsx      # 布局容器 (支持 as="div|section|main|header...")
-│   │   ├── Text.tsx      # 文本与标题 (支持 as="h1|h2|p|span..."，支持 content/children)
-│   │   ├── Image.tsx     # 图片展示 (src, alt, fit, width, height)
-│   │   ├── Button.tsx    # 按钮 (onClick, action, text/children)
-│   │   ├── Input.tsx     # 输入框 (支持 $bindState 双向数据绑定, placeholder, type)
-│   │   └── registry.ts   # 组件注册表 (defaultRegistry)
-│   └── index.ts          # 统一导出入口
-├── App.tsx               # 动态渲染引擎完整特性演示 (计数器、双向绑定、多语言、卡片显隐)
-├── index.tsx             # 应用挂载入口
-└── index.css             # 纯原生全局重置样式
+├── openscene.tsx  # component/action declarations and the shared manifest
+├── App.tsx        # Provider + Renderer shell
+├── index.tsx      # installOpenScene, then mount the shell
+├── vite-env.d.ts  # public Vite environment types
+└── index.css      # app-wide styles
 ```
 
----
+## Component and action declarations
 
-## 核心特性
+`src/openscene.tsx` calls `defineOpenSceneSolidApp()` with `baseSolidComponents` and two small extensions:
 
-1. **递归 DOM 渲染树**：根据 `spec.root` 与 `spec.elements` 自动递归构建 Solid 响应式组件树，支持命名插槽（`slots` / `__slotMap`）。
-2. **多模式动态求值**：
-   - `$state`: JSON Pointer 状态读取（如 `{"$state": "/user/name"}`）
-   - `$bindState`: 状态双向绑定（如 Input 实时输入回写）
-   - `$t`: 多语言翻译（结合 `state.lang` 与 `state.i18n`）
-   - `$template`: 字符串模板插值（如 `{"$template": "你好，${/username}！"}`）
-   - `$page`: 页面元信息绑定（如 `{"$page": "title"}` 映射至 `/__scene/pageInfo/title`）
-3. **响应式动作分发**：支持内置 `setState` 及自定义 Action 处理器（如计数器增减、重置、语言切换等）。
-4. **自适应样式引擎**：
-   - `styles` 结构化样式自动转换为 CSS 属性。
-   - 自适应 `design` 设计稿宽度换算（`calc(N / var(--scene-design-width) * 100vw)`）。
-   - 自动展开 `marginX/Y` 与 `paddingX/Y`。
-5. **极简轻量**：仅依赖 `solid-js`，生产构建打包体积仅 ~39KB。
+- `SolidV1Callout` composes the shared `View` primitive.
+- `SolidV1StatusCard` uses `useOpenSceneNode()` and spreads `nodeAttrs` onto its semantic `<article>` root.
 
----
+Both definitions keep their Zod props schema, editor metadata, and renderer together. The `solidV1SetNotice` action follows the same pattern. `solidApp.manifest` is converted with `defineAppManifest()` and exported as the one manifest consumed by the browser client and Vite manifest plugin. Renderer functions never enter that serializable manifest.
 
-## 本地开发与构建
+The first Solid adapter does not support non-empty named slots. Use the flat `children` capability and the `View`/`Text`/`Button` primitives instead. Rendered nodes receive `data-node-id` for Studio selection and outlines; the identity comes from the flat `spec.elements` key, not from persisted props.
+
+## Runtime and editor behavior
+
+`src/index.tsx` installs `installOpenScene()` once and checks that the returned client is `window.OpenScene` before mounting `OpenSceneProvider` and `OpenSceneRenderer`.
+
+- A normal browser visit requests the published runtime delivery using `VITE_OPENSCENE_ADMIN_URL` and the application identity in `VITE_OPENSCENE_APP_KEY`. The browser path selects the page key: `/` resolves to `home`; `/pricing` resolves to `pricing`. One application can therefore serve every Admin page without a per-build page setting.
+- An editor iframe URL containing the OpenScene editor query contract skips the release fetch and waits for Studio's Protocol v2 `DOCUMENT_SET` message.
+- The client owns fetch, MessagePort, immutable document snapshots, runtime state, and error reporting. The Solid adapter only subscribes and renders.
+
+No runtime key or page fallback belongs in this bundle. If runtime delivery must be private, point the public client URL at an application-owned same-origin proxy instead of exposing a secret to Vite.
+
+## Development and build
 
 ```bash
-# 启动开发服务
+vp install
 vp dev
-
-# 编译构建
 vp build
 ```
+
+Copy `.env.example` to a local env file. `VITE_OPENSCENE_ADMIN_URL` and `VITE_OPENSCENE_APP_KEY` are browser-visible configuration and may be included in client assets; the app key is an identity, not a credential. The separate build-only `OPENSCENE_ADMIN_URL`, `OPENSCENE_APP_ID`, and `OPENSCENE_APP_KEY` values are read by `openSceneManifestPlugin({ manifest })` during Vite `closeBundle`; they publish the central manifest with the server-side app key and are never referenced by client source or injected into generated assets. If all three build values are absent, publishing is skipped; a partial set fails the build.

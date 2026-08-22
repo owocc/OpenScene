@@ -11,13 +11,317 @@ This module is generated from `packages/protocol/src/index.ts`. Run `bun run gen
 
 ## Transport lifecycle
 
-1. Studio adds the editor query parameters to the iframe URL.
-2. The renderer validates them and posts `SCENE_READY` to the configured Studio origin.
-3. Studio validates origin and session, then transfers a `MessageChannel` port with `SCENE_CONNECT`.
-4. The renderer sends `SCENE_DOCUMENT` and subsequent `SCENE_NODE_SELECTED` messages through that port.
-5. Studio sends `SCENE_SELECT` when its node tree selection changes.
+1. Studio adds the three editor query parameters to the iframe URL.
+2. The renderer validates them and posts `RENDERER_READY` with `appType: "web"` to the configured Studio origin.
+3. Studio validates origin, source, and session, then transfers a `MessageChannel` port with `STUDIO_CONNECT`.
+4. Studio sends `DOCUMENT_SET` and `EDITOR_STATE_SET` through the port; the renderer returns `DOCUMENT_RENDERED`, `SELECTION_CHANGED`, or `RENDERER_ERROR`.
+
+## Document wrapper and flat Spec
+
+```ts
+interface SceneDocument {
+  schemaVersion: "1.0.0";
+  pageInfo: {
+    title: string;
+    description: string;
+    keywords: string[];
+    locale: string;
+    metadata: Record<string, unknown>;
+  };
+  globalConfig: {
+    design?: unknown;
+    body?: unknown;
+    variables?: unknown;
+    css?: unknown;
+    i18n?: unknown;
+  };
+  spec: { root: string; elements: Record<string, UIElement>; state?: Record<string, unknown> };
+}
+```
+
+The OpenScene page wrapper contains json-render's flat identity map (the flat Spec) in its `spec` field. Node identity is **only** the map key in `spec.elements`: `root` and every `children` or `slots` reference point to a key. Element values must not duplicate an id or persist adapter-private fields. json-render natively owns `$state`, `$bindState`, `$bindItem`, `$template`, `$computed`, `$cond`, visibility, repeat, watch, and action binding.
+
+## OpenScene directives
+
+OpenScene adds only two framework-neutral directives: `$page` reads page information from runtime `/__scene/pageInfo`; `$t` resolves translations from `/i18n/{locale}` using the runtime language and `globalConfig.i18n.defaultLocale`. Register them alongside json-render's built-ins; do not replace them with adapter-private props.
+
+## Solid named-slot constraint
+
+The protocol and json-render core support named slots, but the first OpenScene Solid adapter does not support non-empty named slots. It reports a precise error containing the node ID and slot name before rendering; empty `slots` are removed. Use children or `View` composition for extensibility instead of publishing an unrenderable slot capability.
+
+## Bridge v2 transport
+
+Every message has a versioned envelope and is validated by the directional Zod discriminated union. iframe window → Studio window sends `RENDERER_READY { appType: "web" }`; Studio window → iframe window sends `STUDIO_CONNECT` and transfers a `MessagePort`. On the port, Studio → client sends `DOCUMENT_SET { document, revision }` and `EDITOR_STATE_SET { interactionMode, selectedElementIds }`; client → Studio sends `DOCUMENT_RENDERED { schemaVersion, root }`, `SELECTION_CHANGED { elementIds, primaryElementId, source: "click" | "marquee" }`, or `RENDERER_ERROR { message }`. Receivers must validate with the concrete schema for that direction rather than asserting the payload.
 
 ## Public API
+
+## SCENE_DOCUMENT_SCHEMA_VERSION
+
+Protocol constant exported by `@openscene/protocol`.
+
+**Kind:** Constant
+
+```ts
+const SCENE_DOCUMENT_SCHEMA_VERSION = "1.0.0" as const;
+```
+
+## ScenePageInfo
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface ScenePageInfo {
+  title: string;
+  description: string;
+  keywords: string[];
+  locale: string;
+  metadata: Record<string, unknown>;
+}
+```
+
+## SceneGlobalConfig
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface SceneGlobalConfig {
+  design?: unknown;
+  body?: unknown;
+  variables?: unknown;
+  css?: unknown;
+  i18n?: unknown;
+  [key: string]: unknown;
+}
+```
+
+## SceneDocument
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface SceneDocument {
+  schemaVersion: typeof SCENE_DOCUMENT_SCHEMA_VERSION;
+  pageInfo: ScenePageInfo;
+  globalConfig: SceneGlobalConfig;
+  spec: Spec;
+  [key: string]: unknown;
+}
+```
+
+## SceneDocumentSchema
+
+Canonical page/document schema. In addition to JSON-render's own flat
+shape, this checks every child and named-slot edge before a document can be
+persisted or sent over the bridge.
+
+**Kind:** Constant
+
+```ts
+const SceneDocumentSchema: z.ZodType<SceneDocument> = z
+  .object({
+    schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
+    pageInfo: PageInfoSchema,
+    globalConfig: GlobalConfigSchema,
+    spec: SpecSchema,
+  })
+  .catchall(z.unknown())
+  .superRefine((document, context) => {
+    const { root, elements, state } = document.spec;
+    if (!(root in elements)) {
+      context.addIssue({
+        code: "custom",
+        path: ["spec", "root"],
+        message: `Root element "${root}" is not present in spec.elements`,
+      });
+    }
+
+    for (const [nodeId, element] of Object.entries(elements) as Array<[string, UIElement]>) {
+      const references = [
+        ...(element.children ?? []),
+        ...Object.values(element.slots ?? {}).flat(),
+      ];
+      for (const childId of references) {
+        if (!(childId in elements)) {
+          context.addIssue({
+            code: "custom",
+            path: ["spec", "elements", nodeId],
+            message: `Element "${nodeId}" references missing element "${childId}"`,
+          });
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(element, "id")) {
+        context.addIssue({
+          code: "custom",
+          path: ["spec", "elements", nodeId, "id"],
+          message: "Element identity is represented by the spec.elements map key",
+        });
+      }
+      if (hasKey(element.props, "__opensceneNodeId")) {
+        context.addIssue({
+          code: "custom",
+          path: ["spec", "elements", nodeId, "props"],
+          message: "Persisted props may not contain __opensceneNodeId",
+        });
+      }
+    }
+
+    if (state && Object.prototype.hasOwnProperty.call(state, "__scene")) {
+      context.addIssue({
+        code: "custom",
+        path: ["spec", "state", "__scene"],
+        message: "Persisted state may not contain the reserved __scene root",
+      });
+    }
+  }) as z.ZodType<SceneDocument>;
+```
+
+## createEmptySceneDocument
+
+Protocol function exported by `@openscene/protocol`.
+
+**Kind:** Function
+
+```ts
+function createEmptySceneDocument(): SceneDocument {
+  return {
+    schemaVersion: SCENE_DOCUMENT_SCHEMA_VERSION,
+    pageInfo: {
+      title: "",
+      description: "",
+      keywords: [],
+      locale: "en-US",
+      metadata: {},
+    },
+    globalConfig: {},
+    spec: {
+      root: "root",
+      elements: {
+        root: { type: "View", props: {}, children: [] },
+      },
+      state: {},
+    },
+  };
+}
+```
+
+## ComponentManifest
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface ComponentManifest {
+  title: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  /** JSON Schema generated from the component's catalog props schema. */
+  props: Record<string, unknown>;
+  editor?: Record<string, unknown>;
+  events?: Record<string, unknown>;
+  /** Whether the component accepts children, or its child capability metadata. */
+  children?: unknown;
+  /** Named-slot capability metadata (non-empty slots are adapter-defined). */
+  slots?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+```
+
+## AppManifest
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface AppManifest {
+  protocolVersion: string;
+  app: {
+    key: string;
+    type: AppType;
+    version?: string;
+    [key: string]: unknown;
+  };
+  components: Record<string, ComponentManifest>;
+  actions?: Record<string, unknown>;
+  dataSources?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+```
+
+## AppManifestSchema
+
+Protocol constant exported by `@openscene/protocol`.
+
+**Kind:** Constant
+
+```ts
+const AppManifestSchema: z.ZodType<AppManifest> = z
+  .object({
+    protocolVersion: nonEmptyString,
+    app: z
+      .object({
+        key: nonEmptyString,
+        type: appTypeSchema,
+        version: nonEmptyString.optional(),
+      })
+      .catchall(z.unknown()),
+    components: z.record(nonEmptyString, ComponentManifestSchema),
+    actions: unknownRecord.optional(),
+    dataSources: unknownRecord.optional(),
+    capabilities: unknownRecord.optional(),
+  })
+  .catchall(z.unknown()) as z.ZodType<AppManifest>;
+```
+
+## RuntimePageDelivery
+
+Protocol interface exported by `@openscene/protocol`.
+
+**Kind:** Interface
+
+```ts
+interface RuntimePageDelivery {
+  app: {
+    id: string;
+    key: string;
+    type: AppType;
+  };
+  page: {
+    id: string;
+    key: string;
+    title: string;
+  };
+  document: SceneDocument;
+  [key: string]: unknown;
+}
+```
+
+## RuntimePageDeliverySchema
+
+Minimal public runtime payload. Release/version metadata may be attached by
+Admin, but the SDK only needs the app, page, and canonical document fields.
+
+**Kind:** Constant
+
+```ts
+const RuntimePageDeliverySchema: z.ZodType<RuntimePageDelivery> = z
+  .object({
+    app: z.object({ id: nonEmptyString, key: nonEmptyString, type: appTypeSchema }),
+    page: z.object({ id: nonEmptyString, key: nonEmptyString, title: z.string() }),
+    document: SceneDocumentSchema,
+  })
+  .catchall(z.unknown()) as unknown as z.ZodType<RuntimePageDelivery>;
+```
 
 ## STUDIO_BRIDGE_PROTOCOL
 
@@ -26,17 +330,17 @@ Stable browser protocol identifier shared by Studio and renderer SDKs.
 **Kind:** Constant
 
 ```ts
-const STUDIO_BRIDGE_PROTOCOL = "openscene-studio";
+const STUDIO_BRIDGE_PROTOCOL = "openscene-studio" as const;
 ```
 
 ## STUDIO_BRIDGE_VERSION
 
-Increment when either side introduces a breaking message change.
+Breaking bridge version.
 
 **Kind:** Constant
 
 ```ts
-const STUDIO_BRIDGE_VERSION = 1;
+const STUDIO_BRIDGE_VERSION = 2 as const;
 ```
 
 ## editorQueryKeys
@@ -55,7 +359,7 @@ const editorQueryKeys = {
 
 ## EditorConnection
 
-Origin and opaque session token negotiated through the iframe URL.
+Protocol interface exported by `@openscene/protocol`.
 
 **Kind:** Interface
 
@@ -68,7 +372,7 @@ interface EditorConnection {
 
 ## StudioBridgeEnvelope
 
-Versioned envelope transported through window.postMessage and MessagePort.
+Protocol interface exported by `@openscene/protocol`.
 
 **Kind:** Interface
 
@@ -82,64 +386,143 @@ interface StudioBridgeEnvelope<TType extends string = string, TPayload = unknown
 }
 ```
 
-## SceneNodeSnapshot
+## BridgeEnvelopeSchema
 
-Serializable runtime node detail shown by Studio's tree and property panel.
+Base schema used to reject messages from another protocol/version.
 
-**Kind:** Interface
+**Kind:** Constant
 
 ```ts
-interface SceneNodeSnapshot {
-  id: string;
-  type: string;
-  props: Record<string, unknown>;
-  children: string[];
-  slots: Record<string, string[]>;
-}
+const BridgeEnvelopeSchema = z
+  .object({
+    protocol: z.literal(STUDIO_BRIDGE_PROTOCOL),
+    version: z.literal(STUDIO_BRIDGE_VERSION),
+    sessionId: nonEmptyString,
+    type: nonEmptyString,
+    payload: z.unknown(),
+  })
+  .passthrough();
 ```
 
-## SceneDocumentSnapshot
+## RendererWindowMessageSchema
 
-Serializable JSON-render tree snapshot sent when a renderer connects.
+iframe window → Studio window.
 
-**Kind:** Interface
+**Kind:** Constant
 
 ```ts
-interface SceneDocumentSnapshot {
-  root: string;
-  elements: Record<string, SceneNodeSnapshot>;
-  state: Record<string, unknown>;
-}
+const RendererWindowMessageSchema = z.discriminatedUnion("type", [
+  envelope("RENDERER_READY", z.object({ appType: z.literal(APP_TYPE_WEB) })),
+]);
+```
+
+## StudioWindowMessageSchema
+
+Studio window → iframe window. The MessagePort is transferred separately.
+
+**Kind:** Constant
+
+```ts
+const StudioWindowMessageSchema = z.discriminatedUnion("type", [
+  envelope("STUDIO_CONNECT", z.undefined()),
+]);
+```
+
+## StudioPortMessageSchema
+
+Studio MessagePort → renderer client.
+
+**Kind:** Constant
+
+```ts
+const StudioPortMessageSchema = z.discriminatedUnion("type", [
+  envelope(
+    "DOCUMENT_SET",
+    z.object({
+      document: SceneDocumentSchema,
+      revision: z.number().int().nonnegative(),
+    }),
+  ),
+  envelope(
+    "EDITOR_STATE_SET",
+    z.object({
+      interactionMode: z.enum(["select", "preview"]),
+      selectedElementIds: z.array(nonEmptyString),
+    }),
+  ),
+]);
+```
+
+## RendererPortMessageSchema
+
+Renderer client → Studio MessagePort.
+
+**Kind:** Constant
+
+```ts
+const RendererPortMessageSchema = z.discriminatedUnion("type", [
+  envelope(
+    "DOCUMENT_RENDERED",
+    z.object({
+      schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
+      root: nonEmptyString,
+    }),
+  ),
+  envelope(
+    "SELECTION_CHANGED",
+    z.object({
+      elementIds: z.array(nonEmptyString),
+      primaryElementId: nonEmptyString.nullable(),
+      source: z.enum(["click", "marquee"]),
+    }),
+  ),
+  envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
+]);
+```
+
+## RendererWindowMessage
+
+Protocol type exported by `@openscene/protocol`.
+
+**Kind:** Type
+
+```ts
+type RendererWindowMessage = z.infer<typeof RendererWindowMessageSchema>;
+```
+
+## StudioWindowMessage
+
+Protocol type exported by `@openscene/protocol`.
+
+**Kind:** Type
+
+```ts
+type StudioWindowMessage = z.infer<typeof StudioWindowMessageSchema>;
 ```
 
 ## StudioPortMessage
 
-Messages emitted by the renderer to Studio after the port is connected.
+Protocol type exported by `@openscene/protocol`.
 
 **Kind:** Type
 
 ```ts
-type StudioPortMessage =
-  | StudioBridgeEnvelope<"SCENE_DOCUMENT", SceneDocumentSnapshot>
-  | StudioBridgeEnvelope<"SCENE_NODE_SELECTED", SceneNodeSnapshot>
-  | StudioBridgeEnvelope<"SCENE_ERROR", { message: string }>;
+type StudioPortMessage = z.infer<typeof StudioPortMessageSchema>;
 ```
 
 ## RendererPortMessage
 
-Messages emitted by Studio to a connected renderer.
+Protocol type exported by `@openscene/protocol`.
 
 **Kind:** Type
 
 ```ts
-type RendererPortMessage =
-  | StudioBridgeEnvelope<"SCENE_CONNECT", undefined>
-  | StudioBridgeEnvelope<"SCENE_SELECT", { elementId: string | null }>;
+type RendererPortMessage = z.infer<typeof RendererPortMessageSchema>;
 ```
 
 ## createBridgeEnvelope
 
-Creates a protocol envelope without exposing mutable shared state.
+Creates a v2 protocol envelope without exposing mutable shared state.
 
 **Kind:** Function
 
@@ -149,7 +532,13 @@ function createBridgeEnvelope<TType extends string, TPayload>(
   type: TType,
   payload: TPayload,
 ): StudioBridgeEnvelope<TType, TPayload> {
-  return { protocol: STUDIO_BRIDGE_PROTOCOL, version: STUDIO_BRIDGE_VERSION, sessionId, type, payload };
+  return {
+    protocol: STUDIO_BRIDGE_PROTOCOL,
+    version: STUDIO_BRIDGE_VERSION,
+    sessionId,
+    type,
+    payload,
+  };
 }
 ```
 
@@ -161,9 +550,7 @@ Validates the stable envelope fields before a message is processed.
 
 ```ts
 function isBridgeEnvelope(value: unknown): value is StudioBridgeEnvelope {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const candidate = value as Record<string, unknown>;
-  return candidate.protocol === STUDIO_BRIDGE_PROTOCOL && candidate.version === STUDIO_BRIDGE_VERSION && typeof candidate.sessionId === "string" && typeof candidate.type === "string";
+  return BridgeEnvelopeSchema.safeParse(value).success;
 }
 ```
 
@@ -181,8 +568,14 @@ function getEditorConnection(search: string): EditorConnection | null {
   const sessionId = params.get(editorQueryKeys.sessionId);
   if (!enabled || !studioOrigin || !sessionId) return null;
   try {
-    const origin = new URL(studioOrigin).origin;
-    return origin === studioOrigin ? { studioOrigin: origin, sessionId } : null;
+    const parsed = new URL(studioOrigin);
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      parsed.origin !== studioOrigin
+    ) {
+      return null;
+    }
+    return { studioOrigin: parsed.origin, sessionId };
   } catch {
     return null;
   }
@@ -197,7 +590,8 @@ Appends a validated Studio connection to a target iframe URL.
 
 ```ts
 function withEditorConnection(url: string, connection: EditorConnection): string {
-  const target = new URL(url, window.location.href);
+  const base = typeof window === "undefined" ? "http://localhost/" : window.location.href;
+  const target = new URL(url, base);
   target.searchParams.set(editorQueryKeys.enabled, "1");
   target.searchParams.set(editorQueryKeys.studioOrigin, connection.studioOrigin);
   target.searchParams.set(editorQueryKeys.sessionId, connection.sessionId);

@@ -3,7 +3,9 @@ import { z } from "zod";
 import {
   AppCreateSchema,
   AppPatchSchema,
+  AppKeyRotationSchema,
   AppSchema,
+  AppManifestSchema,
   AssetCompleteSchema,
   AssetSchema,
   BootstrapSchema,
@@ -17,8 +19,6 @@ import {
   LocaleCreateSchema,
   LocalePatchSchema,
   LocaleSchema,
-  ManifestRevisionSchema,
-  ManifestSchema,
   PreviewProfileCreateSchema,
   PreviewProfilePatchSchema,
   PreviewProfileSchema,
@@ -28,7 +28,6 @@ import {
   ResourceCreateSchema,
   ResourcePatchSchema,
   ResourceSchema,
-  RuntimeDeliverySchema,
   StudioSessionCreateSchema,
   StudioSessionSchema,
   UiSessionCreateSchema,
@@ -42,6 +41,7 @@ import {
 extendZodWithOpenApi(z);
 
 export const registry = new OpenAPIRegistry();
+const OpenApiJsonObjectSchema = z.object({}).catchall(z.unknown());
 
 const schemas = [
   ["App", AppSchema],
@@ -52,14 +52,12 @@ const schemas = [
   ["Document", DocumentSchema],
   ["Version", VersionSchema],
   ["Release", ReleaseSchema],
-  ["Asset", AssetSchema],
-  ["Manifest", ManifestSchema],
-  ["ManifestRevision", ManifestRevisionSchema],
-  ["Health", HealthSchema],
-  ["Bootstrap", BootstrapSchema],
+  ["Manifest", OpenApiJsonObjectSchema],
+  ["ManifestRevision", OpenApiJsonObjectSchema],
+  ["Bootstrap", OpenApiJsonObjectSchema],
   ["StudioSession", StudioSessionSchema],
-  ["UiSession", UiSessionSchema],
-  ["RuntimeDelivery", RuntimeDeliverySchema],
+  ["RuntimeDelivery", OpenApiJsonObjectSchema],
+  ["AppKeyRotation", AppKeyRotationSchema],
   ["Problem", ProblemSchema],
 ] as const;
 for (const [name, schema] of [...schemas].sort(([a], [b]) => a.localeCompare(b)))
@@ -180,6 +178,14 @@ const operations: Operation[] = [
     status: 204,
   },
   {
+    method: "post",
+    path: "/api/v1/apps/{appId}/app-keys/rotate",
+    operationId: "rotateAppKey",
+    tag: "Apps",
+    response: AppKeyRotationSchema,
+    params: true,
+  },
+  {
     method: "get",
     path: "/api/v1/apps/{appId}/preview-profiles",
     operationId: "listPreviewProfiles",
@@ -236,7 +242,7 @@ const operations: Operation[] = [
     path: "/api/v1/apps/{appId}/manifest/revisions",
     operationId: "listManifestRevisions",
     tag: "Manifest",
-    response: z.array(ManifestRevisionSchema),
+    response: z.array(JsonObjectSchema),
     params: true,
   },
   {
@@ -244,7 +250,7 @@ const operations: Operation[] = [
     path: "/api/v1/apps/{appId}/manifest/revisions/{revisionId}",
     operationId: "getManifestRevision",
     tag: "Manifest",
-    response: ManifestRevisionSchema,
+    response: JsonObjectSchema,
     params: true,
   },
   {
@@ -261,7 +267,7 @@ const operations: Operation[] = [
     operationId: "pushManifest",
     tag: "Manifest",
     response: JsonObjectSchema,
-    body: ManifestSchema,
+    body: JsonObjectSchema,
     params: true,
     headers: AppKeyHeaderSchema,
   },
@@ -409,11 +415,20 @@ const operations: Operation[] = [
     params: true,
   },
   {
+    method: "patch",
+    path: "/api/v1/studio-sessions/{sessionId}/draft",
+    operationId: "updateStudioDraft",
+    tag: "Studio Sessions",
+    response: JsonObjectSchema,
+    body: DraftPatchSchema,
+    params: true,
+  },
+  {
     method: "get",
     path: "/api/v1/runtime/apps/{appKey}/pages/{pageKey}",
     operationId: "getRuntimePage",
     tag: "Runtime",
-    response: RuntimeDeliverySchema,
+    response: JsonObjectSchema,
     params: true,
   },
   {
@@ -421,7 +436,7 @@ const operations: Operation[] = [
     path: "/api/v1/runtime/apps/{appKey}/releases/{releaseId}",
     operationId: "getRuntimeRelease",
     tag: "Runtime",
-    response: RuntimeDeliverySchema,
+    response: JsonObjectSchema,
     params: true,
   },
 ];

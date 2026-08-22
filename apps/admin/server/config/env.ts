@@ -21,6 +21,7 @@ const envSchema = z.object({
   OPENSCENE_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
   OPENSCENE_S3_PUBLIC_BASE_URL: z.string().url().optional().or(z.literal("")),
   OPENSCENE_STUDIO_PUBLIC_BASE_URL: z.string().url().default("http://localhost:5173"),
+  OPENSCENE_API_PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
   OPENSCENE_SESSION_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(1_800),
   OPENSCENE_UI_SESSION_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(28_800),
   OPENSCENE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
@@ -51,6 +52,7 @@ export type AppConfig = {
     forcePathStyle: boolean;
     publicBaseUrl?: string;
   };
+  api: { publicBaseUrl: string };
   studio: { publicBaseUrl: string; sessionTtlSeconds: number; uiSessionTtlSeconds: number };
   security: { maxUploadBytes: number; allowedMimeTypes: string[] };
 };
@@ -107,6 +109,7 @@ export function getConfig(): AppConfig {
       forcePathStyle: env.OPENSCENE_S3_FORCE_PATH_STYLE === "true",
       publicBaseUrl: env.OPENSCENE_S3_PUBLIC_BASE_URL || undefined,
     },
+    api: { publicBaseUrl: env.OPENSCENE_API_PUBLIC_BASE_URL },
     studio: {
       publicBaseUrl: env.OPENSCENE_STUDIO_PUBLIC_BASE_URL,
       sessionTtlSeconds: env.OPENSCENE_SESSION_TTL_SECONDS,

@@ -44,7 +44,7 @@ export const navigationGroups = [
       { href: "/overview", key: "overview", icon: "chart" },
       { href: "/pages", key: "pages", icon: "file" },
       { href: "/templates", key: "templates", icon: "copy" },
-      { href: "/manifest", key: "manifest", icon: "code" },
+      { href: "/components", key: "components", icon: "cubes" },
       { href: "/preview-profiles", key: "previewProfiles", icon: "eye" },
       { href: "/assets", key: "assets", icon: "image" },
       { href: "/categories", key: "categories", icon: "tag" },

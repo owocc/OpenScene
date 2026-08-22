@@ -1,3 +1,4 @@
+import { APP_TYPE_WEB } from "@openscene/constants";
 import { initializeDatabase } from "./client";
 import { apps, appKeys, categories, locales } from "./schema";
 import { eq } from "drizzle-orm";
@@ -19,6 +20,7 @@ if (!existing) {
         name: "OpenScene Demo",
         description: "Development seed App",
         status: "active",
+        type: APP_TYPE_WEB,
         manifestMode: "push",
         createdAt: timestamp,
         updatedAt: timestamp,

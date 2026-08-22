@@ -1,11 +1,9 @@
-import type { SceneDocumentSnapshot } from "@openscene/protocol";
+import type { AppType } from "@openscene/constants";
+import type { SceneDocument } from "@openscene/protocol";
 import type { ReactNode } from "react";
 
-import type { AppDocument } from "@/core/document";
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
-
-export type CanvasKind = "web-iframe" | "native" | "text";
 
 export type PreviewInteractionMode = "preview" | "select";
 
@@ -19,23 +17,28 @@ export interface CanvasRendererProps {
   url: string;
   allowedOrigin: string;
   identity: PreviewIdentity;
-  document: AppDocument;
-  locale: string;
+  appType: AppType;
+  document: SceneDocument;
   revision: number;
-  selectedId: string;
+  selectedNodeIds: string[];
+  primaryNodeId: string | null;
   interactionMode: PreviewInteractionMode;
-  onSelect: (id: string) => void;
-  onRemoteDocument?: (document: SceneDocumentSnapshot) => void;
+  onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
+  onError?: (message: string) => void;
+}
+
+export interface CanvasRendererAdapter {
+  appType: AppType;
+  render: (props: CanvasRendererProps) => ReactNode;
 }
 
 export interface StudioCanvasProps {
-  kind?: CanvasKind;
   surface: Surface;
   bootstrap: StudioBootstrap;
-  document: AppDocument;
-  locale: string;
+  document: SceneDocument;
   revision: number;
-  selectedId: string;
+  selectedNodeIds: string[];
+  primaryNodeId: string | null;
   viewport: ViewportState;
   activeToolMode: ActiveToolMode;
   pastLength?: number;
@@ -43,11 +46,9 @@ export interface StudioCanvasProps {
   onPatchViewport: (patch: Partial<ViewportState>) => void;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
-  onSelectNode: (id: string | null) => void;
-  onRemoteDocument?: (document: SceneDocumentSnapshot) => void;
+  onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onCopyJson?: () => void;
   onSave?: () => void;
-  renderCustomPreview?: (props: CanvasRendererProps) => ReactNode;
 }

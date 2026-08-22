@@ -7,6 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { APP_TYPE_WEB, APP_TYPES } from "@openscene/constants";
 
 const timestamps = {
   createdAt: text("created_at").notNull(),
@@ -20,6 +21,7 @@ export const apps = sqliteTable(
     key: text("key").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
+    type: text("type", { enum: APP_TYPES }).notNull().default(APP_TYPE_WEB),
     status: text("status", { enum: ["active", "disabled"] }).notNull(),
     manifestMode: text("manifest_mode", { enum: ["remote", "push"] }).notNull(),
     manifestUrl: text("manifest_url"),

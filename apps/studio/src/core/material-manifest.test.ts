@@ -1,3 +1,4 @@
+import { APP_TYPE_WEB } from "@openscene/constants";
 import { describe, expect, it } from "vite-plus/test";
 
 import { materialManifestToAdapterMeta } from "./material-manifest";
@@ -6,11 +7,11 @@ describe("App material manifest adapter", () => {
   it("maps union schema, enum and explicit editor metadata", () => {
     const adapter = materialManifestToAdapterMeta({
       protocolVersion: "1.0",
-      app: { key: "demo" },
+      app: { key: "demo", type: APP_TYPE_WEB },
       components: {
         Card: {
           title: "Card",
-          slots: ["default", "footer"],
+          slots: ["default", "footer"] as unknown as Record<string, unknown>,
           props: {
             tone: {
               anyOf: [{ type: "string" }, { enum: ["neutral", "brand"] }],

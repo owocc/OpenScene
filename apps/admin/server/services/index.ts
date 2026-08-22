@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
 import type { AppDatabase } from "../db/client";
 import { hashSecret, newId, newSecret, nowIso } from "../db/ids";
 import {
@@ -28,7 +28,15 @@ import {
 import { getStorage } from "../storage";
 import { assetObjectKey, releaseObjectKey } from "../storage/keys";
 import {
+  AppManifestSchema,
+  RuntimePageDeliverySchema,
+  SceneDocumentSchema,
+  createEmptySceneDocument,
+  type SceneDocument,
+} from "@openscene/protocol";
+import {
   AppCreateSchema,
+  AppKeyRotationSchema,
   AppPatchSchema,
   AppSchema,
   AssetCompleteSchema,
@@ -40,8 +48,6 @@ import {
   LocaleCreateSchema,
   LocalePatchSchema,
   LocaleSchema,
-  ManifestPushSchema,
-  ManifestSchema,
   PaginationQuerySchema,
   PreviewProfileCreateSchema,
   PreviewProfilePatchSchema,
@@ -50,16 +56,13 @@ import {
   ResourceCreateSchema,
   ResourcePatchSchema,
   ResourceSchema,
-  SceneDocumentSchema,
   StudioSessionCreateSchema,
   UploadIntentSchema,
   VersionCreateSchema,
   VersionSchema,
   type ResourceKind,
-  type SceneDocument,
 } from "../validation/schemas";
 import { z } from "zod";
-
 type ResourceRow = typeof pages.$inferSelect | typeof templates.$inferSelect;
 type ResourceRecordInput = {
   id: string;
@@ -74,12 +77,7 @@ type ResourceRecordInput = {
   updatedAt: string;
 };
 
-const EmptyDocument: SceneDocument = {
-  schemaVersion: "1.0.0",
-  pageInfo: {},
-  globalConfig: {},
-  spec: {},
-};
+const EmptyDocument = createEmptySceneDocument();
 
 export async function listApps(
   db: AppDatabase,
@@ -109,6 +107,7 @@ export async function createApp(db: AppDatabase, input: unknown): Promise<unknow
           key: body.key,
           name: body.name,
           description: body.description,
+          type: body.type,
           status: body.status,
           manifestMode: body.manifest.mode,
           manifestUrl: body.manifest.url,
@@ -184,6 +183,30 @@ export async function getApp(db: AppDatabase, appId: string): Promise<unknown> {
   const row = await db.select().from(apps).where(eq(apps.id, appId)).get();
   if (!row) throw notFound();
   return AppSchema.parse(appRecord(row));
+}
+export async function rotateAppKey(db: AppDatabase, appId: string): Promise<{ appKey: string }> {
+  await getAppRow(db, appId);
+  const appKey = newSecret("appkey");
+  const timestamp = nowIso();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(appKeys)
+      .set({ revokedAt: timestamp, updatedAt: timestamp })
+      .where(and(eq(appKeys.appId, appId), eq(appKeys.kind, "app"), isNull(appKeys.revokedAt)))
+      .run();
+    await tx
+      .insert(appKeys)
+      .values({
+        id: newId("key"),
+        appId,
+        kind: "app",
+        keyHash: hashSecret(appKey),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .run();
+  });
+  return AppKeyRotationSchema.parse({ appKey });
 }
 
 export async function updateApp(db: AppDatabase, appId: string, input: unknown): Promise<unknown> {
@@ -366,7 +389,7 @@ export async function getManifest(db: AppDatabase, appId: string): Promise<unkno
     .get();
   if (!revision) return { manifest: null, revision: null };
   return {
-    manifest: parseJson(ManifestSchema, revision.manifestJson),
+    manifest: parseJson(AppManifestSchema, revision.manifestJson),
     revision: manifestRevisionRecord(revision),
   };
 }
@@ -403,11 +426,18 @@ export async function pushManifest(
   source: "push" | "sync" = "push",
 ): Promise<unknown> {
   const app = await getAppRow(db, appId);
-  const manifest = ManifestPushSchema.parse(input);
-  if (manifest.app.key !== app.key)
-    throw validation("Manifest app identity does not match the target App", [
-      { path: "app.key", message: "Must match the App key" },
-    ]);
+  const manifest = AppManifestSchema.parse(input);
+  if (manifest.app.key !== app.key || manifest.app.type !== app.type) {
+    const errors = [
+      ...(manifest.app.key !== app.key
+        ? [{ path: "app.key", message: "Must match the App key" }]
+        : []),
+      ...(manifest.app.type !== app.type
+        ? [{ path: "app.type", message: "Must match the App type" }]
+        : []),
+    ];
+    throw validation("Manifest app identity does not match the target App", errors);
+  }
   const manifestJson = stableJson(manifest);
   const checksum = await sha256(manifestJson);
   const existing = await db
@@ -415,8 +445,17 @@ export async function pushManifest(
     .from(manifestRevisions)
     .where(and(eq(manifestRevisions.appId, appId), eq(manifestRevisions.checksum, checksum)))
     .get();
-  if (existing)
-    return { manifest: manifest, revision: manifestRevisionRecord(existing), unchanged: true };
+  if (existing) {
+    if (app.activeManifestRevisionId === existing.id)
+      return { manifest, revision: manifestRevisionRecord(existing), unchanged: true };
+    const timestamp = nowIso();
+    await db
+      .update(apps)
+      .set({ activeManifestRevisionId: existing.id, updatedAt: timestamp })
+      .where(eq(apps.id, appId))
+      .run();
+    return { manifest, revision: manifestRevisionRecord(existing), unchanged: false };
+  }
   const timestamp = nowIso();
   const row = {
     id: newId("manifest"),
@@ -712,6 +751,7 @@ export async function createVersion(
 ): Promise<unknown> {
   const body = VersionCreateSchema.parse(input);
   const document = await getDocumentRow(db, appId, documentId);
+  const canonicalDocument = parseJson(SceneDocumentSchema, document.draftJson);
   if (body.sourceRevision !== undefined && body.sourceRevision !== document.revision)
     throw conflict(
       `Expected revision ${body.sourceRevision} but current revision is ${document.revision}`,
@@ -729,7 +769,7 @@ export async function createVersion(
     appId,
     documentId,
     versionNumber: (latest?.versionNumber ?? 0) + 1,
-    documentJson: document.draftJson,
+    documentJson: stableJson(canonicalDocument),
     sourceRevision: document.revision,
     message: body.message,
     createdAt: nowIso(),
@@ -1231,14 +1271,16 @@ export async function createStudioSession(
     updatedAt: timestamp,
   };
   await db.insert(studioSessions).values(row).run();
-  const studioBaseUrl = getConfig().studio.publicBaseUrl.replace(/\/$/, "");
+  const config = getConfig();
+  const studioBaseUrl = config.studio.publicBaseUrl.replace(/\/$/, "");
+  const serverUrl = encodeURIComponent(config.api.publicBaseUrl);
   return {
     id: row.id,
     token,
     expiresAt,
     resourceKind: row.resourceKind,
     resourceId: row.resourceId,
-    launchUrl: `${studioBaseUrl}?sessionId=${encodeURIComponent(row.id)}#token=${encodeURIComponent(token)}`,
+    launchUrl: `${studioBaseUrl}?server-url=${serverUrl}&sessionId=${encodeURIComponent(row.id)}#token=${encodeURIComponent(token)}`,
   };
 }
 
@@ -1260,14 +1302,14 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
   const document = await getDocumentRow(db, session.appId, resource.documentId);
   const profile = await getPreviewRow(db, session.appId, session.previewProfileId);
   const manifestResult = z
-    .object({ manifest: ManifestSchema.nullable() })
+    .object({ manifest: AppManifestSchema.nullable() })
     .passthrough()
     .parse(await getManifest(db, session.appId));
   const allowedOrigin = JSON.parse(profile.allowedOriginsJson) as unknown;
   const origins = z.array(z.string()).parse(allowedOrigin);
   return {
     session: { id: session.id, expiresAt: session.expiresAt },
-    app: { id: app.id, key: app.key, name: app.name },
+    app: { id: app.id, key: app.key, name: app.name, type: app.type },
     resource: {
       id: resource.id,
       kind: session.resourceKind,
@@ -1283,6 +1325,27 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
     capabilities: { saveDraft: true, createVersion: true, publish: true, uploadAsset: true },
     returnUrl: session.returnUrl,
   };
+}
+
+export async function updateStudioDraft(
+  db: AppDatabase,
+  sessionId: string,
+  input: unknown,
+): Promise<unknown> {
+  const session = await db
+    .select()
+    .from(studioSessions)
+    .where(eq(studioSessions.id, sessionId))
+    .get();
+  if (!session) throw notFound();
+  if (new Date(session.expiresAt).getTime() <= Date.now()) throw new ProblemSessionExpired();
+  const resource = await getResourceRow(
+    db,
+    session.appId,
+    session.resourceKind,
+    session.resourceId,
+  );
+  return updateDraft(db, session.appId, resource.documentId, input);
 }
 
 export async function runtimePage(
@@ -1331,13 +1394,13 @@ export async function runtimePage(
     .get();
   if (!version) throw notFound();
   const documentJson = parseJson(SceneDocumentSchema, version.documentJson);
-  const payload = {
-    app: { id: app.id, key: app.key },
+  const payload = RuntimePageDeliverySchema.parse({
+    app: { id: app.id, key: app.key, type: app.type },
     page: { id: page.id, key: page.key, title: page.title },
     release: releaseRecord(release),
     version: versionRecord(version),
     document: documentJson,
-  };
+  });
   return { payload, etag: `"${version.id}-${version.sourceRevision}"` };
 }
 
@@ -1366,15 +1429,21 @@ export async function runtimeRelease(
     .where(and(eq(documentVersions.appId, app.id), eq(documentVersions.id, release.versionId)))
     .get();
   if (!version) throw notFound();
-  return {
-    payload: {
-      app: { id: app.id, key: app.key },
-      release: releaseRecord(release),
-      version: versionRecord(version),
-      document: parseJson(SceneDocumentSchema, version.documentJson),
-    },
-    etag: `"${version.id}-${version.sourceRevision}"`,
-  };
+  const page = await db
+    .select()
+    .from(pages)
+    .where(and(eq(pages.appId, app.id), eq(pages.documentId, release.documentId)))
+    .limit(1)
+    .get();
+  if (!page) throw notFound();
+  const payload = RuntimePageDeliverySchema.parse({
+    app: { id: app.id, key: app.key, type: app.type },
+    page: { id: page.id, key: page.key, title: page.title },
+    release: releaseRecord(release),
+    version: versionRecord(version),
+    document: parseJson(SceneDocumentSchema, version.documentJson),
+  });
+  return { payload, etag: `"${version.id}-${version.sourceRevision}"` };
 }
 
 export async function storageHealth(): Promise<unknown> {
@@ -1451,6 +1520,7 @@ function appRecord(row: typeof apps.$inferSelect): unknown {
     key: row.key,
     name: row.name,
     description: row.description,
+    type: row.type,
     status: row.status,
     manifest: {
       mode: row.manifestMode,
@@ -1581,7 +1651,7 @@ function manifestRevisionRecord(row: typeof manifestRevisions.$inferSelect): unk
     appId: row.appId,
     protocolVersion: row.protocolVersion,
     appKey: row.appKey,
-    manifest: parseJson(ManifestSchema, row.manifestJson),
+    manifest: parseJson(AppManifestSchema, row.manifestJson),
     checksum: row.checksum,
     source: row.source,
     createdAt: row.createdAt,

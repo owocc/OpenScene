@@ -1,60 +1,62 @@
 import { describe, expect, it } from "vite-plus/test";
+import { createEmptySceneDocument } from "@openscene/protocol";
 
-import type { AppDocument } from "./document";
 import { createEditorState, editorReducer } from "./editor-state";
 
-const emptyDocument: AppDocument = {
-  schemaVersion: "1.0",
-  pageInfo: { title: "", description: "", keywords: [], locale: "en-US", metadata: {} },
-  globalConfig: { design: {}, body: {}, variables: {} },
-  spec: { root: "", elements: {} },
-};
+const emptyDocument = createEmptySceneDocument();
 
 describe("Studio editor state", () => {
-  it("creates a root from the first material without a hidden node", () => {
-    const state = createEditorState(emptyDocument, 0);
-    const next = editorReducer(state, {
-      type: "node.add",
-      elementId: "button-1",
-      element: { type: "Button" },
-    });
-
-    expect(next.document.spec.root).toBe("button-1");
-    expect(Object.keys(next.document.spec.elements)).toEqual(["button-1"]);
-  });
-
-  it("deletes the root by returning to an empty spec", () => {
+  it("normalizes multi-selection to known unique IDs and a valid primary", () => {
     const state = createEditorState(
       {
         ...emptyDocument,
-        spec: { root: "root", elements: { root: { type: "View" } } },
+        spec: {
+          ...emptyDocument.spec,
+          elements: {
+            root: { type: "View", props: {}, children: ["button"] },
+            button: { type: "Button", props: {}, children: [] },
+          },
+        },
       },
-      1,
+      0,
     );
-    const next = editorReducer(state, { type: "node.delete", elementId: "root" });
-    expect(next.document.spec).toEqual({ root: "", elements: {} });
-    expect(next.selectedNodeId).toBeNull();
-  });
-
-  it("clamps zoom and clears selection in hand mode", () => {
-    const state = createEditorState(emptyDocument, 0);
-    const zoomed = editorReducer(state, {
-      type: "viewport.patch",
-      patch: { zoom: 9 },
+    const next = editorReducer(state, {
+      type: "nodes.select",
+      nodeIds: ["button", "missing", "button", "root"],
+      primaryNodeId: "missing",
     });
-    const hand = editorReducer(
-      { ...zoomed, selectedNodeId: "node-1" },
-      { type: "tool.set", mode: "hand" },
-    );
-    expect(zoomed.viewport.zoom).toBe(3);
-    expect(hand.selectedNodeId).toBeNull();
-    expect(state.surface).toBe("visual");
+    expect(next.selectedNodeIds).toEqual(["button", "root"]);
+    expect(next.selectedNodeId).toBe("button");
   });
 
-  it("keeps the preview locale in sync with the document locale", () => {
+  it("clears selection in hand mode and filters it after document replacement", () => {
     const state = createEditorState(emptyDocument, 0);
-    const next = editorReducer(state, { type: "locale.switch", locale: "zh-CN" });
+    const selected = editorReducer(state, {
+      type: "nodes.select",
+      nodeIds: ["root"],
+      primaryNodeId: "root",
+    });
+    const hand = editorReducer(selected, { type: "tool.set", mode: "hand" });
+    expect(hand.selectedNodeIds).toEqual([]);
+    expect(hand.selectedNodeId).toBeNull();
+    const replacement = {
+      ...emptyDocument,
+      spec: {
+        ...emptyDocument.spec,
+        elements: { next: { type: "View", props: {} } },
+        root: "next",
+      },
+    };
+    const replaced = editorReducer(selected, { type: "document.replace", document: replacement });
+    expect(replaced.selectedNodeIds).toEqual([]);
+    expect(replaced.selectedNodeId).toBeNull();
+  });
 
+  it("clamps zoom and keeps locale in sync with the canonical document", () => {
+    const state = createEditorState(emptyDocument, 0);
+    const zoomed = editorReducer(state, { type: "viewport.patch", patch: { zoom: 9 } });
+    const next = editorReducer(state, { type: "locale.switch", locale: "zh-CN" });
+    expect(zoomed.viewport.zoom).toBe(3);
     expect(next.locale).toBe("zh-CN");
     expect(next.document.pageInfo.locale).toBe("zh-CN");
     expect(next.document.spec.state?.lang).toBe("zh-CN");

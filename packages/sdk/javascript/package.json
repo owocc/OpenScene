@@ -1,7 +1,7 @@
 {
   "name": "@openscene/javascript",
   "version": "0.0.0",
-  "description": "A starter for creating a TypeScript package.",
+  "description": "Framework-neutral OpenScene runtime client and Vite manifest publisher.",
   "homepage": "https://github.com/author/library#readme",
   "bugs": {
     "url": "https://github.com/author/library/issues"
@@ -18,7 +18,7 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.mjs",
-    "./solid": "./dist/solid.mjs",
+    "./vite": "./dist/vite.mjs",
     "./package.json": "./package.json"
   },
   "publishConfig": {
@@ -32,17 +32,14 @@
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@openscene/protocol": "workspace:*"
+    "@json-render/core": "^0.20.0",
+    "@openscene/protocol": "workspace:*",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "jsdom": "^27.0.0",
-    "solid-js": "^1.9.14",
     "typescript": "catalog:",
-    "vite-plugin-solid": "^2.11.13",
     "vite-plus": "catalog:"
-  },
-  "peerDependencies": {
-    "solid-js": "^1.9.14"
   }
 }

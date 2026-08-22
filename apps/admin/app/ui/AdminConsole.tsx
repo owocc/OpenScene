@@ -12,6 +12,8 @@ import {
   Star,
   Trash,
 } from "@phosphor-icons/react";
+import { APP_TYPE_WEB } from "@openscene/constants";
+import { AppManifestSchema, type ComponentManifest } from "@openscene/protocol";
 import { useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
@@ -30,13 +32,63 @@ import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { components } from "@openscene/api-client";
 import { api, fetchClient } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import { isAppScopedPath } from "./navigation";
 
 type App = components["schemas"]["App"];
+
+function getActiveManifest(data: unknown) {
+  const result = AppManifestSchema.safeParse(
+    typeof data === "object" && data !== null && "manifest" in data ? data.manifest : undefined,
+  );
+  return result.success ? result.data : null;
+}
+
+function componentPropCount(component: ComponentManifest) {
+  const properties = component.props.properties;
+  return typeof properties === "object" && properties !== null && !Array.isArray(properties)
+    ? Object.keys(properties).length
+    : 0;
+}
+
+type ManifestRevision = {
+  id: string;
+  source: string;
+  checksum: string;
+  createdAt: string;
+};
+
+function getManifestRevisions(data: unknown): ManifestRevision[] {
+  if (!Array.isArray(data)) return [];
+
+  return data.filter(
+    (revision): revision is ManifestRevision =>
+      typeof revision === "object" &&
+      revision !== null &&
+      "id" in revision &&
+      typeof revision.id === "string" &&
+      "source" in revision &&
+      typeof revision.source === "string" &&
+      "checksum" in revision &&
+      typeof revision.checksum === "string" &&
+      "createdAt" in revision &&
+      typeof revision.createdAt === "string",
+  );
+}
+
+function ComponentMetadata({ title, value }: { title: string; value: unknown }) {
+  return (
+    <Surface className="grid gap-3 p-4">
+      <Text variant="heading" as="h2">
+        {title}
+      </Text>
+      <Code code={JSON.stringify(value ?? {}, null, 2)} lang="jsonc" />
+    </Surface>
+  );
+}
 type Resource = components["schemas"]["Resource"];
 
 export function AdminConsole() {
@@ -89,6 +141,8 @@ export function AdminConsole() {
   if (pathname === "/locales") return <LocalesView />;
   if (pathname === "/assets") return <AssetsView />;
   if (pathname === "/manifest") return <ManifestView />;
+  if (pathname === "/components") return <ComponentsView />;
+  if (pathname.startsWith("/components/")) return <ComponentDetailView />;
   if (pathname === "/settings") return <SettingsView />;
   return <NotFoundView />;
 }
@@ -173,6 +227,7 @@ function AppsView() {
     key: "",
     name: "",
     description: "",
+    type: APP_TYPE_WEB,
     status: "active",
     mode: "push",
   });
@@ -205,8 +260,14 @@ function AppsView() {
   });
 
   function startCreate() {
-    setForm({ key: "", name: "", description: "", status: "active", mode: "push" });
-    setOpen(true);
+    setForm({
+      key: "",
+      name: "",
+      description: "",
+      type: APP_TYPE_WEB,
+      status: "active",
+      mode: "push",
+    });
   }
   function submitCreate() {
     create.mutate({
@@ -214,6 +275,7 @@ function AppsView() {
         key: form.key,
         name: form.name,
         description: form.description,
+        type: APP_TYPE_WEB,
         status: form.status as "active" | "disabled",
         manifest: { mode: form.mode as "remote" | "push" },
       },
@@ -295,6 +357,7 @@ function AppsView() {
                               key: app.key,
                               name: app.name,
                               description: app.description,
+                              type: app.type,
                               status: app.status,
                               mode: app.manifest.mode,
                             });
@@ -379,6 +442,7 @@ function AppsView() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
+            <Input label="Type" value={APP_TYPE_WEB} readOnly />
             <Input
               label="Description"
               value={form.description}
@@ -1016,9 +1080,24 @@ function ResourceDetailView() {
       void queryClient.invalidateQueries();
     },
   });
+  const studioWindow = useRef<Window | null>(null);
   const studio = api.useMutation("post", "/api/v1/apps/{appId}/studio-sessions", {
     onSuccess: (data) => {
-      if (data?.launchUrl) window.open(data.launchUrl, "_blank", "noopener,noreferrer");
+      const launchWindow = studioWindow.current;
+      studioWindow.current = null;
+      if (!data?.launchUrl) {
+        launchWindow?.close();
+        return;
+      }
+      if (launchWindow && !launchWindow.closed) {
+        launchWindow.location.replace(data.launchUrl);
+        return;
+      }
+      window.location.assign(data.launchUrl);
+    },
+    onError: () => {
+      studioWindow.current?.close();
+      studioWindow.current = null;
     },
   });
   const [versionMessage, setVersionMessage] = useState("");
@@ -1036,8 +1115,11 @@ function ResourceDetailView() {
       <PageHeader title={resource.title} description={resource.description}>
         <StatusBadge status={resource.status} />
         <Button
-          onClick={() =>
-            profile &&
+          loading={studio.isPending}
+          onClick={() => {
+            if (!profile) return;
+            studioWindow.current = window.open("", "_blank");
+            if (studioWindow.current) studioWindow.current.opener = null;
             studio.mutate({
               params: { path: { appId: context.appId ?? "" } },
               body: {
@@ -1046,8 +1128,8 @@ function ResourceDetailView() {
                 previewProfileId: profile.id,
                 returnUrl: window.location.href,
               },
-            })
-          }
+            });
+          }}
         >
           {t("studio")}
         </Button>
@@ -1886,6 +1968,181 @@ function AssetsView() {
   );
 }
 
+function ComponentsView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const [search, setSearch] = useState("");
+  const query = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const manifest = getActiveManifest(query.data);
+  const revision =
+    typeof query.data === "object" &&
+    query.data !== null &&
+    "revision" in query.data &&
+    typeof query.data.revision === "object" &&
+    query.data.revision !== null &&
+    "createdAt" in query.data.revision &&
+    typeof query.data.revision.createdAt === "string"
+      ? query.data.revision.createdAt
+      : null;
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const components = manifest
+    ? Object.entries(manifest.components)
+        .map(([key, component]) => ({ key, component }))
+        .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
+        .filter(({ key, component }) =>
+          [key, component.title, component.category ?? ""].some((value) =>
+            value.toLocaleLowerCase().includes(normalizedSearch),
+          ),
+        )
+    : [];
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.error) return <ErrorState error={query.error} />;
+
+  return (
+    <>
+      <PageHeader
+        title={t("components")}
+        description="Read-only component metadata from the active build manifest."
+      />
+      {!manifest ? (
+        <Empty
+          icon={<ClipboardText size={32} />}
+          title="No active manifest"
+          description="Components are managed by build output. Run the app build with manifest push configured to publish them."
+        />
+      ) : (
+        <>
+          <Input
+            aria-label="Search components"
+            placeholder={t("search")}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="mb-4 w-full sm:max-w-sm"
+          />
+          {components.length === 0 ? (
+            <Empty title={t("noResults")} description={t("noResultsDescription")} />
+          ) : (
+            <LayerCard className="w-full overflow-x-auto p-0">
+              <Table layout="fixed">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head>{t("components")}</Table.Head>
+                    <Table.Head>Category</Table.Head>
+                    <Table.Head>Props</Table.Head>
+                    <Table.Head>Manifest revision</Table.Head>
+                    <Table.Head sticky="right">
+                      <span className="sr-only">{t("details")}</span>
+                    </Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {components.map(({ key, component }) => (
+                    <Table.Row key={key}>
+                      <Table.Cell>
+                        <span className="font-medium">{component.title}</span>
+                        <span className="font-mono text-kumo-subtle">{key}</span>
+                      </Table.Cell>
+                      <Table.Cell>{component.category ?? "—"}</Table.Cell>
+                      <Table.Cell>{componentPropCount(component)}</Table.Cell>
+                      <Table.Cell>
+                        {revision ? new Date(revision).toLocaleString() : "—"}
+                      </Table.Cell>
+                      <Table.Cell sticky="right" className="text-right">
+                        <LinkButton
+                          size="sm"
+                          href={context.href(`/components/${encodeURIComponent(key)}`)}
+                        >
+                          {t("details")}
+                        </LinkButton>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
+            </LayerCard>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function ComponentDetailView() {
+  const pathname = usePathname();
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const componentKey = decodeURIComponent(pathname.slice("/components/".length));
+  const query = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const manifest = getActiveManifest(query.data);
+  const component = manifest?.components[componentKey];
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.error) return <ErrorState error={query.error} />;
+
+  if (!manifest) {
+    return (
+      <>
+        <PageHeader title={t("components")} />
+        <Empty
+          icon={<ClipboardText size={32} />}
+          title="No active manifest"
+          description="Components are managed by build output. Run the app build with manifest push configured to publish them."
+        />
+      </>
+    );
+  }
+
+  if (!component) {
+    return (
+      <>
+        <PageHeader title={t("components")}>
+          <LinkButton href={context.href("/components")}>{t("components")}</LinkButton>
+        </PageHeader>
+        <Empty title={t("notFound")} description="This component is not in the active manifest." />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PageHeader title={component.title} description={component.description}>
+        <LinkButton href={context.href("/components")}>{t("components")}</LinkButton>
+      </PageHeader>
+      <Surface className="mb-4 grid gap-3 p-4 sm:grid-cols-3">
+        <div>
+          <Text variant="secondary">Component key</Text>
+          <span className="font-mono">{componentKey}</span>
+        </div>
+        <div>
+          <Text variant="secondary">Category</Text>
+          <Text>{component.category ?? "—"}</Text>
+        </div>
+        <div>
+          <Text variant="secondary">Props</Text>
+          <Text>{componentPropCount(component)}</Text>
+        </div>
+      </Surface>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ComponentMetadata title="Props schema" value={component.props} />
+        <ComponentMetadata title="Editor metadata" value={component.editor} />
+        <ComponentMetadata title="Dynamic metadata" value={component["dynamic"]} />
+        <ComponentMetadata title="Events" value={component.events} />
+        <ComponentMetadata title="Slots" value={component.slots} />
+        <ComponentMetadata
+          title="Runtime mapping"
+          value={component["runtime"] ?? component["runtimeMapping"]}
+        />
+        <ComponentMetadata title="Capabilities" value={component.capabilities} />
+      </div>
+    </>
+  );
+}
+
 function ManifestView() {
   const context = useAdminContext();
   const { t } = useI18n();
@@ -1900,6 +2157,7 @@ function ManifestView() {
   const revisions = api.useQuery("get", "/api/v1/apps/{appId}/manifest/revisions", {
     params: { path: { appId: context.appId ?? "" } },
   });
+  const manifestRevisions = getManifestRevisions(revisions.data);
   const sync = api.useMutation("post", "/api/v1/apps/{appId}/manifest/sync", {
     onSuccess: () => {
       toast.add({ title: t("updated") });
@@ -1979,7 +2237,7 @@ function ManifestView() {
         <Text variant="heading" as="h2">
           Revision history
         </Text>
-        {(revisions.data ?? []).map((revision) => (
+        {manifestRevisions.map((revision) => (
           <div key={revision.id} className="flex justify-between border-b border-kumo-line py-2">
             <Text>
               {revision.source} · {revision.checksum}
@@ -2009,7 +2267,34 @@ function SettingsView() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [runtimeUrl, setRuntimeUrl] = useState("");
+  const [rotationConfirmationAppId, setRotationConfirmationAppId] = useState<string | null>(null);
+  const [rotatedAppKey, setRotatedAppKey] = useState<string | null>(null);
+  const [rotationError, setRotationError] = useState<unknown>(null);
+  const [isRotating, setIsRotating] = useState(false);
   const app = query.data;
+  async function rotateAppKey() {
+    setRotationError(null);
+    setIsRotating(true);
+    try {
+      const result = await fetchClient.POST("/api/v1/apps/{appId}/app-keys/rotate", {
+        params: { path: { appId: rotationConfirmationAppId ?? "" } },
+      });
+      if (result.error) {
+        setRotationError(result.error);
+        return;
+      }
+      if (!result.data) {
+        setRotationError(new Error(t("requestFailed")));
+        return;
+      }
+      setRotationConfirmationAppId(null);
+      setRotatedAppKey(result.data.appKey);
+    } catch (error) {
+      setRotationError(error);
+    } finally {
+      setIsRotating(false);
+    }
+  }
   useEffect(() => {
     if (app) {
       setName(app.name);
@@ -2086,6 +2371,58 @@ function SettingsView() {
           </Button>
         </LayerCard.Primary>
       </LayerCard>
+      <LayerCard className="mt-4 max-w-2xl">
+        <LayerCard.Secondary>{t("appKey")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-4">
+          <Text variant="secondary">{t("rotateAppKeyDescription")}</Text>
+          {rotationError ? <ErrorState error={rotationError} /> : null}
+          <div>
+            <Button
+              onClick={() => {
+                setRotationError(null);
+                setRotationConfirmationAppId(context.appId ?? null);
+              }}
+            >
+              {t("rotateAppKey")}
+            </Button>
+          </div>
+        </LayerCard.Primary>
+      </LayerCard>
+      <Dialog.Root
+        role="alertdialog"
+        open={Boolean(rotationConfirmationAppId)}
+        onOpenChange={(value) => {
+          if (!value) setRotationConfirmationAppId(null);
+        }}
+      >
+        <Dialog className="px-8 py-6">
+          <Dialog.Title>{t("rotateAppKeyConfirmTitle")}</Dialog.Title>
+          <Dialog.Description>{t("rotateAppKeyConfirmDescription")}</Dialog.Description>
+          <div className="mt-4 flex justify-end gap-2">
+            <Dialog.Close render={<Button disabled={isRotating}>{t("cancel")}</Button>} />
+            <Button variant="destructive" loading={isRotating} onClick={rotateAppKey}>
+              {t("rotateAppKey")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+      <Dialog.Root
+        open={rotatedAppKey !== null}
+        onOpenChange={(value) => {
+          if (!value) setRotatedAppKey(null);
+        }}
+      >
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("appKeyRotated")}</Dialog.Title>
+          <Dialog.Description>{t("appKeyRotatedDescription")}</Dialog.Description>
+          <div className="grid gap-3 py-4">
+            {rotatedAppKey ? <Credential label={t("appKey")} value={rotatedAppKey} /> : null}
+          </div>
+          <div className="flex justify-end">
+            <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
+          </div>
+        </Dialog>
+      </Dialog.Root>
     </>
   );
 }

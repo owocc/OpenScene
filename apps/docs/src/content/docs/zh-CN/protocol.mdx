@@ -11,37 +11,341 @@ sidebar:
 
 ## 传输生命周期
 
-1. Studio 将编辑器 query 参数加入 iframe URL。
-2. 渲染器校验参数后，向配置的 Studio origin 发送 `SCENE_READY`。
-3. Studio 校验 origin 与 session 后，通过 `SCENE_CONNECT` 移交 `MessageChannel` 端口。
-4. 渲染器通过端口发送 `SCENE_DOCUMENT` 与后续 `SCENE_NODE_SELECTED` 消息。
-5. Studio 节点树选择变化时发送 `SCENE_SELECT`。
+1. Studio 将三个 editor query 参数加入 iframe URL。
+2. 渲染器校验参数后，向配置的 Studio origin 发送带 `appType: "web"` 的 `RENDERER_READY`。
+3. Studio 校验 origin、source 与 session 后，通过 `STUDIO_CONNECT` 移交 `MessageChannel` 端口。
+4. Studio 通过端口发送 `DOCUMENT_SET` 和 `EDITOR_STATE_SET`；渲染器返回 `DOCUMENT_RENDERED`、`SELECTION_CHANGED` 或 `RENDERER_ERROR`。
+
+## 文档外壳与 flat Spec
+
+```ts
+interface SceneDocument {
+  schemaVersion: "1.0.0";
+  pageInfo: {
+    title: string;
+    description: string;
+    keywords: string[];
+    locale: string;
+    metadata: Record<string, unknown>;
+  };
+  globalConfig: {
+    design?: unknown;
+    body?: unknown;
+    variables?: unknown;
+    css?: unknown;
+    i18n?: unknown;
+  };
+  spec: { root: string; elements: Record<string, UIElement>; state?: Record<string, unknown> };
+}
+```
+
+OpenScene 的 page wrapper（页面外壳）将 json-render 的 flat identity map（flat Spec）放在 `spec` 字段中。节点身份**只有** `spec.elements` 的 map key：`root` 和每个 `children`、`slots` 引用都指向一个 key，element value 不得重复保存 id，也不得持久化 adapter 私有字段。json-render 原生处理 `$state`、`$bindState`、`$bindItem`、`$template`、`$computed`、`$cond`、visibility、repeat、watch 和 action binding。
+
+## OpenScene 指令
+
+OpenScene 只增加两个 framework-neutral 指令：`$page` 从运行时 `/__scene/pageInfo` 读取页面信息；`$t` 按运行时语言和 `globalConfig.i18n.defaultLocale` 从 `/i18n/{locale}` 读取翻译。它们与 json-render 内建指令一起注册，不能用 adapter 私有 props 代替。
+
+## Solid named-slot 限制
+
+协议和 json-render core 支持 named slots，但首版 OpenScene Solid adapter 不支持非空 named slot。渲染前会以 node ID 和 slot 名称报告明确错误；空 `slots` 会被移除。请使用 children 或 `View` 组合来扩展组件，不要依赖无法渲染的 slot capability。
+
+## Bridge v2 传输
+
+所有消息都带有版本化 envelope，并由对应的 Zod discriminated union 校验。iframe window → Studio window 发送 `RENDERER_READY { appType: "web" }`；Studio window → iframe window 发送 `STUDIO_CONNECT` 并转移 `MessagePort`。端口上，Studio → client 发送 `DOCUMENT_SET { document, revision }` 和 `EDITOR_STATE_SET { interactionMode, selectedElementIds }`；client → Studio 发送 `DOCUMENT_RENDERED { schemaVersion, root }`、`SELECTION_CHANGED { elementIds, primaryElementId, source: "click" | "marquee" }` 或 `RENDERER_ERROR { message }`。接收端必须按方向使用具体 schema，不能只断言 payload。
 
 ## 公开 API
 
-## STUDIO_BRIDGE_PROTOCOL
+## SCENE_DOCUMENT_SCHEMA_VERSION
 
-Studio 与渲染器 SDK 共用的稳定浏览器协议标识符。
+由 `@openscene/protocol` 导出的协议声明。
 
 **类型:** Constant
 
 ```ts
-const STUDIO_BRIDGE_PROTOCOL = "openscene-studio";
+const SCENE_DOCUMENT_SCHEMA_VERSION = "1.0.0" as const;
+```
+
+## ScenePageInfo
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface ScenePageInfo {
+  title: string;
+  description: string;
+  keywords: string[];
+  locale: string;
+  metadata: Record<string, unknown>;
+}
+```
+
+## SceneGlobalConfig
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface SceneGlobalConfig {
+  design?: unknown;
+  body?: unknown;
+  variables?: unknown;
+  css?: unknown;
+  i18n?: unknown;
+  [key: string]: unknown;
+}
+```
+
+## SceneDocument
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface SceneDocument {
+  schemaVersion: typeof SCENE_DOCUMENT_SCHEMA_VERSION;
+  pageInfo: ScenePageInfo;
+  globalConfig: SceneGlobalConfig;
+  spec: Spec;
+  [key: string]: unknown;
+}
+```
+
+## SceneDocumentSchema
+
+Canonical page/document schema. In addition to JSON-render's own flat
+shape, this checks every child and named-slot edge before a document can be
+persisted or sent over the bridge.
+
+**类型:** Constant
+
+```ts
+const SceneDocumentSchema: z.ZodType<SceneDocument> = z
+  .object({
+    schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
+    pageInfo: PageInfoSchema,
+    globalConfig: GlobalConfigSchema,
+    spec: SpecSchema,
+  })
+  .catchall(z.unknown())
+  .superRefine((document, context) => {
+    const { root, elements, state } = document.spec;
+    if (!(root in elements)) {
+      context.addIssue({
+        code: "custom",
+        path: ["spec", "root"],
+        message: `Root element "${root}" is not present in spec.elements`,
+      });
+    }
+
+    for (const [nodeId, element] of Object.entries(elements) as Array<[string, UIElement]>) {
+      const references = [
+        ...(element.children ?? []),
+        ...Object.values(element.slots ?? {}).flat(),
+      ];
+      for (const childId of references) {
+        if (!(childId in elements)) {
+          context.addIssue({
+            code: "custom",
+            path: ["spec", "elements", nodeId],
+            message: `Element "${nodeId}" references missing element "${childId}"`,
+          });
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(element, "id")) {
+        context.addIssue({
+          code: "custom",
+          path: ["spec", "elements", nodeId, "id"],
+          message: "Element identity is represented by the spec.elements map key",
+        });
+      }
+      if (hasKey(element.props, "__opensceneNodeId")) {
+        context.addIssue({
+          code: "custom",
+          path: ["spec", "elements", nodeId, "props"],
+          message: "Persisted props may not contain __opensceneNodeId",
+        });
+      }
+    }
+
+    if (state && Object.prototype.hasOwnProperty.call(state, "__scene")) {
+      context.addIssue({
+        code: "custom",
+        path: ["spec", "state", "__scene"],
+        message: "Persisted state may not contain the reserved __scene root",
+      });
+    }
+  }) as z.ZodType<SceneDocument>;
+```
+
+## createEmptySceneDocument
+
+由 `@openscene/protocol` 导出的协议声明。
+
+**类型:** Function
+
+```ts
+function createEmptySceneDocument(): SceneDocument {
+  return {
+    schemaVersion: SCENE_DOCUMENT_SCHEMA_VERSION,
+    pageInfo: {
+      title: "",
+      description: "",
+      keywords: [],
+      locale: "en-US",
+      metadata: {},
+    },
+    globalConfig: {},
+    spec: {
+      root: "root",
+      elements: {
+        root: { type: "View", props: {}, children: [] },
+      },
+      state: {},
+    },
+  };
+}
+```
+
+## ComponentManifest
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface ComponentManifest {
+  title: string;
+  description?: string;
+  category?: string;
+  tags?: string[];
+  /** JSON Schema generated from the component's catalog props schema. */
+  props: Record<string, unknown>;
+  editor?: Record<string, unknown>;
+  events?: Record<string, unknown>;
+  /** Whether the component accepts children, or its child capability metadata. */
+  children?: unknown;
+  /** Named-slot capability metadata (non-empty slots are adapter-defined). */
+  slots?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+```
+
+## AppManifest
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface AppManifest {
+  protocolVersion: string;
+  app: {
+    key: string;
+    type: AppType;
+    version?: string;
+    [key: string]: unknown;
+  };
+  components: Record<string, ComponentManifest>;
+  actions?: Record<string, unknown>;
+  dataSources?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+```
+
+## AppManifestSchema
+
+由 `@openscene/protocol` 导出的协议声明。
+
+**类型:** Constant
+
+```ts
+const AppManifestSchema: z.ZodType<AppManifest> = z
+  .object({
+    protocolVersion: nonEmptyString,
+    app: z
+      .object({
+        key: nonEmptyString,
+        type: appTypeSchema,
+        version: nonEmptyString.optional(),
+      })
+      .catchall(z.unknown()),
+    components: z.record(nonEmptyString, ComponentManifestSchema),
+    actions: unknownRecord.optional(),
+    dataSources: unknownRecord.optional(),
+    capabilities: unknownRecord.optional(),
+  })
+  .catchall(z.unknown()) as z.ZodType<AppManifest>;
+```
+
+## RuntimePageDelivery
+
+由 `@openscene/protocol` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface RuntimePageDelivery {
+  app: {
+    id: string;
+    key: string;
+    type: AppType;
+  };
+  page: {
+    id: string;
+    key: string;
+    title: string;
+  };
+  document: SceneDocument;
+  [key: string]: unknown;
+}
+```
+
+## RuntimePageDeliverySchema
+
+Minimal public runtime payload. Release/version metadata may be attached by
+Admin, but the SDK only needs the app, page, and canonical document fields.
+
+**类型:** Constant
+
+```ts
+const RuntimePageDeliverySchema: z.ZodType<RuntimePageDelivery> = z
+  .object({
+    app: z.object({ id: nonEmptyString, key: nonEmptyString, type: appTypeSchema }),
+    page: z.object({ id: nonEmptyString, key: nonEmptyString, title: z.string() }),
+    document: SceneDocumentSchema,
+  })
+  .catchall(z.unknown()) as unknown as z.ZodType<RuntimePageDelivery>;
+```
+
+## STUDIO_BRIDGE_PROTOCOL
+
+Stable browser protocol identifier shared by Studio and renderer SDKs.
+
+**类型:** Constant
+
+```ts
+const STUDIO_BRIDGE_PROTOCOL = "openscene-studio" as const;
 ```
 
 ## STUDIO_BRIDGE_VERSION
 
-任一端引入破坏性消息变更时递增。
+Breaking bridge version.
 
 **类型:** Constant
 
 ```ts
-const STUDIO_BRIDGE_VERSION = 1;
+const STUDIO_BRIDGE_VERSION = 2 as const;
 ```
 
 ## editorQueryKeys
 
-使 iframe 进入 Studio 检查模式的 query 参数。
+Query parameters that opt an iframe into Studio inspection mode.
 
 **类型:** Constant
 
@@ -55,7 +359,7 @@ const editorQueryKeys = {
 
 ## EditorConnection
 
-通过 iframe URL 协商的 origin 与不透明 session token。
+由 `@openscene/protocol` 导出的协议接口。
 
 **类型:** Interface
 
@@ -68,7 +372,7 @@ interface EditorConnection {
 
 ## StudioBridgeEnvelope
 
-通过 window.postMessage 与 MessagePort 传输的版本化信封。
+由 `@openscene/protocol` 导出的协议接口。
 
 **类型:** Interface
 
@@ -82,64 +386,143 @@ interface StudioBridgeEnvelope<TType extends string = string, TPayload = unknown
 }
 ```
 
-## SceneNodeSnapshot
+## BridgeEnvelopeSchema
 
-Studio 节点树与属性面板展示的可序列化运行时节点详情。
+Base schema used to reject messages from another protocol/version.
 
-**类型:** Interface
+**类型:** Constant
 
 ```ts
-interface SceneNodeSnapshot {
-  id: string;
-  type: string;
-  props: Record<string, unknown>;
-  children: string[];
-  slots: Record<string, string[]>;
-}
+const BridgeEnvelopeSchema = z
+  .object({
+    protocol: z.literal(STUDIO_BRIDGE_PROTOCOL),
+    version: z.literal(STUDIO_BRIDGE_VERSION),
+    sessionId: nonEmptyString,
+    type: nonEmptyString,
+    payload: z.unknown(),
+  })
+  .passthrough();
 ```
 
-## SceneDocumentSnapshot
+## RendererWindowMessageSchema
 
-渲染器建立连接时发送的可序列化 JSON-render 树快照。
+iframe window → Studio window.
 
-**类型:** Interface
+**类型:** Constant
 
 ```ts
-interface SceneDocumentSnapshot {
-  root: string;
-  elements: Record<string, SceneNodeSnapshot>;
-  state: Record<string, unknown>;
-}
+const RendererWindowMessageSchema = z.discriminatedUnion("type", [
+  envelope("RENDERER_READY", z.object({ appType: z.literal(APP_TYPE_WEB) })),
+]);
+```
+
+## StudioWindowMessageSchema
+
+Studio window → iframe window. The MessagePort is transferred separately.
+
+**类型:** Constant
+
+```ts
+const StudioWindowMessageSchema = z.discriminatedUnion("type", [
+  envelope("STUDIO_CONNECT", z.undefined()),
+]);
+```
+
+## StudioPortMessageSchema
+
+Studio MessagePort → renderer client.
+
+**类型:** Constant
+
+```ts
+const StudioPortMessageSchema = z.discriminatedUnion("type", [
+  envelope(
+    "DOCUMENT_SET",
+    z.object({
+      document: SceneDocumentSchema,
+      revision: z.number().int().nonnegative(),
+    }),
+  ),
+  envelope(
+    "EDITOR_STATE_SET",
+    z.object({
+      interactionMode: z.enum(["select", "preview"]),
+      selectedElementIds: z.array(nonEmptyString),
+    }),
+  ),
+]);
+```
+
+## RendererPortMessageSchema
+
+Renderer client → Studio MessagePort.
+
+**类型:** Constant
+
+```ts
+const RendererPortMessageSchema = z.discriminatedUnion("type", [
+  envelope(
+    "DOCUMENT_RENDERED",
+    z.object({
+      schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
+      root: nonEmptyString,
+    }),
+  ),
+  envelope(
+    "SELECTION_CHANGED",
+    z.object({
+      elementIds: z.array(nonEmptyString),
+      primaryElementId: nonEmptyString.nullable(),
+      source: z.enum(["click", "marquee"]),
+    }),
+  ),
+  envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
+]);
+```
+
+## RendererWindowMessage
+
+由 `@openscene/protocol` 导出的协议声明。
+
+**类型:** Type
+
+```ts
+type RendererWindowMessage = z.infer<typeof RendererWindowMessageSchema>;
+```
+
+## StudioWindowMessage
+
+由 `@openscene/protocol` 导出的协议声明。
+
+**类型:** Type
+
+```ts
+type StudioWindowMessage = z.infer<typeof StudioWindowMessageSchema>;
 ```
 
 ## StudioPortMessage
 
-端口连接后由渲染器发送给 Studio 的消息。
+由 `@openscene/protocol` 导出的协议声明。
 
 **类型:** Type
 
 ```ts
-type StudioPortMessage =
-  | StudioBridgeEnvelope<"SCENE_DOCUMENT", SceneDocumentSnapshot>
-  | StudioBridgeEnvelope<"SCENE_NODE_SELECTED", SceneNodeSnapshot>
-  | StudioBridgeEnvelope<"SCENE_ERROR", { message: string }>;
+type StudioPortMessage = z.infer<typeof StudioPortMessageSchema>;
 ```
 
 ## RendererPortMessage
 
-Studio 发送给已连接渲染器的消息。
+由 `@openscene/protocol` 导出的协议声明。
 
 **类型:** Type
 
 ```ts
-type RendererPortMessage =
-  | StudioBridgeEnvelope<"SCENE_CONNECT", undefined>
-  | StudioBridgeEnvelope<"SCENE_SELECT", { elementId: string | null }>;
+type RendererPortMessage = z.infer<typeof RendererPortMessageSchema>;
 ```
 
 ## createBridgeEnvelope
 
-创建协议信封，不暴露可变共享状态。
+Creates a v2 protocol envelope without exposing mutable shared state.
 
 **类型:** Function
 
@@ -149,27 +532,31 @@ function createBridgeEnvelope<TType extends string, TPayload>(
   type: TType,
   payload: TPayload,
 ): StudioBridgeEnvelope<TType, TPayload> {
-  return { protocol: STUDIO_BRIDGE_PROTOCOL, version: STUDIO_BRIDGE_VERSION, sessionId, type, payload };
+  return {
+    protocol: STUDIO_BRIDGE_PROTOCOL,
+    version: STUDIO_BRIDGE_VERSION,
+    sessionId,
+    type,
+    payload,
+  };
 }
 ```
 
 ## isBridgeEnvelope
 
-在处理消息前校验稳定的信封字段。
+Validates the stable envelope fields before a message is processed.
 
 **类型:** Function
 
 ```ts
 function isBridgeEnvelope(value: unknown): value is StudioBridgeEnvelope {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const candidate = value as Record<string, unknown>;
-  return candidate.protocol === STUDIO_BRIDGE_PROTOCOL && candidate.version === STUDIO_BRIDGE_VERSION && typeof candidate.sessionId === "string" && typeof candidate.type === "string";
+  return BridgeEnvelopeSchema.safeParse(value).success;
 }
 ```
 
 ## getEditorConnection
 
-从 URL query string 读取并校验编辑模式连接参数。
+Reads and validates editor-mode connection values from a URL query string.
 
 **类型:** Function
 
@@ -181,8 +568,14 @@ function getEditorConnection(search: string): EditorConnection | null {
   const sessionId = params.get(editorQueryKeys.sessionId);
   if (!enabled || !studioOrigin || !sessionId) return null;
   try {
-    const origin = new URL(studioOrigin).origin;
-    return origin === studioOrigin ? { studioOrigin: origin, sessionId } : null;
+    const parsed = new URL(studioOrigin);
+    if (
+      (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+      parsed.origin !== studioOrigin
+    ) {
+      return null;
+    }
+    return { studioOrigin: parsed.origin, sessionId };
   } catch {
     return null;
   }
@@ -191,13 +584,14 @@ function getEditorConnection(search: string): EditorConnection | null {
 
 ## withEditorConnection
 
-将已校验的 Studio 连接参数追加到目标 iframe URL。
+Appends a validated Studio connection to a target iframe URL.
 
 **类型:** Function
 
 ```ts
 function withEditorConnection(url: string, connection: EditorConnection): string {
-  const target = new URL(url, window.location.href);
+  const base = typeof window === "undefined" ? "http://localhost/" : window.location.href;
+  const target = new URL(url, base);
   target.searchParams.set(editorQueryKeys.enabled, "1");
   target.searchParams.set(editorQueryKeys.studioOrigin, connection.studioOrigin);
   target.searchParams.set(editorQueryKeys.sessionId, connection.sessionId);

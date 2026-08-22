@@ -13,6 +13,7 @@ export const messages = {
     pages: "Pages",
     templates: "Templates",
     manifest: "Manifest",
+    components: "Components",
     previewProfiles: "Preview profiles",
     assets: "Assets",
     categories: "Categories",
@@ -65,6 +66,14 @@ export const messages = {
     serverDetail: "Server detail",
     notFound: "Resource not found",
     requestFailed: "The request failed",
+    appKey: "App Key",
+    rotateAppKey: "Rotate App Key",
+    rotateAppKeyDescription: "Generate a replacement App Key for build and manifest publishing.",
+    rotateAppKeyConfirmTitle: "Rotate App Key?",
+    rotateAppKeyConfirmDescription:
+      "Your current App Key will be revoked immediately. Builds and manifest publishing that use it will stop working.",
+    appKeyRotated: "App Key rotated",
+    appKeyRotatedDescription: "This replacement key is shown once. Copy it before closing.",
   },
   "zh-CN": {
     apps: "应用",
@@ -74,6 +83,7 @@ export const messages = {
     pages: "页面",
     templates: "模板",
     manifest: "Manifest",
+    components: "组件",
     previewProfiles: "预览配置",
     assets: "资源",
     categories: "分类",
@@ -126,6 +136,14 @@ export const messages = {
     serverDetail: "服务端详情",
     notFound: "资源不存在",
     requestFailed: "请求失败",
+    appKey: "应用密钥",
+    rotateAppKey: "轮换应用密钥",
+    rotateAppKeyDescription: "为构建和 Manifest 发布生成新的应用密钥。",
+    rotateAppKeyConfirmTitle: "轮换应用密钥？",
+    rotateAppKeyConfirmDescription:
+      "当前应用密钥将立即失效。使用该密钥的构建和 Manifest 发布将无法继续。",
+    appKeyRotated: "应用密钥已轮换",
+    appKeyRotatedDescription: "此替换密钥仅显示一次，请在关闭前复制。",
   },
 } as const;
 

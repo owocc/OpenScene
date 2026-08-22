@@ -1,16 +1,21 @@
 import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
+import type { AppType } from "@openscene/constants";
+import {
+  AppManifestSchema,
+  SceneDocumentSchema,
+  type AppManifest,
+  type SceneDocument,
+} from "@openscene/protocol";
 
-import { normalizeAppDocument, type AppDocument } from "./document";
 import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
-import type { AppMaterialManifest } from "./material-manifest";
 import { useQueryStore } from "@/stores/query-store";
 
 export interface StudioBootstrap {
   session: { id: string; expiresAt: string };
-  app: { id: string; key: string; name: string };
+  app: { id: string; key: string; name: string; type: AppType };
   resource: { id: string; kind: "page" | "template"; title: string; documentId: string };
-  draft: { revision: number; document: AppDocument };
-  manifest: AppMaterialManifest | null;
+  draft: { revision: number; document: SceneDocument };
+  manifest: AppManifest | null;
   preview: { url: string; allowedOrigin: string; profileId: string };
   capabilities: {
     saveDraft: boolean;
@@ -35,25 +40,15 @@ export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioB
   const serverUrl = query.serverUrl;
   const previewUrl = query.previewUrl;
 
-  // 1. Local test session (development only)
   if (sessionId === LOCAL_TEST_SESSION_ID) {
     if (!import.meta.env.DEV) {
       return { status: "error", message: "local-test session is only available in development" };
     }
-
-    const value = createLocalTestBootstrap(previewUrl ?? undefined);
-    return { status: "ready", value };
+    return { status: "ready", value: createLocalTestBootstrap(previewUrl ?? undefined) };
   }
 
-  // 2. Standalone: Missing sessionId or token
-  if (!sessionId || !token) {
-    return { status: "standalone" };
-  }
-
-  // 3. Strict Server URL requirement: App does NOT store baseUrl, must be passed via query parameter
-  if (!serverUrl) {
-    return { status: "missing-server-url" };
-  }
+  if (!sessionId || !token) return { status: "standalone" };
+  if (!serverUrl) return { status: "missing-server-url" };
 
   try {
     const client = createOpenSceneClient({
@@ -61,36 +56,40 @@ export async function loadStudioBootstrap(signal?: AbortSignal): Promise<StudioB
       headers: { "x-openscene-session-token": token },
       signal,
     });
-
     const { data, error, response } = await client.GET(
       "/api/v1/studio-sessions/{sessionId}/bootstrap",
-      {
-        params: {
-          path: { sessionId },
-        },
-        signal,
-      },
+      { params: { path: { sessionId } }, signal },
     );
-
     if (error) {
       const message = isApiProblem(error) ? error.detail : `Bootstrap failed (${response.status})`;
       return { status: "error", message };
     }
-
     if (!data || typeof data !== "object" || !("draft" in data) || !data.draft) {
       return { status: "error", message: "Studio bootstrap payload is invalid" };
     }
 
     const value = data as unknown as StudioBootstrap;
-    value.draft = {
-      revision: value.draft.revision,
-      document: normalizeAppDocument(value.draft.document),
-    };
-
+    const parsed = SceneDocumentSchema.safeParse(value.draft.document);
+    if (!parsed.success) {
+      return {
+        status: "error",
+        message: "Studio draft document does not match the canonical protocol",
+      };
+    }
+    value.draft = { revision: value.draft.revision, document: parsed.data };
+    if (value.manifest !== null) {
+      const manifest = AppManifestSchema.safeParse(value.manifest);
+      if (!manifest.success || manifest.data.app.type !== value.app.type) {
+        return {
+          status: "error",
+          message: "Studio manifest does not match the canonical App type",
+        };
+      }
+      value.manifest = manifest.data;
+    }
     if (!value.manifest && !value.preview?.url) {
       return { status: "error", message: "Target App did not provide a preview profile" };
     }
-
     return { status: "ready", value };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;

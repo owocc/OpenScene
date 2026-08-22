@@ -1,14 +1,7 @@
+import type { AppManifest } from "@openscene/protocol";
+
 import type { AdapterMeta, ComponentMeta, EditorMeta, PropMeta } from "./meta";
 import { isRecord, type DynamicMode, type JsonValue } from "./document";
-
-export interface AppMaterialManifest {
-  protocolVersion: string;
-  app: { key: string; version?: string };
-  components: Record<string, unknown>;
-  actions?: Record<string, unknown>;
-  dataSources?: Record<string, unknown>;
-  capabilities?: Record<string, boolean>;
-}
 
 function jsonValue(value: unknown): JsonValue | undefined {
   if (
@@ -226,7 +219,7 @@ function componentMeta(type: string, value: unknown): ComponentMeta {
   };
 }
 
-export function materialManifestToAdapterMeta(manifest: AppMaterialManifest | null): AdapterMeta {
+export function materialManifestToAdapterMeta(manifest: AppManifest | null): AdapterMeta {
   const components = manifest?.components ?? {};
   return {
     id: manifest ? `app:${manifest.app.key}` : "app:unavailable",

@@ -10,7 +10,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { AppDocument } from "@/core/document";
+import type { SceneDocument } from "@openscene/protocol";
+
 import type { Surface, ViewportState } from "@/core/editor-state";
 import type { AdapterRegistry } from "@/core/registry";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
@@ -68,7 +69,7 @@ export const devicePresets: DevicePreset[] = [
 
 export interface StudioSidebarProps {
   bootstrap: StudioBootstrap;
-  document: AppDocument;
+  document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
   surface: Surface;

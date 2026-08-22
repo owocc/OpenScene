@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 
+import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
+
 import { CanvasArtboard } from "./canvas-artboard";
 import { CanvasSettingsDialog } from "./canvas-settings-dialog";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -7,23 +9,30 @@ import { CanvasViewport } from "./canvas-viewport";
 import { ShortcutsPanel } from "@/components/studio/shortcuts";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { WebIframeRenderer } from "./renderers/web-iframe-renderer";
-import type { CanvasRendererProps, StudioCanvasProps } from "./types";
-/**
- * Encapsulated Studio Canvas Subsystem.
- *
- * Provides a unified, extensible multi-target canvas layer:
- * - Default: Web iframe canvas with Preview Bridge protocol
- * - Extensible: supports custom preview renderers and multi-surface modes
- * - Decoupled: camera viewport, physical artboard, and bottom toolbar are independently managed.
- */
+import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
+
+export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
+  [APP_TYPE_WEB]: { appType: APP_TYPE_WEB, render: (props) => <WebIframeRenderer {...props} /> },
+};
+
+function UnsupportedRenderer({ appType }: { appType: string }) {
+  return (
+    <div className="grid h-full place-items-center p-6 text-center text-sm text-muted-foreground">
+      <div>
+        <p className="font-medium text-foreground">Unsupported App type</p>
+        <p className="mt-1">Studio has no canvas renderer registered for “{appType}”.</p>
+      </div>
+    </div>
+  );
+}
+
 export function StudioCanvas({
-  kind = "web-iframe",
   surface,
   bootstrap,
   document,
-  locale,
   revision,
-  selectedId,
+  selectedNodeIds,
+  primaryNodeId,
   viewport,
   activeToolMode,
   pastLength,
@@ -31,13 +40,11 @@ export function StudioCanvas({
   onPatchViewport,
   onSurfaceChange,
   onToolChange,
-  onSelectNode,
-  onRemoteDocument,
+  onSelectionChange,
   onUndo,
   onRedo,
   onCopyJson,
   onSave,
-  renderCustomPreview,
 }: StudioCanvasProps) {
   const previewIdentity = useMemo(
     () => ({
@@ -47,32 +54,29 @@ export function StudioCanvas({
     }),
     [bootstrap.app.key, bootstrap.resource.id, bootstrap.resource.kind],
   );
-
   const rendererProps: CanvasRendererProps = {
     url: bootstrap.preview.url,
     allowedOrigin: bootstrap.preview.allowedOrigin,
     identity: previewIdentity,
+    appType: bootstrap.app.type,
     document,
-    locale,
     revision,
-    selectedId,
+    selectedNodeIds,
+    primaryNodeId,
     interactionMode: activeToolMode === "select" ? "select" : "preview",
-    onSelect: onSelectNode,
-    onRemoteDocument,
+    onSelectionChange,
   };
-
-  const previewElement = renderCustomPreview ? (
-    renderCustomPreview(rendererProps)
-  ) : kind === "web-iframe" ? (
-    <WebIframeRenderer {...rendererProps} />
-  ) : null;
+  const adapter = canvasRendererRegistry[bootstrap.app.type];
+  const previewElement = adapter ? (
+    adapter.render(rendererProps)
+  ) : (
+    <UnsupportedRenderer appType={bootstrap.app.type} />
+  );
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
-      {/* 1. Full-screen Canvas Layer */}
       {surface === "text" ? (
         <ResizablePanelGroup orientation="horizontal" className="h-full w-full bg-background">
-          {/* 1. Left Preview Iframe Panel */}
           <ResizablePanel
             defaultSize="60%"
             minSize="30%"
@@ -80,11 +84,7 @@ export function StudioCanvas({
           >
             <div className="h-full w-full overflow-hidden">{previewElement}</div>
           </ResizablePanel>
-
-          {/* 2. Drag Handle */}
           <ResizableHandle withHandle />
-
-          {/* 3. Right Document Editor Panel */}
           <ResizablePanel
             defaultSize="40%"
             minSize="20%"
@@ -93,36 +93,30 @@ export function StudioCanvas({
           >
             <aside className="h-full overflow-auto bg-background">
               <div className="border-b border-border px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold">Document editor</span>
-                  <span className="rounded-md bg-muted px-1.5 py-1 text-[9px] text-muted-foreground">
-                    placeholder
-                  </span>
-                </div>
+                <span className="text-xs font-semibold">Document editor</span>
                 <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                  在这里编辑文档文本。当前仅作为编辑器占位，不会回写 AppDocument。
+                  Canonical page information is edited in the Studio document.
                 </p>
               </div>
               <div className="grid gap-4 p-4">
                 <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
                   Title
                   <input
-                    className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs text-foreground"
                     defaultValue={document.pageInfo.title}
-                    aria-label="Document title placeholder"
+                    aria-label="Document title"
                   />
                 </label>
                 <label className="grid gap-1.5 text-[10px] font-medium text-muted-foreground">
                   Body text
                   <textarea
-                    className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="min-h-52 resize-y rounded-lg border border-input bg-background p-2.5 text-xs leading-5 text-foreground"
                     defaultValue={document.pageInfo.description}
-                    placeholder="开始输入文档内容…"
-                    aria-label="Document body text placeholder"
+                    aria-label="Document body text"
                   />
                 </label>
                 <div className="rounded-lg border border-dashed border-border p-3 text-[10px] leading-4 text-muted-foreground">
-                  Revision {revision} · Text editing bridge will be connected in a later slice.
+                  Revision {revision}
                 </div>
               </div>
             </aside>
@@ -137,8 +131,6 @@ export function StudioCanvas({
           <CanvasArtboard viewport={viewport}>{previewElement}</CanvasArtboard>
         </CanvasViewport>
       )}
-
-      {/* 2. Floating Bottom Dock Container (Fixed z-40 elevated above sidebars and panels) */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end">
         <div className="pointer-events-auto pb-4">
           <CanvasToolbar
@@ -160,8 +152,6 @@ export function StudioCanvas({
           <ShortcutsPanel />
         </div>
       </div>
-
-      {/* 3. Canvas Settings Dialog (modal overlay) */}
       <CanvasSettingsDialog />
     </div>
   );

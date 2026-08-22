@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-import type { AppDocument } from "@/core/document";
+import type { SceneDocument } from "@openscene/protocol";
 import type { AdapterRegistry } from "@/core/registry";
 import type { TreeNode } from "@/core/slot-tree";
 import { buildTree } from "@/core/slot-tree";
 import { cn } from "@/lib/utils";
 
 interface OutlineTreeProps {
-  document: AppDocument;
+  document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
   onSelect: (id: string) => void;

@@ -1,4 +1,5 @@
-import type { AppDocument, AppElement } from "./document";
+import type { SceneDocument, UIElement } from "@openscene/protocol";
+
 import {
   deleteElementRecursive,
   getElementLocation,
@@ -6,6 +7,7 @@ import {
   isSlotNodeId,
 } from "./slot-tree";
 
+export type EditorElement = UIElement & { name?: string };
 export type Surface = "visual" | "text" | "developer" | "preview";
 export type ActiveToolMode = "select" | "interact" | "hand";
 
@@ -20,10 +22,11 @@ export interface ViewportState {
 }
 
 export interface EditorState {
-  document: AppDocument;
+  document: SceneDocument;
+  selectedNodeIds: string[];
   selectedNodeId: string | null;
-  past: AppDocument[];
-  future: AppDocument[];
+  past: SceneDocument[];
+  future: SceneDocument[];
   revision: number;
   locale: string;
   surface: Surface;
@@ -32,16 +35,16 @@ export interface EditorState {
 }
 
 export type EditorAction =
-  | { type: "element.update"; elementId: string; element: AppElement }
+  | { type: "element.update"; elementId: string; element: EditorElement }
   | {
       type: "node.add";
       elementId: string;
-      element: AppElement;
+      element: EditorElement;
       target?: Parameters<typeof insertElement>[2];
     }
   | { type: "node.delete"; elementId: string }
-  | { type: "node.select"; nodeId: string | null }
-  | { type: "document.replace"; document: AppDocument }
+  | { type: "nodes.select"; nodeIds: string[]; primaryNodeId: string | null }
+  | { type: "document.replace"; document: SceneDocument }
   | { type: "locale.switch"; locale: string }
   | { type: "surface.set"; surface: Surface }
   | { type: "tool.set"; mode: ActiveToolMode }
@@ -49,10 +52,32 @@ export type EditorAction =
   | { type: "history.undo" }
   | { type: "history.redo" };
 
-export function createEditorState(document: AppDocument, revision: number): EditorState {
+function selectedForDocument(
+  document: SceneDocument,
+  nodeIds: readonly string[],
+  primary: string | null,
+) {
+  const ids = [...new Set(nodeIds)].filter((id) => id in document.spec.elements);
+  return {
+    selectedNodeIds: ids,
+    selectedNodeId: primary && ids.includes(primary) ? primary : (ids[0] ?? null),
+  };
+}
+
+function documentWidth(document: SceneDocument) {
+  const design = document.globalConfig.design;
+  return typeof design === "object" &&
+    design !== null &&
+    "width" in design &&
+    typeof design.width === "number"
+    ? design.width
+    : 390;
+}
+
+export function createEditorState(document: SceneDocument, revision: number): EditorState {
   return {
     document,
-    selectedNodeId: document.spec.root || null,
+    ...selectedForDocument(document, [document.spec.root], document.spec.root),
     past: [],
     future: [],
     revision,
@@ -61,7 +86,7 @@ export function createEditorState(document: AppDocument, revision: number): Edit
     activeToolMode: "select",
     viewport: {
       selectedDeviceId: "mobile",
-      currentDeviceWidth: document.globalConfig.design.width ?? 390,
+      currentDeviceWidth: documentWidth(document),
       currentDeviceHeight: 844,
       isRotated: false,
       zoom: 0.85,
@@ -71,12 +96,16 @@ export function createEditorState(document: AppDocument, revision: number): Edit
   };
 }
 
-function commit(state: EditorState, document: AppDocument, selectedNodeId = state.selectedNodeId) {
+function commit(
+  state: EditorState,
+  document: SceneDocument,
+  selection = selectedForDocument(document, state.selectedNodeIds, state.selectedNodeId),
+) {
   if (document === state.document) return state;
   return {
     ...state,
     document,
-    selectedNodeId,
+    ...selection,
     past: [...state.past.slice(-14), state.document],
     future: [],
     revision: state.revision + 1,
@@ -85,19 +114,15 @@ function commit(state: EditorState, document: AppDocument, selectedNodeId = stat
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
-    case "element.update": {
+    case "element.update":
       if (!state.document.spec.elements[action.elementId]) return state;
       return commit(state, {
         ...state.document,
         spec: {
           ...state.document.spec,
-          elements: {
-            ...state.document.spec.elements,
-            [action.elementId]: action.element,
-          },
+          elements: { ...state.document.spec.elements, [action.elementId]: action.element },
         },
       });
-    }
     case "node.add": {
       const elements = { ...state.document.spec.elements, [action.elementId]: action.element };
       const next = insertElement(
@@ -105,22 +130,25 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         action.elementId,
         action.target,
       );
-      return commit(state, next, action.elementId);
+      return commit(state, next, selectedForDocument(next, [action.elementId], action.elementId));
     }
     case "node.delete": {
       if (isSlotNodeId(action.elementId) || !state.document.spec.elements[action.elementId])
         return state;
       const parent = getElementLocation(state.document, action.elementId)?.parentId;
-      const nextSelected = parent ?? null;
-      return commit(state, deleteElementRecursive(state.document, action.elementId), nextSelected);
+      const next = deleteElementRecursive(state.document, action.elementId);
+      return commit(state, next, selectedForDocument(next, parent ? [parent] : [], parent ?? null));
     }
-    case "node.select":
-      return { ...state, selectedNodeId: action.nodeId };
+    case "nodes.select":
+      return {
+        ...state,
+        ...selectedForDocument(state.document, action.nodeIds, action.primaryNodeId),
+      };
     case "document.replace":
       return {
         ...state,
         document: action.document,
-        selectedNodeId: action.document.spec.root || null,
+        ...selectedForDocument(action.document, state.selectedNodeIds, state.selectedNodeId),
         locale: action.document.pageInfo.locale || "en-US",
         past: [],
         future: [],
@@ -133,10 +161,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           pageInfo: { ...state.document.pageInfo, locale: action.locale },
           spec: {
             ...state.document.spec,
-            state: {
-              ...state.document.spec.state,
-              lang: action.locale,
-            },
+            state: { ...state.document.spec.state, lang: action.locale },
           },
         }),
         locale: action.locale,
@@ -147,7 +172,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         activeToolMode: action.mode,
-        selectedNodeId: action.mode === "hand" ? null : state.selectedNodeId,
+        ...(action.mode === "hand" ? selectedForDocument(state.document, [], null) : {}),
       };
     case "viewport.patch":
       return {
@@ -164,7 +189,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         document: previous,
-        selectedNodeId: previous.spec.root || null,
+        ...selectedForDocument(previous, state.selectedNodeIds, state.selectedNodeId),
         locale: previous.pageInfo.locale || "en-US",
         past: state.past.slice(0, -1),
         future: [state.document, ...state.future],
@@ -177,7 +202,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return {
         ...state,
         document: next,
-        selectedNodeId: next.spec.root || null,
+        ...selectedForDocument(next, state.selectedNodeIds, state.selectedNodeId),
         locale: next.pageInfo.locale || "en-US",
         past: [...state.past, state.document],
         future: state.future.slice(1),

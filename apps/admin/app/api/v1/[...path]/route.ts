@@ -1,5 +1,4 @@
 import type { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   assertManagementCsrf,
@@ -12,7 +11,6 @@ import { initializeDatabase, checkDatabaseHealth } from "../../../../server/db/c
 import { getConfig } from "../../../../server/config/env";
 import { notFound, problemResponse, ProblemError, validation } from "../../../../server/errors";
 import { getStorage } from "../../../../server/storage";
-import { apps } from "../../../../server/db/schema";
 import {
   bootstrapStudioSession,
   completeAsset,
@@ -53,6 +51,7 @@ import {
   listResources,
   listVersions,
   pushManifest,
+  rotateAppKey,
   runtimePage,
   runtimeRelease,
   storageHealth,
@@ -63,9 +62,10 @@ import {
   updateLocale,
   updatePreviewProfile,
   updateResource,
+  updateStudioDraft,
 } from "../../../../server/services";
 import {
-  ManifestSchema,
+  AppManifestSchema,
   UiSessionCreateSchema,
   UiSessionSchema,
 } from "../../../../server/validation/schemas";
@@ -73,7 +73,7 @@ import {
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ path: string[] }> };
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PATCH" | "DELETE" | "OPTIONS";
 
 export async function GET(request: NextRequest, context: Context): Promise<Response> {
   return handle(request, context, "GET");
@@ -87,10 +87,27 @@ export async function PATCH(request: NextRequest, context: Context): Promise<Res
 export async function DELETE(request: NextRequest, context: Context): Promise<Response> {
   return handle(request, context, "DELETE");
 }
+export async function OPTIONS(request: NextRequest, context: Context): Promise<Response> {
+  return handle(request, context, "OPTIONS");
+}
 
 async function handle(request: NextRequest, context: Context, method: Method): Promise<Response> {
   const { path } = await context.params;
+  return withCors(
+    await handleRequest(request, { params: Promise.resolve({ path }) }, method),
+    request,
+    path,
+  );
+}
+
+async function handleRequest(
+  request: NextRequest,
+  context: Context,
+  method: Method,
+): Promise<Response> {
+  const { path } = await context.params;
   const pathname = `/api/v1/${path.join("/")}`;
+  if (method === "OPTIONS") return new Response(null, { status: 204 });
   try {
     const runtimeDb = await initializeDatabase();
     const db = runtimeDb.db;
@@ -142,11 +159,20 @@ async function handle(request: NextRequest, context: Context, method: Method): P
     }
     if (path.length === 2 && path[0] === "storage" && path[1] === "health" && method === "GET")
       return Response.json(await storageHealth());
-
     if (path[0] === "runtime") return await handleRuntime(request, db, path, method);
     if (path[0] === "studio-sessions" && path[2] === "bootstrap" && method === "GET") {
-      await authenticate(request, db, "session");
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
       return json(await bootstrapStudioSession(db, path[1]), 200, { "cache-control": "no-store" });
+    }
+    if (path[0] === "studio-sessions" && path[2] === "draft" && method === "PATCH") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const result = await updateStudioDraft(db, path[1], await body(request));
+      return json(result, 200, {
+        etag: `"${(result as { revision: number }).revision}"`,
+        "cache-control": "no-store",
+      });
     }
 
     const appId = path[0] === "apps" ? path[1] : undefined;
@@ -163,6 +189,7 @@ async function handle(request: NextRequest, context: Context, method: Method): P
     if (path.length === 2) return await resourceCrud(request, db, method, "app", path[1]);
 
     if (path[2] === "preview-profiles") return await previewRoutes(request, db, method, path);
+    if (path[2] === "app-keys") return await appKeyRoutes(db, method, path);
     if (path[2] === "manifest") return await manifestRoutes(request, db, method, path);
     if (path[2] === "pages" || path[2] === "templates")
       return await resourceRoutes(request, db, method, path);
@@ -196,6 +223,14 @@ async function resourceCrud(
     return noContent();
   }
   throw notFound();
+}
+async function appKeyRoutes(
+  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
+  method: Method,
+  path: string[],
+): Promise<Response> {
+  if (path.length !== 4 || path[3] !== "rotate" || method !== "POST") throw notFound();
+  return json(await rotateAppKey(db, path[1]));
 }
 
 async function previewRoutes(
@@ -234,7 +269,7 @@ async function manifestRoutes(
     return json(await getManifestRevision(db, appId, path[4]));
   if (path[3] === "sync" && method === "POST") return json(await syncManifest(db, appId));
   if (path[3] === "push" && method === "POST")
-    return json(await pushManifest(db, appId, await parseBody(request, ManifestSchema), "push"));
+    return json(await pushManifest(db, appId, await parseBody(request, AppManifestSchema), "push"));
   throw notFound();
 }
 
@@ -394,21 +429,17 @@ async function handleRuntime(
   const context = await authenticate(request, db, "runtime");
   if (path[3] === "pages" && path.length === 5) {
     const result = await runtimePage(db, appKey, path[4]);
-    if (context.appId) {
-      const app = await db.select({ id: apps.id }).from(apps).where(eq(apps.key, appKey)).get();
-      if (app?.id !== context.appId) throw notFound();
-    }
+    if (context.appId && context.appId !== (result.payload as { app: { id: string } }).app.id)
+      throw notFound();
     return json(result.payload, 200, {
       etag: result.etag,
       "cache-control": "public, max-age=60, s-maxage=300, immutable",
     });
   }
   if (path[3] === "releases" && path.length === 5) {
-    if (context.appId) {
-      const app = await db.select({ id: apps.id }).from(apps).where(eq(apps.key, appKey)).get();
-      if (app?.id !== context.appId) throw notFound();
-    }
     const result = await runtimeRelease(db, appKey, path[4]);
+    if (context.appId && context.appId !== (result.payload as { app: { id: string } }).app.id)
+      throw notFound();
     return json(result.payload, 200, {
       etag: result.etag,
       "cache-control": "public, max-age=60, s-maxage=300, immutable",
@@ -448,6 +479,41 @@ async function parseBody<T>(request: NextRequest, schema: z.ZodType<T>): Promise
   return parsed.data;
 }
 
+function withCors(response: Response, request: NextRequest, path: string[]): Response {
+  const headers = new Headers(response.headers);
+  const config = getConfig();
+  const origin = request.headers.get("origin");
+  if (path[0] === "runtime" && config.auth.runtimePublic) {
+    headers.set("access-control-allow-origin", "*");
+    headers.set("access-control-allow-methods", "GET, OPTIONS");
+    headers.set("access-control-allow-headers", "content-type, authorization");
+  } else if (path[0] === "studio-sessions") {
+    headers.set("vary", appendVary(headers.get("vary"), "Origin"));
+    const studioOrigin = new URL(config.studio.publicBaseUrl).origin;
+    if (origin === studioOrigin) headers.set("access-control-allow-origin", studioOrigin);
+    headers.set("access-control-allow-methods", "GET, PATCH, OPTIONS");
+    headers.set(
+      "access-control-allow-headers",
+      "content-type, x-openscene-session-token, authorization",
+    );
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function appendVary(current: string | null, value: string): string {
+  const values = new Set(
+    (current ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
+  values.add(value);
+  return [...values].join(", ");
+}
 function json(value: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return Response.json(value, { status, headers });
 }

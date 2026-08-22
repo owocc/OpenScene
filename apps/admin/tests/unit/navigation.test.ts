@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { messages } from "../../app/ui/i18n";
-import { buildHref, parseLanguage, parseMode } from "../../app/ui/navigation";
+import { buildHref, navigationGroups, parseLanguage, parseMode } from "../../app/ui/navigation";
 
 describe("admin navigation context", () => {
   test("defaults invalid modes and languages safely", () => {
@@ -19,5 +19,17 @@ describe("admin navigation context", () => {
 
   test("keeps dictionary keys aligned", () => {
     expect(Object.keys(messages.en).sort()).toEqual(Object.keys(messages["zh-CN"]).sort());
+  });
+
+  test("includes app-scoped Components navigation", () => {
+    const navigationItems = navigationGroups.reduce<
+      Array<{ href: string; key: string; icon: string }>
+    >((items, group) => [...items, ...group.items], []);
+
+    expect(navigationItems).toContainEqual({
+      href: "/components",
+      key: "components",
+      icon: "cubes",
+    });
   });
 });

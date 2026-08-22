@@ -7,6 +7,8 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "module": "nodenext",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

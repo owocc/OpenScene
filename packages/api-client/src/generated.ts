@@ -34,6 +34,22 @@ export interface paths {
     patch: operations["updateApp"];
     trace?: never;
   };
+  "/api/v1/apps/{appId}/app-keys/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["rotateAppKey"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/apps/{appId}/assets": {
     parameters: {
       query?: never;
@@ -546,6 +562,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/studio-sessions/{sessionId}/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["updateStudioDraft"];
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -555,6 +587,8 @@ export interface components {
       key: string;
       name: string;
       description: string;
+      /** @enum {string} */
+      type: "web";
       /** @enum {string} */
       status: "active" | "disabled";
       manifest: {
@@ -577,125 +611,11 @@ export interface components {
         runtimeKey: string;
       };
     };
-    Asset: {
-      id: string;
-      appId: string;
-      /** @enum {string} */
-      status: "pending" | "ready" | "failed";
-      fileName: string;
-      mimeType: string;
-      size: number;
-      storageKey: string;
-      checksum: string | null;
-      width: number | null;
-      height: number | null;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
+    AppKeyRotation: {
+      appKey: string;
     };
     Bootstrap: {
-      session: {
-        id: string;
-        /** Format: date-time */
-        expiresAt: string;
-      };
-      app: {
-        id: string;
-        key: string;
-        name: string;
-      };
-      resource: {
-        id: string;
-        /** @enum {string} */
-        kind: "page" | "template";
-        title: string;
-        documentId: string;
-      };
-      draft: {
-        revision: number;
-        document: {
-          schemaVersion: string;
-          pageInfo?: {
-            [key: string]: unknown;
-          };
-          globalConfig?: {
-            [key: string]: unknown;
-          };
-          spec?: {
-            [key: string]: unknown;
-          };
-        } & {
-          [key: string]: unknown;
-        };
-      };
-      manifest:
-        | ({
-            protocolVersion: string;
-            app: {
-              key: string;
-              version?: string;
-            } & {
-              [key: string]: unknown;
-            };
-            components: {
-              [key: string]: {
-                key?: string;
-                name?: string;
-                props?: {
-                  [key: string]: {
-                    type?: string;
-                    meta?: {
-                      content?: boolean;
-                      /** @enum {string} */
-                      kind?: "image" | "link" | "number" | "rich-text" | "text";
-                      label?: string;
-                      translatable?: boolean;
-                      required?: boolean;
-                      group?: string;
-                      searchable?: boolean;
-                    } & {
-                      [key: string]: unknown;
-                    };
-                  } & {
-                    [key: string]: unknown;
-                  };
-                };
-                actions?: {
-                  [key: string]: unknown;
-                };
-              } & {
-                [key: string]: unknown;
-              };
-            };
-            actions?: {
-              [key: string]: unknown;
-            };
-            dataSources?: {
-              [key: string]: unknown;
-            };
-            capabilities?: {
-              [key: string]: boolean;
-            };
-          } & {
-            [key: string]: unknown;
-          })
-        | null;
-      preview: {
-        /** Format: uri */
-        url: string;
-        /** Format: uri */
-        allowedOrigin: string;
-        profileId: string;
-      };
-      capabilities: {
-        saveDraft: boolean;
-        createVersion: boolean;
-        publish: boolean;
-        uploadAsset: boolean;
-      };
-      /** Format: uri */
-      returnUrl: string;
+      [key: string]: unknown;
     };
     Category: {
       id: string;
@@ -719,14 +639,56 @@ export interface components {
       schemaVersion: string;
       revision: number;
       draft: {
-        schemaVersion: string;
-        pageInfo?: {
+        /** @enum {string} */
+        schemaVersion: "1.0.0";
+        pageInfo: {
+          title: string;
+          description: string;
+          keywords: string[];
+          locale: string;
+          metadata: {
+            [key: string]: unknown;
+          };
+        } & {
           [key: string]: unknown;
         };
-        globalConfig?: {
+        globalConfig: {
+          design?: unknown;
+          body?: unknown;
+          variables?: unknown;
+          css?: unknown;
+          i18n?: unknown;
+        } & {
           [key: string]: unknown;
         };
-        spec?: {
+        spec: {
+          root: string;
+          elements: {
+            [key: string]: {
+              type: string;
+              props: {
+                [key: string]: unknown;
+              };
+              children?: string[];
+              slots?: {
+                [key: string]: string[];
+              };
+              visible?: unknown;
+              on?: {
+                [key: string]: unknown;
+              };
+              repeat?: unknown;
+              watch?: {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            };
+          };
+          state?: {
+            [key: string]: unknown;
+          };
+        } & {
           [key: string]: unknown;
         };
       } & {
@@ -736,21 +698,6 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
-    };
-    Health: {
-      /** @enum {string} */
-      status: "ok" | "degraded";
-      database: {
-        /** @enum {string} */
-        status: "up" | "down";
-      };
-      storage: {
-        /** @enum {string} */
-        status: "up" | "down" | "not_configured";
-        /** @enum {string} */
-        driver: "s3" | "memory";
-        detail?: string;
-      };
     };
     Locale: {
       id: string;
@@ -764,117 +711,10 @@ export interface components {
       updatedAt: string;
     };
     Manifest: {
-      protocolVersion: string;
-      app: {
-        key: string;
-        version?: string;
-      } & {
-        [key: string]: unknown;
-      };
-      components: {
-        [key: string]: {
-          key?: string;
-          name?: string;
-          props?: {
-            [key: string]: {
-              type?: string;
-              meta?: {
-                content?: boolean;
-                /** @enum {string} */
-                kind?: "image" | "link" | "number" | "rich-text" | "text";
-                label?: string;
-                translatable?: boolean;
-                required?: boolean;
-                group?: string;
-                searchable?: boolean;
-              } & {
-                [key: string]: unknown;
-              };
-            } & {
-              [key: string]: unknown;
-            };
-          };
-          actions?: {
-            [key: string]: unknown;
-          };
-        } & {
-          [key: string]: unknown;
-        };
-      };
-      actions?: {
-        [key: string]: unknown;
-      };
-      dataSources?: {
-        [key: string]: unknown;
-      };
-      capabilities?: {
-        [key: string]: boolean;
-      };
-    } & {
       [key: string]: unknown;
     };
     ManifestRevision: {
-      id: string;
-      appId: string;
-      protocolVersion: string;
-      appKey: string;
-      manifest: {
-        protocolVersion: string;
-        app: {
-          key: string;
-          version?: string;
-        } & {
-          [key: string]: unknown;
-        };
-        components: {
-          [key: string]: {
-            key?: string;
-            name?: string;
-            props?: {
-              [key: string]: {
-                type?: string;
-                meta?: {
-                  content?: boolean;
-                  /** @enum {string} */
-                  kind?: "image" | "link" | "number" | "rich-text" | "text";
-                  label?: string;
-                  translatable?: boolean;
-                  required?: boolean;
-                  group?: string;
-                  searchable?: boolean;
-                } & {
-                  [key: string]: unknown;
-                };
-              } & {
-                [key: string]: unknown;
-              };
-            };
-            actions?: {
-              [key: string]: unknown;
-            };
-          } & {
-            [key: string]: unknown;
-          };
-        };
-        actions?: {
-          [key: string]: unknown;
-        };
-        dataSources?: {
-          [key: string]: unknown;
-        };
-        capabilities?: {
-          [key: string]: boolean;
-        };
-      } & {
-        [key: string]: unknown;
-      };
-      checksum: string;
-      /** @enum {string} */
-      source: "push" | "sync";
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
+      [key: string]: unknown;
     };
     PreviewProfile: {
       id: string;
@@ -930,69 +770,7 @@ export interface components {
       updatedAt: string;
     };
     RuntimeDelivery: {
-      app: {
-        id: string;
-        key: string;
-      };
-      page?: {
-        id: string;
-        key: string;
-        title: string;
-      };
-      release: {
-        id: string;
-        appId: string;
-        documentId: string;
-        versionId: string;
-        channel: string;
-        /** @enum {string} */
-        status: "active" | "superseded" | "failed";
-        storageKey: string;
-        /** Format: date-time */
-        createdAt: string;
-        /** Format: date-time */
-        updatedAt: string;
-      };
-      version: {
-        id: string;
-        appId: string;
-        documentId: string;
-        versionNumber: number;
-        document: {
-          schemaVersion: string;
-          pageInfo?: {
-            [key: string]: unknown;
-          };
-          globalConfig?: {
-            [key: string]: unknown;
-          };
-          spec?: {
-            [key: string]: unknown;
-          };
-        } & {
-          [key: string]: unknown;
-        };
-        sourceRevision: number;
-        message: string;
-        /** Format: date-time */
-        createdAt: string;
-        /** Format: date-time */
-        updatedAt: string;
-      };
-      document: {
-        schemaVersion: string;
-        pageInfo?: {
-          [key: string]: unknown;
-        };
-        globalConfig?: {
-          [key: string]: unknown;
-        };
-        spec?: {
-          [key: string]: unknown;
-        };
-      } & {
-        [key: string]: unknown;
-      };
+      [key: string]: unknown;
     };
     StudioSession: {
       id: string;
@@ -1005,27 +783,62 @@ export interface components {
       /** Format: uri */
       launchUrl: string;
     };
-    UiSession: {
-      authenticated: boolean;
-      /** @enum {string} */
-      mode: "disabled" | "token" | "proxy";
-      /** Format: date-time */
-      expiresAt?: string;
-    };
     Version: {
       id: string;
       appId: string;
       documentId: string;
       versionNumber: number;
       document: {
-        schemaVersion: string;
-        pageInfo?: {
+        /** @enum {string} */
+        schemaVersion: "1.0.0";
+        pageInfo: {
+          title: string;
+          description: string;
+          keywords: string[];
+          locale: string;
+          metadata: {
+            [key: string]: unknown;
+          };
+        } & {
           [key: string]: unknown;
         };
-        globalConfig?: {
+        globalConfig: {
+          design?: unknown;
+          body?: unknown;
+          variables?: unknown;
+          css?: unknown;
+          i18n?: unknown;
+        } & {
           [key: string]: unknown;
         };
-        spec?: {
+        spec: {
+          root: string;
+          elements: {
+            [key: string]: {
+              type: string;
+              props: {
+                [key: string]: unknown;
+              };
+              children?: string[];
+              slots?: {
+                [key: string]: string[];
+              };
+              visible?: unknown;
+              on?: {
+                [key: string]: unknown;
+              };
+              repeat?: unknown;
+              watch?: {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            };
+          };
+          state?: {
+            [key: string]: unknown;
+          };
+        } & {
           [key: string]: unknown;
         };
       } & {
@@ -1071,6 +884,8 @@ export interface operations {
               key: string;
               name: string;
               description: string;
+              /** @enum {string} */
+              type: "web";
               /** @enum {string} */
               status: "active" | "disabled";
               manifest: {
@@ -1225,6 +1040,8 @@ export interface operations {
         "application/json": {
           key: string;
           name: string;
+          /** @enum {string} */
+          type: "web";
           /** @default  */
           description?: string;
           /**
@@ -1263,6 +1080,8 @@ export interface operations {
             key: string;
             name: string;
             description: string;
+            /** @enum {string} */
+            type: "web";
             /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
@@ -1425,6 +1244,8 @@ export interface operations {
             key: string;
             name: string;
             description: string;
+            /** @enum {string} */
+            type: "web";
             /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
@@ -1752,6 +1573,8 @@ export interface operations {
             name: string;
             description: string;
             /** @enum {string} */
+            type: "web";
+            /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
               /** @enum {string} */
@@ -1772,6 +1595,144 @@ export interface operations {
               appKey: string;
               runtimeKey: string;
             };
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  rotateAppKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            appKey: string;
           };
         };
       };
@@ -3435,14 +3396,56 @@ export interface operations {
             schemaVersion: string;
             revision: number;
             draft: {
-              schemaVersion: string;
-              pageInfo?: {
+              /** @enum {string} */
+              schemaVersion: "1.0.0";
+              pageInfo: {
+                title: string;
+                description: string;
+                keywords: string[];
+                locale: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
-              globalConfig?: {
+              globalConfig: {
+                design?: unknown;
+                body?: unknown;
+                variables?: unknown;
+                css?: unknown;
+                i18n?: unknown;
+              } & {
                 [key: string]: unknown;
               };
-              spec?: {
+              spec: {
+                root: string;
+                elements: {
+                  [key: string]: {
+                    type: string;
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                    visible?: unknown;
+                    on?: {
+                      [key: string]: unknown;
+                    };
+                    repeat?: unknown;
+                    watch?: {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                };
+                state?: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
             } & {
@@ -3725,14 +3728,56 @@ export interface operations {
         "application/json": {
           baseRevision?: number;
           document: {
-            schemaVersion: string;
-            pageInfo?: {
+            /** @enum {string} */
+            schemaVersion: "1.0.0";
+            pageInfo: {
+              title: string;
+              description: string;
+              keywords: string[];
+              locale: string;
+              metadata: {
+                [key: string]: unknown;
+              };
+            } & {
               [key: string]: unknown;
             };
-            globalConfig?: {
+            globalConfig: {
+              design?: unknown;
+              body?: unknown;
+              variables?: unknown;
+              css?: unknown;
+              i18n?: unknown;
+            } & {
               [key: string]: unknown;
             };
-            spec?: {
+            spec: {
+              root: string;
+              elements: {
+                [key: string]: {
+                  type: string;
+                  props: {
+                    [key: string]: unknown;
+                  };
+                  children?: string[];
+                  slots?: {
+                    [key: string]: string[];
+                  };
+                  visible?: unknown;
+                  on?: {
+                    [key: string]: unknown;
+                  };
+                  repeat?: unknown;
+                  watch?: {
+                    [key: string]: unknown;
+                  };
+                } & {
+                  [key: string]: unknown;
+                };
+              };
+              state?: {
+                [key: string]: unknown;
+              };
+            } & {
               [key: string]: unknown;
             };
           } & {
@@ -4201,14 +4246,56 @@ export interface operations {
             documentId: string;
             versionNumber: number;
             document: {
-              schemaVersion: string;
-              pageInfo?: {
+              /** @enum {string} */
+              schemaVersion: "1.0.0";
+              pageInfo: {
+                title: string;
+                description: string;
+                keywords: string[];
+                locale: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
-              globalConfig?: {
+              globalConfig: {
+                design?: unknown;
+                body?: unknown;
+                variables?: unknown;
+                css?: unknown;
+                i18n?: unknown;
+              } & {
                 [key: string]: unknown;
               };
-              spec?: {
+              spec: {
+                root: string;
+                elements: {
+                  [key: string]: {
+                    type: string;
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                    visible?: unknown;
+                    on?: {
+                      [key: string]: unknown;
+                    };
+                    repeat?: unknown;
+                    watch?: {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                };
+                state?: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
             } & {
@@ -4371,14 +4458,56 @@ export interface operations {
             documentId: string;
             versionNumber: number;
             document: {
-              schemaVersion: string;
-              pageInfo?: {
+              /** @enum {string} */
+              schemaVersion: "1.0.0";
+              pageInfo: {
+                title: string;
+                description: string;
+                keywords: string[];
+                locale: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
-              globalConfig?: {
+              globalConfig: {
+                design?: unknown;
+                body?: unknown;
+                variables?: unknown;
+                css?: unknown;
+                i18n?: unknown;
+              } & {
                 [key: string]: unknown;
               };
-              spec?: {
+              spec: {
+                root: string;
+                elements: {
+                  [key: string]: {
+                    type: string;
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                    visible?: unknown;
+                    on?: {
+                      [key: string]: unknown;
+                    };
+                    repeat?: unknown;
+                    watch?: {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                };
+                state?: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
             } & {
@@ -4534,14 +4663,56 @@ export interface operations {
             documentId: string;
             versionNumber: number;
             document: {
-              schemaVersion: string;
-              pageInfo?: {
+              /** @enum {string} */
+              schemaVersion: "1.0.0";
+              pageInfo: {
+                title: string;
+                description: string;
+                keywords: string[];
+                locale: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
-              globalConfig?: {
+              globalConfig: {
+                design?: unknown;
+                body?: unknown;
+                variables?: unknown;
+                css?: unknown;
+                i18n?: unknown;
+              } & {
                 [key: string]: unknown;
               };
-              spec?: {
+              spec: {
+                root: string;
+                elements: {
+                  [key: string]: {
+                    type: string;
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                    visible?: unknown;
+                    on?: {
+                      [key: string]: unknown;
+                    };
+                    repeat?: unknown;
+                    watch?: {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                };
+                state?: {
+                  [key: string]: unknown;
+                };
+              } & {
                 [key: string]: unknown;
               };
             } & {
@@ -5563,53 +5734,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          protocolVersion: string;
-          app: {
-            key: string;
-            version?: string;
-          } & {
-            [key: string]: unknown;
-          };
-          components: {
-            [key: string]: {
-              key?: string;
-              name?: string;
-              props?: {
-                [key: string]: {
-                  type?: string;
-                  meta?: {
-                    content?: boolean;
-                    /** @enum {string} */
-                    kind?: "image" | "link" | "number" | "rich-text" | "text";
-                    label?: string;
-                    translatable?: boolean;
-                    required?: boolean;
-                    group?: string;
-                    searchable?: boolean;
-                  } & {
-                    [key: string]: unknown;
-                  };
-                } & {
-                  [key: string]: unknown;
-                };
-              };
-              actions?: {
-                [key: string]: unknown;
-              };
-            } & {
-              [key: string]: unknown;
-            };
-          };
-          actions?: {
-            [key: string]: unknown;
-          };
-          dataSources?: {
-            [key: string]: unknown;
-          };
-          capabilities?: {
-            [key: string]: boolean;
-          };
-        } & {
           [key: string]: unknown;
         };
       };
@@ -5760,67 +5884,7 @@ export interface operations {
         };
         content: {
           "application/json": {
-            id: string;
-            appId: string;
-            protocolVersion: string;
-            appKey: string;
-            manifest: {
-              protocolVersion: string;
-              app: {
-                key: string;
-                version?: string;
-              } & {
-                [key: string]: unknown;
-              };
-              components: {
-                [key: string]: {
-                  key?: string;
-                  name?: string;
-                  props?: {
-                    [key: string]: {
-                      type?: string;
-                      meta?: {
-                        content?: boolean;
-                        /** @enum {string} */
-                        kind?: "image" | "link" | "number" | "rich-text" | "text";
-                        label?: string;
-                        translatable?: boolean;
-                        required?: boolean;
-                        group?: string;
-                        searchable?: boolean;
-                      } & {
-                        [key: string]: unknown;
-                      };
-                    } & {
-                      [key: string]: unknown;
-                    };
-                  };
-                  actions?: {
-                    [key: string]: unknown;
-                  };
-                } & {
-                  [key: string]: unknown;
-                };
-              };
-              actions?: {
-                [key: string]: unknown;
-              };
-              dataSources?: {
-                [key: string]: unknown;
-              };
-              capabilities?: {
-                [key: string]: boolean;
-              };
-            } & {
-              [key: string]: unknown;
-            };
-            checksum: string;
-            /** @enum {string} */
-            source: "push" | "sync";
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
+            [key: string]: unknown;
           }[];
         };
       };
@@ -5959,67 +6023,7 @@ export interface operations {
         };
         content: {
           "application/json": {
-            id: string;
-            appId: string;
-            protocolVersion: string;
-            appKey: string;
-            manifest: {
-              protocolVersion: string;
-              app: {
-                key: string;
-                version?: string;
-              } & {
-                [key: string]: unknown;
-              };
-              components: {
-                [key: string]: {
-                  key?: string;
-                  name?: string;
-                  props?: {
-                    [key: string]: {
-                      type?: string;
-                      meta?: {
-                        content?: boolean;
-                        /** @enum {string} */
-                        kind?: "image" | "link" | "number" | "rich-text" | "text";
-                        label?: string;
-                        translatable?: boolean;
-                        required?: boolean;
-                        group?: string;
-                        searchable?: boolean;
-                      } & {
-                        [key: string]: unknown;
-                      };
-                    } & {
-                      [key: string]: unknown;
-                    };
-                  };
-                  actions?: {
-                    [key: string]: unknown;
-                  };
-                } & {
-                  [key: string]: unknown;
-                };
-              };
-              actions?: {
-                [key: string]: unknown;
-              };
-              dataSources?: {
-                [key: string]: unknown;
-              };
-              capabilities?: {
-                [key: string]: boolean;
-              };
-            } & {
-              [key: string]: unknown;
-            };
-            checksum: string;
-            /** @enum {string} */
-            source: "push" | "sync";
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
+            [key: string]: unknown;
           };
         };
       };
@@ -9480,69 +9484,7 @@ export interface operations {
         };
         content: {
           "application/json": {
-            app: {
-              id: string;
-              key: string;
-            };
-            page?: {
-              id: string;
-              key: string;
-              title: string;
-            };
-            release: {
-              id: string;
-              appId: string;
-              documentId: string;
-              versionId: string;
-              channel: string;
-              /** @enum {string} */
-              status: "active" | "superseded" | "failed";
-              storageKey: string;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-            };
-            version: {
-              id: string;
-              appId: string;
-              documentId: string;
-              versionNumber: number;
-              document: {
-                schemaVersion: string;
-                pageInfo?: {
-                  [key: string]: unknown;
-                };
-                globalConfig?: {
-                  [key: string]: unknown;
-                };
-                spec?: {
-                  [key: string]: unknown;
-                };
-              } & {
-                [key: string]: unknown;
-              };
-              sourceRevision: number;
-              message: string;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-            };
-            document: {
-              schemaVersion: string;
-              pageInfo?: {
-                [key: string]: unknown;
-              };
-              globalConfig?: {
-                [key: string]: unknown;
-              };
-              spec?: {
-                [key: string]: unknown;
-              };
-            } & {
-              [key: string]: unknown;
-            };
+            [key: string]: unknown;
           };
         };
       };
@@ -9681,69 +9623,7 @@ export interface operations {
         };
         content: {
           "application/json": {
-            app: {
-              id: string;
-              key: string;
-            };
-            page?: {
-              id: string;
-              key: string;
-              title: string;
-            };
-            release: {
-              id: string;
-              appId: string;
-              documentId: string;
-              versionId: string;
-              channel: string;
-              /** @enum {string} */
-              status: "active" | "superseded" | "failed";
-              storageKey: string;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-            };
-            version: {
-              id: string;
-              appId: string;
-              documentId: string;
-              versionNumber: number;
-              document: {
-                schemaVersion: string;
-                pageInfo?: {
-                  [key: string]: unknown;
-                };
-                globalConfig?: {
-                  [key: string]: unknown;
-                };
-                spec?: {
-                  [key: string]: unknown;
-                };
-              } & {
-                [key: string]: unknown;
-              };
-              sourceRevision: number;
-              message: string;
-              /** Format: date-time */
-              createdAt: string;
-              /** Format: date-time */
-              updatedAt: string;
-            };
-            document: {
-              schemaVersion: string;
-              pageInfo?: {
-                [key: string]: unknown;
-              };
-              globalConfig?: {
-                [key: string]: unknown;
-              };
-              spec?: {
-                [key: string]: unknown;
-              };
-            } & {
-              [key: string]: unknown;
-            };
+            [key: string]: unknown;
           };
         };
       };
@@ -10026,6 +9906,8 @@ export interface operations {
               id: string;
               key: string;
               name: string;
+              /** @enum {string} */
+              type: "web";
             };
             resource: {
               id: string;
@@ -10037,14 +9919,56 @@ export interface operations {
             draft: {
               revision: number;
               document: {
-                schemaVersion: string;
-                pageInfo?: {
+                /** @enum {string} */
+                schemaVersion: "1.0.0";
+                pageInfo: {
+                  title: string;
+                  description: string;
+                  keywords: string[];
+                  locale: string;
+                  metadata: {
+                    [key: string]: unknown;
+                  };
+                } & {
                   [key: string]: unknown;
                 };
-                globalConfig?: {
+                globalConfig: {
+                  design?: unknown;
+                  body?: unknown;
+                  variables?: unknown;
+                  css?: unknown;
+                  i18n?: unknown;
+                } & {
                   [key: string]: unknown;
                 };
-                spec?: {
+                spec: {
+                  root: string;
+                  elements: {
+                    [key: string]: {
+                      type: string;
+                      props: {
+                        [key: string]: unknown;
+                      };
+                      children?: string[];
+                      slots?: {
+                        [key: string]: string[];
+                      };
+                      visible?: unknown;
+                      on?: {
+                        [key: string]: unknown;
+                      };
+                      repeat?: unknown;
+                      watch?: {
+                        [key: string]: unknown;
+                      };
+                    } & {
+                      [key: string]: unknown;
+                    };
+                  };
+                  state?: {
+                    [key: string]: unknown;
+                  };
+                } & {
                   [key: string]: unknown;
                 };
               } & {
@@ -10056,34 +9980,32 @@ export interface operations {
                   protocolVersion: string;
                   app: {
                     key: string;
+                    /** @enum {string} */
+                    type: "web";
                     version?: string;
                   } & {
                     [key: string]: unknown;
                   };
                   components: {
                     [key: string]: {
-                      key?: string;
-                      name?: string;
-                      props?: {
-                        [key: string]: {
-                          type?: string;
-                          meta?: {
-                            content?: boolean;
-                            /** @enum {string} */
-                            kind?: "image" | "link" | "number" | "rich-text" | "text";
-                            label?: string;
-                            translatable?: boolean;
-                            required?: boolean;
-                            group?: string;
-                            searchable?: boolean;
-                          } & {
-                            [key: string]: unknown;
-                          };
-                        } & {
-                          [key: string]: unknown;
-                        };
+                      title: string;
+                      description?: string;
+                      category?: string;
+                      tags?: string[];
+                      props: {
+                        [key: string]: unknown;
                       };
-                      actions?: {
+                      editor?: {
+                        [key: string]: unknown;
+                      };
+                      events?: {
+                        [key: string]: unknown;
+                      };
+                      children?: unknown;
+                      slots?: {
+                        [key: string]: unknown;
+                      };
+                      capabilities?: {
                         [key: string]: unknown;
                       };
                     } & {
@@ -10097,7 +10019,7 @@ export interface operations {
                     [key: string]: unknown;
                   };
                   capabilities?: {
-                    [key: string]: boolean;
+                    [key: string]: unknown;
                   };
                 } & {
                   [key: string]: unknown;
@@ -10118,6 +10040,206 @@ export interface operations {
             };
             /** Format: uri */
             returnUrl: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  updateStudioDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          baseRevision?: number;
+          document: {
+            /** @enum {string} */
+            schemaVersion: "1.0.0";
+            pageInfo: {
+              title: string;
+              description: string;
+              keywords: string[];
+              locale: string;
+              metadata: {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            };
+            globalConfig: {
+              design?: unknown;
+              body?: unknown;
+              variables?: unknown;
+              css?: unknown;
+              i18n?: unknown;
+            } & {
+              [key: string]: unknown;
+            };
+            spec: {
+              root: string;
+              elements: {
+                [key: string]: {
+                  type: string;
+                  props: {
+                    [key: string]: unknown;
+                  };
+                  children?: string[];
+                  slots?: {
+                    [key: string]: string[];
+                  };
+                  visible?: unknown;
+                  on?: {
+                    [key: string]: unknown;
+                  };
+                  repeat?: unknown;
+                  watch?: {
+                    [key: string]: unknown;
+                  };
+                } & {
+                  [key: string]: unknown;
+                };
+              };
+              state?: {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            };
+          } & {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
           };
         };
       };

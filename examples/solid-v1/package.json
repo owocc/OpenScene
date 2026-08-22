@@ -8,8 +8,11 @@
     "preview": "vp preview"
   },
   "dependencies": {
+    "@openscene/constants": "workspace:*",
     "@openscene/javascript": "workspace:*",
-    "solid-js": "^1.9.14"
+    "@openscene/solid": "workspace:*",
+    "solid-js": "^1.9.14",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

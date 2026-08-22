@@ -1,5 +1,8 @@
-import type { AppDocument, AppElement } from "./document";
+import type { SceneDocument, UIElement } from "@openscene/protocol";
+
 import type { ComponentMeta } from "./meta";
+
+type EditorElement = UIElement & { name?: string };
 
 export type ElementTreeNode = {
   kind: "element";
@@ -7,7 +10,7 @@ export type ElementTreeNode = {
   type: string;
   label: string;
   isRoot: boolean;
-  element: AppElement;
+  element: EditorElement;
   children: TreeNode[];
 };
 
@@ -22,11 +25,7 @@ export type SlotTreeNode = {
 
 export type TreeNode = ElementTreeNode | SlotTreeNode;
 
-export type ChildContainer = {
-  parentId: string;
-  slotName?: string;
-  index?: number;
-};
+export type ChildContainer = { parentId: string; slotName?: string; index?: number };
 
 export function slotNodeId(parentId: string, slotName: string) {
   return `${parentId}:slot:${slotName}`;
@@ -43,18 +42,18 @@ export function isSlotNodeId(id: string) {
   return parseSlotNodeId(id) !== undefined;
 }
 
-function childIds(element: AppElement, slotName?: string) {
+function childIds(element: UIElement, slotName?: string) {
   return slotName ? (element.slots?.[slotName] ?? []) : (element.children ?? []);
 }
 
 function buildElement(
-  document: AppDocument,
+  document: SceneDocument,
   id: string,
   getMeta: (type: string) => ComponentMeta | undefined,
   path: Set<string>,
   isRoot = false,
 ): ElementTreeNode | undefined {
-  const element = document.spec.elements[id];
+  const element = document.spec.elements[id] as EditorElement | undefined;
   if (!element || path.has(id)) return undefined;
 
   const nextPath = new Set(path).add(id);
@@ -108,14 +107,13 @@ function buildElement(
 }
 
 export function buildTree(
-  document: AppDocument,
+  document: SceneDocument,
   getMeta: (type: string) => ComponentMeta | undefined,
 ) {
-  if (!document.spec.root) return undefined;
   return buildElement(document, document.spec.root, getMeta, new Set(), true);
 }
 
-export function getElementLocation(document: AppDocument, elementId: string) {
+export function getElementLocation(document: SceneDocument, elementId: string) {
   for (const [parentId, element] of Object.entries(document.spec.elements)) {
     const childIndex = element.children?.indexOf(elementId) ?? -1;
     if (childIndex >= 0) return { parentId, index: childIndex } satisfies ChildContainer;
@@ -128,14 +126,11 @@ export function getElementLocation(document: AppDocument, elementId: string) {
 }
 
 export function insertElement(
-  document: AppDocument,
+  document: SceneDocument,
   elementId: string,
   target: ChildContainer | undefined,
-): AppDocument {
-  if (!target) {
-    return { ...document, spec: { ...document.spec, root: elementId } };
-  }
-
+): SceneDocument {
+  if (!target) return { ...document, spec: { ...document.spec, root: elementId } };
   const parent = document.spec.elements[target.parentId];
   if (!parent) return document;
   const index = target.index ?? Number.MAX_SAFE_INTEGER;
@@ -155,7 +150,7 @@ export function insertElement(
   return { ...document, spec: { ...document.spec, elements } };
 }
 
-export function removeElementFromContainer(document: AppDocument, elementId: string) {
+export function removeElementFromContainer(document: SceneDocument, elementId: string) {
   const location = getElementLocation(document, elementId);
   if (!location) return document;
   const parent = document.spec.elements[location.parentId];
@@ -168,11 +163,7 @@ export function removeElementFromContainer(document: AppDocument, elementId: str
     else slots[location.slotName] = children;
     elements[location.parentId] = Object.keys(slots).length
       ? { ...parent, slots }
-      : (() => {
-          const next = { ...parent };
-          delete next.slots;
-          return next;
-        })();
+      : { ...parent, slots: undefined };
   } else {
     elements[location.parentId] = {
       ...parent,
@@ -182,7 +173,7 @@ export function removeElementFromContainer(document: AppDocument, elementId: str
   return { ...document, spec: { ...document.spec, elements } };
 }
 
-export function collectDescendants(document: AppDocument, rootId: string) {
+export function collectDescendants(document: SceneDocument, rootId: string) {
   const removed = new Set<string>();
   const visit = (id: string) => {
     if (removed.has(id)) return;
@@ -198,11 +189,15 @@ export function collectDescendants(document: AppDocument, rootId: string) {
   return removed;
 }
 
-export function deleteElementRecursive(document: AppDocument, elementId: string) {
+export function deleteElementRecursive(document: SceneDocument, elementId: string) {
   if (elementId === document.spec.root) {
+    const root = document.spec.elements[elementId];
     return {
       ...document,
-      spec: { ...document.spec, root: "", elements: {} },
+      spec: {
+        ...document.spec,
+        elements: { [elementId]: { type: root?.type ?? "View", props: {}, children: [] } },
+      },
     };
   }
   const removed = collectDescendants(document, elementId);

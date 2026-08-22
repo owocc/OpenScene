@@ -1,11 +1,15 @@
+import { and, eq, isNull } from "drizzle-orm";
+import { APP_TYPE_WEB } from "@openscene/constants";
+import { createEmptySceneDocument } from "@openscene/protocol";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { DELETE, GET, PATCH, POST } from "../../app/api/v1/[...path]/route";
+import { initializeDatabase, resetDatabaseForTests } from "../../server/db/client";
+import { appKeys } from "../../server/db/schema";
 import { resetConfigForTests } from "../../server/config/env";
-import { resetDatabaseForTests } from "../../server/db/client";
 import { resetStorageForTests } from "../../server/storage";
 import { createOpenApiDocument } from "../../server/openapi/document";
 
@@ -15,6 +19,7 @@ let tempDir: string;
 let appA: { id: string; appKey: string; runtimeKey: string };
 let appB: { id: string; appKey: string; runtimeKey: string };
 let pageA: { id: string; documentId: string };
+const emptyDocument = createEmptySceneDocument();
 let profileA: { id: string };
 
 beforeAll(async () => {
@@ -27,15 +32,24 @@ beforeAll(async () => {
   resetStorageForTests();
   await resetDatabaseForTests();
 
-  const responseA = await call("POST", ["apps"], { key: "app-a", name: "App A" });
+  const responseA = await call("POST", ["apps"], {
+    key: "app-a",
+    name: "App A",
+    type: APP_TYPE_WEB,
+  });
   expect(responseA.status).toBe(201);
   const bodyA = await responseA.json();
+  expect(bodyA.type).toBe(APP_TYPE_WEB);
   appA = {
     id: bodyA.id,
     appKey: bodyA.credentials.appKey,
     runtimeKey: bodyA.credentials.runtimeKey,
   };
-  const responseB = await call("POST", ["apps"], { key: "app-b", name: "App B" });
+  const responseB = await call("POST", ["apps"], {
+    key: "app-b",
+    name: "App B",
+    type: APP_TYPE_WEB,
+  });
   expect(responseB.status).toBe(201);
   const bodyB = await responseB.json();
   appB = {
@@ -81,7 +95,9 @@ describe("Admin API HTTP flow", () => {
     expect(session.status).toBe(201);
     const sessionBody = await session.json();
     expect(sessionBody.launchUrl).toMatch(
-      new RegExp(`^http://localhost:5173\\?sessionId=${sessionBody.id}#token=`),
+      new RegExp(
+        `^http://localhost:5173\\?server-url=http%3A%2F%2Flocalhost%3A3000&sessionId=${sessionBody.id}#token=`,
+      ),
     );
     const bootstrap = await call(
       "GET",
@@ -94,6 +110,7 @@ describe("Admin API HTTP flow", () => {
     expect(bootstrap.status).toBe(200);
     const bootstrapBody = await bootstrap.json();
     expect(bootstrapBody.resource.documentId).toBe(pageA.documentId);
+    expect(bootstrapBody.app.type).toBe(APP_TYPE_WEB);
     expect(bootstrapBody.preview.allowedOrigin).toBe("http://localhost:4000");
     expect(JSON.stringify(bootstrapBody)).not.toContain("encryptedHeaders");
   });
@@ -104,14 +121,14 @@ describe("Admin API HTTP flow", () => {
     expect(draft.headers.get("etag")).toBe('"0"');
     const updated = await call("PATCH", ["apps", appA.id, "documents", pageA.documentId, "draft"], {
       baseRevision: 0,
-      document: { schemaVersion: "1.0.0", spec: { title: "Updated" } },
+      document: { ...emptyDocument, spec: { ...emptyDocument.spec, title: "Updated" } },
     });
     expect(updated.status).toBe(200);
     expect((await updated.json()).revision).toBe(1);
     const conflict = await call(
       "PATCH",
       ["apps", appA.id, "documents", pageA.documentId, "draft"],
-      { baseRevision: 0, document: { schemaVersion: "1.0.0", spec: {} } },
+      { baseRevision: 0, document: emptyDocument },
     );
     expect(conflict.status).toBe(409);
     expect((await conflict.json()).errors[0].path).toBe("currentRevision");
@@ -136,8 +153,9 @@ describe("Admin API HTTP flow", () => {
     const runtime = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
       "x-openscene-runtime-key": appA.runtimeKey,
     });
-    expect(runtime.status).toBe(200);
-    expect((await runtime.json()).document.spec.title).toBe("Updated");
+    const runtimeBody = await runtime.json();
+    expect(runtimeBody.app?.type ?? runtimeBody.type).toBe(APP_TYPE_WEB);
+    expect(runtimeBody.document.spec.title).toBe("Updated");
     const crossApp = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
       "x-openscene-runtime-key": appB.runtimeKey,
     });
@@ -148,10 +166,69 @@ describe("Admin API HTTP flow", () => {
     const response = await call(
       "POST",
       ["apps", appB.id, "manifest", "push"],
-      { protocolVersion: "1.0", app: { key: "app-b" }, components: {} },
+      { protocolVersion: "1.0", app: { key: "app-b", type: APP_TYPE_WEB }, components: {} },
       { "x-openscene-app-key": appA.appKey },
     );
     expect(response.status).toBe(404);
+  });
+  test("atomically rotates App Key while preserving Runtime Key authentication", async () => {
+    const manifest = {
+      protocolVersion: "1.0",
+      app: { key: "app-a", type: APP_TYPE_WEB },
+      components: {},
+    };
+    const initialPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
+      "x-openscene-app-key": appA.appKey,
+    });
+    expect(initialPush.status).toBe(200);
+
+    const runtimeBefore = await call(
+      "GET",
+      ["runtime", "apps", "app-a", "pages", "home"],
+      undefined,
+      {
+        "x-openscene-runtime-key": appA.runtimeKey,
+      },
+    );
+    expect(runtimeBefore.status).toBe(200);
+
+    const oldAppKey = appA.appKey;
+    const rotated = await call("POST", ["apps", appA.id, "app-keys", "rotate"]);
+    expect(rotated.status).toBe(200);
+    const rotatedBody = await rotated.json();
+    expect(Object.keys(rotatedBody)).toEqual(["appKey"]);
+    expect(rotatedBody.appKey).not.toBe(oldAppKey);
+    appA.appKey = rotatedBody.appKey;
+
+    const oldPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
+      "x-openscene-app-key": oldAppKey,
+    });
+    expect(oldPush.status).toBe(404);
+    const newPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
+      "x-openscene-app-key": appA.appKey,
+    });
+    expect(newPush.status).toBe(200);
+
+    const runtimeAfter = await call(
+      "GET",
+      ["runtime", "apps", "app-a", "pages", "home"],
+      undefined,
+      {
+        "x-openscene-runtime-key": appA.runtimeKey,
+      },
+    );
+    expect(runtimeAfter.status).toBe(200);
+
+    const { db } = await initializeDatabase();
+    const activeAppKeys = await db
+      .select({ id: appKeys.id })
+      .from(appKeys)
+      .where(and(eq(appKeys.appId, appA.id), eq(appKeys.kind, "app"), isNull(appKeys.revokedAt)))
+      .all();
+    expect(activeAppKeys).toHaveLength(1);
+
+    const missingApp = await call("POST", ["apps", "app_missing", "app-keys", "rotate"]);
+    expect(missingApp.status).toBe(404);
   });
 
   test("deletes an empty App together with its generated defaults", async () => {
@@ -173,6 +250,8 @@ describe("Admin API HTTP flow", () => {
     expect(validToken.status).toBe(200);
 
     const login = await call("POST", ["auth", "session"], { token: "management-test-token" });
+    const rotationMissingToken = await call("POST", ["apps", appA.id, "app-keys", "rotate"]);
+    expect(rotationMissingToken.status).toBe(401);
     expect(login.status).toBe(200);
     const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
     expect(cookie).toMatch(/^openscene_admin_session=/);
@@ -184,6 +263,20 @@ describe("Admin API HTTP flow", () => {
       { description: "cookie write" },
       { cookie: cookie ?? "" },
     );
+    const rotationCsrfRejected = await call(
+      "POST",
+      ["apps", appA.id, "app-keys", "rotate"],
+      undefined,
+      { cookie: cookie ?? "" },
+    );
+    expect(rotationCsrfRejected.status).toBe(403);
+    const rotationCsrfAccepted = await call(
+      "POST",
+      ["apps", appA.id, "app-keys", "rotate"],
+      undefined,
+      { cookie: cookie ?? "", origin: "http://localhost" },
+    );
+    expect(rotationCsrfAccepted.status).toBe(200);
     expect(csrfRejected.status).toBe(403);
     const csrfAccepted = await call(
       "PATCH",
@@ -220,6 +313,7 @@ describe("Admin API HTTP flow", () => {
     expect(document.openapi).toBe("3.0.3");
     const paths = document.paths as Record<string, unknown>;
     expect(paths["/api/v1/apps/{appId}/documents/{documentId}/draft"]).toBeDefined();
+    expect(paths["/api/v1/apps/{appId}/app-keys/rotate"]).toBeDefined();
     expect(paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"]).toBeDefined();
     const runtimeOperation = paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"] as {
       get: { parameters: Array<{ name: string }> };

@@ -1,7 +1,24 @@
+import { APP_TYPES } from "@openscene/constants";
+import {
+  AppManifestSchema,
+  ComponentManifestSchema,
+  RuntimePageDeliverySchema,
+  SceneDocumentSchema,
+} from "@openscene/protocol";
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
+export {
+  AppManifestSchema,
+  ComponentManifestSchema,
+  RuntimePageDeliverySchema,
+  SceneDocumentSchema,
+};
+export const ManifestSchema = AppManifestSchema;
+
 extendZodWithOpenApi(z);
+
+export type { AppManifest as Manifest, SceneDocument } from "@openscene/protocol";
 
 export const IdSchema = z.string().min(1).max(256);
 export const KeySchema = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/);
@@ -9,58 +26,12 @@ export const IsoDateSchema = z.string().datetime({ offset: true });
 export const ResourceKindSchema = z.enum(["page", "template"]);
 export const ResourceStatusSchema = z.enum(["active", "disabled", "draft", "published"]);
 
-export const SceneDocumentSchema = z
-  .object({
-    schemaVersion: z.string().min(1).max(64),
-    pageInfo: z.record(z.string(), z.unknown()).optional(),
-    globalConfig: z.record(z.string(), z.unknown()).optional(),
-    spec: z.record(z.string(), z.unknown()).optional(),
-  })
-  .catchall(z.unknown());
-
-export const ManifestPropertySchema = z
-  .object({
-    type: z.string().min(1).optional(),
-    meta: z
-      .object({
-        content: z.boolean().optional(),
-        kind: z.enum(["image", "link", "number", "rich-text", "text"]).optional(),
-        label: z.string().optional(),
-        translatable: z.boolean().optional(),
-        required: z.boolean().optional(),
-        group: z.string().optional(),
-        searchable: z.boolean().optional(),
-      })
-      .catchall(z.unknown())
-      .optional(),
-  })
-  .catchall(z.unknown());
-
-export const ManifestComponentSchema = z
-  .object({
-    key: KeySchema.optional(),
-    name: z.string().optional(),
-    props: z.record(z.string(), ManifestPropertySchema).optional(),
-    actions: z.record(z.string(), z.unknown()).optional(),
-  })
-  .catchall(z.unknown());
-
-export const ManifestSchema = z
-  .object({
-    protocolVersion: z.string().min(1),
-    app: z.object({ key: KeySchema, version: z.string().optional() }).catchall(z.unknown()),
-    components: z.record(z.string(), ManifestComponentSchema),
-    actions: z.record(z.string(), z.unknown()).optional(),
-    dataSources: z.record(z.string(), z.unknown()).optional(),
-    capabilities: z.record(z.string(), z.boolean()).optional(),
-  })
-  .catchall(z.unknown());
-
 export const AppSchema = z.object({
   id: IdSchema,
   key: KeySchema,
   name: z.string(),
   description: z.string(),
+  type: z.enum(APP_TYPES),
   status: z.enum(["active", "disabled"]),
   manifest: z.object({
     mode: z.enum(["remote", "push"]),
@@ -72,6 +43,7 @@ export const AppSchema = z.object({
   updatedAt: IsoDateSchema,
   credentials: z.object({ appKey: z.string(), runtimeKey: z.string() }).optional(),
 });
+export const AppKeyRotationSchema = z.object({ appKey: z.string().min(1) });
 
 export const PreviewProfileSchema = z.object({
   id: IdSchema,
@@ -174,7 +146,7 @@ export const ManifestRevisionSchema = z.object({
   appId: IdSchema,
   protocolVersion: z.string(),
   appKey: KeySchema,
-  manifest: ManifestSchema,
+  manifest: AppManifestSchema,
   checksum: z.string(),
   source: z.enum(["push", "sync"]),
   createdAt: IsoDateSchema,
@@ -207,7 +179,12 @@ export const UiSessionSchema = z.object({
 export const UiSessionCreateSchema = z.object({ token: z.string().min(1) });
 export const BootstrapSchema = z.object({
   session: z.object({ id: IdSchema, expiresAt: IsoDateSchema }),
-  app: z.object({ id: IdSchema, key: KeySchema, name: z.string() }),
+  app: z.object({
+    id: IdSchema,
+    key: KeySchema,
+    name: z.string(),
+    type: z.enum(APP_TYPES),
+  }),
   resource: z.object({
     id: IdSchema,
     kind: ResourceKindSchema,
@@ -215,7 +192,7 @@ export const BootstrapSchema = z.object({
     documentId: IdSchema,
   }),
   draft: z.object({ revision: z.number().int().nonnegative(), document: SceneDocumentSchema }),
-  manifest: ManifestSchema.nullable(),
+  manifest: AppManifestSchema.nullable(),
   preview: z.object({
     url: z.string().url(),
     allowedOrigin: z.string().url(),
@@ -229,13 +206,7 @@ export const BootstrapSchema = z.object({
   }),
   returnUrl: z.string().url(),
 });
-export const RuntimeDeliverySchema = z.object({
-  app: z.object({ id: IdSchema, key: KeySchema }),
-  page: z.object({ id: IdSchema, key: KeySchema, title: z.string() }).optional(),
-  release: ReleaseSchema,
-  version: VersionSchema,
-  document: SceneDocumentSchema,
-});
+export const RuntimeDeliverySchema = RuntimePageDeliverySchema;
 export const UploadIntentResponseSchema = z.object({
   asset: AssetSchema,
   uploadUrl: z.string(),
@@ -260,6 +231,7 @@ export const ProblemSchema = z.object({
 export const AppCreateSchema = z.object({
   key: KeySchema,
   name: z.string().min(1).max(200),
+  type: z.enum(APP_TYPES),
   description: z.string().max(2_000).default(""),
   status: z.enum(["active", "disabled"]).default("active"),
   manifest: z
@@ -267,10 +239,12 @@ export const AppCreateSchema = z.object({
     .default({ mode: "push" }),
   runtimePublicBaseUrl: z.string().url().optional(),
 });
-export const AppPatchSchema = AppCreateSchema.partial().refine((value) => value.key === undefined, {
-  message: "App key cannot be changed",
-  path: ["key"],
-});
+export const AppPatchSchema = AppCreateSchema.omit({ type: true })
+  .partial()
+  .refine((value) => value.key === undefined, {
+    message: "App key cannot be changed",
+    path: ["key"],
+  });
 export const PreviewProfileCreateSchema = z.object({
   name: z.string().min(1).max(200),
   url: z.string().url(),
@@ -342,7 +316,6 @@ export const AssetCompleteSchema = z.object({
   width: z.number().int().nonnegative().optional(),
   height: z.number().int().nonnegative().optional(),
 });
-export const ManifestPushSchema = ManifestSchema;
 
 export const PaginationQuerySchema = z.object({
   cursor: z.string().optional(),
@@ -352,6 +325,4 @@ export const PaginationQuerySchema = z.object({
   categoryId: IdSchema.optional(),
 });
 
-export type SceneDocument = z.infer<typeof SceneDocumentSchema>;
-export type Manifest = z.infer<typeof ManifestSchema>;
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

@@ -3,13 +3,13 @@ import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OutlineTree } from "@/components/studio/outline-tree";
 import { useI18n } from "@/i18n";
-import type { AppDocument } from "@/core/document";
+import type { SceneDocument } from "@openscene/protocol";
 import type { AdapterRegistry } from "@/core/registry";
 import type { ComponentItem } from "../types";
 
 interface FilePanelProps {
   title: string;
-  document: AppDocument;
+  document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
   components: ComponentItem[];

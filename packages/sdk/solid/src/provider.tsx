@@ -1,0 +1,244 @@
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  ErrorBoundary,
+  onCleanup,
+  Show,
+  useContext,
+  type Accessor,
+  type JSX,
+  type Component,
+} from "solid-js";
+import {
+  JSONUIProvider,
+  Renderer,
+  type ComponentRenderProps,
+  type ComponentRegistry,
+} from "@json-render/solid";
+import type { UIElement } from "@json-render/core";
+import {
+  openSceneDirectives,
+  type OpenSceneClient,
+  type OpenSceneClientState,
+} from "@openscene/javascript";
+import type { SceneDocument } from "@openscene/protocol";
+import type { OpenSceneSolidApp } from "./catalog.js";
+import { OpenSceneNodeProvider } from "./node.js";
+import { SelectionCanvas } from "./selection.js";
+
+export interface OpenSceneProviderProps {
+  client?: OpenSceneClient;
+  app: OpenSceneSolidApp;
+  children?: JSX.Element;
+}
+
+interface OpenSceneContextValue {
+  client: OpenSceneClient;
+  app: OpenSceneSolidApp;
+  snapshot: Accessor<OpenSceneClientState>;
+}
+
+const OpenSceneContext = createContext<OpenSceneContextValue>();
+
+function getDefaultClient(): OpenSceneClient {
+  if (typeof window !== "undefined" && window.OpenScene) return window.OpenScene;
+  throw new Error("OpenSceneProvider requires a client outside a browser runtime");
+}
+
+function subscribeClient(
+  client: OpenSceneClient,
+  setSnapshot: (value: OpenSceneClientState) => void,
+): () => void {
+  const unsubscribe = client.subscribe(() => setSnapshot(client.getSnapshot()));
+  setSnapshot(client.getSnapshot());
+  return unsubscribe;
+}
+
+function createRuntimeHandlers(
+  app: OpenSceneSolidApp,
+  store: OpenSceneClientState["runtimeStore"],
+): Record<string, (params: Record<string, unknown>) => Promise<void>> | undefined {
+  if (!store || !app.handlers) return undefined;
+  const handlerFactory = app.handlers as unknown;
+  if (typeof handlerFactory !== "function")
+    return app.handlers as unknown as Record<
+      string,
+      (params: Record<string, unknown>) => Promise<void>
+    >;
+  const setState = (updater: (previous: Record<string, unknown>) => Record<string, unknown>) => {
+    const previous = store.getSnapshot();
+    const next = updater(previous);
+    const updates: Record<string, unknown> = {};
+    const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+    for (const key of keys) {
+      if (previous[key] !== next[key]) {
+        const pointer = `/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`;
+        updates[pointer] = next[key];
+      }
+    }
+    store.update(updates);
+  };
+  return (
+    handlerFactory as (
+      getSetState: () => typeof setState,
+      getState: () => Record<string, unknown>,
+    ) => Record<string, (params: Record<string, unknown>) => Promise<void>>
+  )(
+    () => setState,
+    () => store.getSnapshot(),
+  );
+}
+
+export function OpenSceneProvider(props: OpenSceneProviderProps): JSX.Element {
+  const client = props.client ?? getDefaultClient();
+  const [snapshot, setSnapshot] = createSignal(client.getSnapshot(), { equals: false });
+  createEffect(() => onCleanup(subscribeClient(client, setSnapshot)));
+  const store = createMemo(() => snapshot().runtimeStore ?? undefined);
+  const handlers = createMemo(() => createRuntimeHandlers(props.app, store() ?? null));
+  return (
+    <OpenSceneContext.Provider value={{ client, app: props.app, snapshot }}>
+      <JSONUIProvider
+        registry={props.app.registry as ComponentRegistry}
+        store={store()}
+        handlers={handlers()}
+        directives={[...openSceneDirectives]}
+      >
+        {props.children}
+      </JSONUIProvider>
+    </OpenSceneContext.Provider>
+  );
+}
+
+export function useOpenScene(): OpenSceneContextValue {
+  const value = useContext(OpenSceneContext);
+  if (value) return value;
+  throw new Error("useOpenScene must be called inside OpenSceneProvider");
+}
+
+function removePrivateNodeId(element: UIElement): UIElement {
+  const props = { ...(element.props as Record<string, unknown>) };
+  delete props.__opensceneNodeId;
+  return { ...element, props };
+}
+
+function createIdentityRegistry(registry: Record<string, unknown>): ComponentRegistry {
+  const result: ComponentRegistry = {};
+  for (const [type, value] of Object.entries(registry)) {
+    const renderer = value as Component<ComponentRenderProps>;
+    result[type] = (renderProps: ComponentRenderProps) => {
+      const elementProps = renderProps.element.props as Record<string, unknown>;
+      const privateId = elementProps.__opensceneNodeId;
+      const nodeId = typeof privateId === "string" ? privateId : null;
+      const cleanElement = removePrivateNodeId(renderProps.element);
+      const cleanProps: ComponentRenderProps = { ...renderProps, element: cleanElement };
+      return (
+        <OpenSceneNodeProvider nodeId={nodeId ?? ""}>
+          <span data-node-id={nodeId ?? undefined} style={{ display: "contents" }}>
+            {renderer(cleanProps)}
+          </span>
+        </OpenSceneNodeProvider>
+      );
+    };
+  }
+  return result;
+}
+
+interface PreparedSpec {
+  root: string;
+  elements: Record<string, UIElement>;
+  state?: Record<string, unknown>;
+}
+
+function prepareSpec(document: SceneDocument, app: OpenSceneSolidApp): PreparedSpec {
+  const source = document.spec;
+  const cleanElements: Record<string, UIElement> = {};
+  for (const [nodeId, sourceElement] of Object.entries(source.elements)) {
+    const slots = sourceElement.slots;
+    if (slots) {
+      for (const [slot, references] of Object.entries(slots)) {
+        if (references.length > 0) {
+          throw new Error(
+            `OpenScene Solid renderer does not support named slot "${slot}" on node "${nodeId}"`,
+          );
+        }
+      }
+    }
+    const element = { ...sourceElement } as UIElement;
+    if (slots) delete (element as { slots?: unknown }).slots;
+    cleanElements[nodeId] = {
+      ...element,
+      props: { ...(sourceElement.props as Record<string, unknown>) },
+    };
+  }
+  const cleanSpec: PreparedSpec = {
+    root: source.root,
+    elements: cleanElements,
+    ...(source.state === undefined ? {} : { state: source.state }),
+  };
+  const validation = app.catalog.validate(cleanSpec);
+  if (!validation.success) {
+    const issue = validation.error?.issues[0];
+    throw new Error(issue?.message ?? "OpenScene Solid catalog validation failed");
+  }
+  const elements = Object.fromEntries(
+    Object.entries(cleanElements).map(([nodeId, element]) => [
+      nodeId,
+      {
+        ...element,
+        props: { ...(element.props as Record<string, unknown>), __opensceneNodeId: nodeId },
+      },
+    ]),
+  );
+  return { ...cleanSpec, elements };
+}
+
+function ErrorSurface(props: { error: unknown }): JSX.Element {
+  const message = props.error instanceof Error ? props.error.message : String(props.error);
+  return (
+    <div role="alert" data-open-scene-error="true">
+      {message}
+    </div>
+  );
+}
+
+export function OpenSceneRenderer(): JSX.Element {
+  const context = useOpenScene();
+  const snapshot = context.snapshot;
+  const identityRegistry = createMemo(() => createIdentityRegistry(context.app.registry));
+  const prepared = createMemo(() => {
+    const document = snapshot().document;
+    if (!document) return { spec: null as PreparedSpec | null, error: null as Error | null };
+    try {
+      return {
+        spec: prepareSpec(document as unknown as SceneDocument, context.app),
+        error: null as Error | null,
+      };
+    } catch (error) {
+      return {
+        spec: null as PreparedSpec | null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+  });
+  const statusError = createMemo(() => (snapshot().status === "error" ? snapshot().error : null));
+  return (
+    <Show when={snapshot().status !== "loading"} fallback={<div data-open-scene-loading="true" />}>
+      <Show
+        when={!statusError() && !prepared().error}
+        fallback={<ErrorSurface error={statusError() ?? prepared().error} />}
+      >
+        <Show when={prepared().spec}>
+          {(spec) => (
+            <SelectionCanvas>
+              <ErrorBoundary fallback={(error) => <ErrorSurface error={error} />}>
+                <Renderer spec={spec()} registry={identityRegistry()} />
+              </ErrorBoundary>
+            </SelectionCanvas>
+          )}
+        </Show>
+      </Show>
+    </Show>
+  );
+}
