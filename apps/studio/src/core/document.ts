@@ -1,3 +1,5 @@
+import type { SceneDocument } from "@openscene/protocol";
+
 export type JsonPrimitive = string | number | boolean | null;
 
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
@@ -29,6 +31,9 @@ export type DynamicValue =
   | DynamicI18nValue;
 
 export type DynamicMode = "state" | "bindState" | "template" | "i18n";
+
+/** Canonical Studio document shape (protocol scene document). */
+export type AppDocument = SceneDocument;
 
 export function getBindingType(elementType: string, propKey: string): "state" | "bindState" {
   const normalizedType = elementType.toLowerCase();

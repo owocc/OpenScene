@@ -31,6 +31,28 @@ export interface StudioBridgeEnvelope<TType extends string = string, TPayload = 
   payload: TPayload;
 }
 
+/**
+ * Serializable runtime node detail shown by Studio's tree and property panel.
+ * The element map key is the identity; the snapshot duplicates it so the
+ * receiving side can address nodes without the key.
+ */
+export interface SceneNodeSnapshot {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  children: string[];
+  slots: Record<string, string[]>;
+}
+
+/**
+ * Serializable JSON-render tree snapshot sent when a renderer connects.
+ */
+export interface SceneDocumentSnapshot {
+  root: string;
+  elements: Record<string, SceneNodeSnapshot>;
+  state: Record<string, unknown>;
+}
+
 const nonEmptyString = z.string().min(1);
 
 /** Base schema used to reject messages from another protocol/version. */

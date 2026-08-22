@@ -36,6 +36,8 @@ export type {
   EditorConnection,
   RendererPortMessage,
   RendererWindowMessage,
+  SceneDocumentSnapshot,
+  SceneNodeSnapshot,
   StudioBridgeEnvelope,
   StudioPortMessage,
   StudioWindowMessage,
