@@ -10,6 +10,9 @@ export interface StudioSettings {
   surface?: Surface;
   locale?: string;
   tool?: ActiveToolMode;
+  selectedDeviceId?: string;
+  currentDeviceWidth?: number;
+  currentDeviceHeight?: number;
   zoom?: number;
   panX?: number;
   panY?: number;

@@ -12,6 +12,9 @@ export interface StudioQueryParams {
   nodeId: string | null;
   locale: string | null;
   tool: ActiveToolMode;
+  selectedDeviceId: string | null;
+  currentDeviceWidth: number | null;
+  currentDeviceHeight: number | null;
   zoom: number | null;
   panX: number | null;
   panY: number | null;
@@ -50,6 +53,9 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   nodeId: null,
   locale: null,
   tool: "select",
+  selectedDeviceId: null,
+  currentDeviceWidth: null,
+  currentDeviceHeight: null,
   zoom: null,
   panX: null,
   panY: null,
@@ -131,6 +137,9 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
     nodeId,
     locale,
     tool,
+    selectedDeviceId: null,
+    currentDeviceWidth: null,
+    currentDeviceHeight: null,
     zoom,
     panX,
     panY,
@@ -249,6 +258,16 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
         nodeId: patch.nodeId !== undefined ? patch.nodeId : current.nodeId,
         locale: patch.locale !== undefined ? patch.locale : current.locale,
         tool: patch.tool !== undefined ? patch.tool : current.tool,
+        selectedDeviceId:
+          patch.selectedDeviceId !== undefined ? patch.selectedDeviceId : current.selectedDeviceId,
+        currentDeviceWidth:
+          patch.currentDeviceWidth !== undefined
+            ? patch.currentDeviceWidth
+            : current.currentDeviceWidth,
+        currentDeviceHeight:
+          patch.currentDeviceHeight !== undefined
+            ? patch.currentDeviceHeight
+            : current.currentDeviceHeight,
         zoom: patch.zoom !== undefined ? patch.zoom : current.zoom,
         panX: patch.panX !== undefined ? patch.panX : current.panX,
         panY: patch.panY !== undefined ? patch.panY : current.panY,
@@ -266,6 +285,9 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
         surface: updated.surface,
         locale: updated.locale ?? undefined,
         tool: updated.tool,
+        selectedDeviceId: updated.selectedDeviceId ?? undefined,
+        currentDeviceWidth: updated.currentDeviceWidth ?? undefined,
+        currentDeviceHeight: updated.currentDeviceHeight ?? undefined,
         zoom: updated.zoom ?? undefined,
         panX: updated.panX ?? undefined,
         panY: updated.panY ?? undefined,
