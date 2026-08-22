@@ -3,7 +3,12 @@ import { defineConfig, lazyPlugins } from "vite-plus";
 import solid from "vite-plugin-solid";
 
 const require = createRequire(import.meta.url);
-const solidWeb = require.resolve("solid-js/web").replace(/server\.js$/, "web.js");
+// Force the browser build of solid-js/web: require.resolve() follows the
+// node condition and returns the server entry (server.cjs / server.js),
+// which would ship the server runtime to the browser.
+const solidWeb = require
+  .resolve("solid-js/package.json")
+  .replace(/package\.json$/, "web/dist/web.js");
 
 export default defineConfig({
   plugins: lazyPlugins(() => [solid()]),
