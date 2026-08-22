@@ -153,6 +153,8 @@ export const pages = sqliteTable(
     description: text("description").notNull().default(""),
     categoryId: text("category_id").references(() => categories.id, { onDelete: "restrict" }),
     documentId: text("document_id").notNull(),
+    sourceTemplateId: text("source_template_id"),
+    sourceTemplateVersionId: text("source_template_version_id"),
     status: text("status", { enum: ["active", "disabled", "draft", "published"] }).notNull(),
     ...timestamps,
   },

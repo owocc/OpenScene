@@ -18,7 +18,11 @@ type PathContext = { params: Promise<{ path: string[] }> };
 let tempDir: string;
 let appA: { id: string; appKey: string; runtimeKey: string };
 let appB: { id: string; appKey: string; runtimeKey: string };
-let pageA: { id: string; documentId: string };
+let pageA: {
+  id: string;
+  documentId: string;
+  sourceTemplate: { templateId: string; versionId: string } | null;
+};
 const emptyDocument = createEmptySceneDocument();
 let profileA: { id: string };
 
@@ -81,8 +85,42 @@ describe("Admin API HTTP flow", () => {
     const page = await call("POST", ["apps", appA.id, "pages"], { key: "home", title: "Home" });
     expect(page.status).toBe(201);
     pageA = await page.json();
+    expect(pageA.sourceTemplate).toBeNull();
     const foreign = await call("GET", ["apps", appB.id, "pages", pageA.id]);
     expect(foreign.status).toBe(404);
+  });
+
+  test("persists and exposes the source Template association on Pages", async () => {
+    const template = await call("POST", ["apps", appA.id, "templates"], {
+      key: "section",
+      title: "Section",
+    });
+    expect(template.status).toBe(201);
+    const templateBody = await template.json();
+    const version = await call(
+      "POST",
+      ["apps", appA.id, "documents", templateBody.documentId, "versions"],
+      { message: "Seed" },
+    );
+    expect(version.status).toBe(201);
+    const versionBody = await version.json();
+    const page = await call("POST", ["apps", appA.id, "pages"], {
+      key: "from-template",
+      title: "From Template",
+      sourceTemplate: { templateId: templateBody.id, versionId: versionBody.id },
+    });
+    expect(page.status).toBe(201);
+    const pageBody = await page.json();
+    expect(pageBody.sourceTemplate).toEqual({
+      templateId: templateBody.id,
+      versionId: versionBody.id,
+    });
+    const fetched = await call("GET", ["apps", appA.id, "pages", pageBody.id]);
+    expect(fetched.status).toBe(200);
+    expect((await fetched.json()).sourceTemplate).toEqual({
+      templateId: templateBody.id,
+      versionId: versionBody.id,
+    });
   });
 
   test("creates a short-lived Studio Session and Bootstrap", async () => {

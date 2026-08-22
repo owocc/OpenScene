@@ -85,6 +85,7 @@ export const ResourceSchema = z.object({
   description: z.string(),
   categoryId: IdSchema.nullable(),
   documentId: IdSchema,
+  sourceTemplate: z.object({ templateId: IdSchema, versionId: IdSchema }).nullable(),
   status: ResourceStatusSchema,
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,

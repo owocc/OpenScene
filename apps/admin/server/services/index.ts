@@ -72,6 +72,8 @@ type ResourceRecordInput = {
   description: string;
   categoryId: string | null | undefined;
   documentId: string;
+  sourceTemplateId?: string | null | undefined;
+  sourceTemplateVersionId?: string | null | undefined;
   status: "active" | "disabled" | "draft" | "published";
   createdAt: string;
   updatedAt: string;
@@ -569,6 +571,13 @@ export async function createResource(
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+  const persistedResource = body.sourceTemplate
+    ? {
+        ...resource,
+        sourceTemplateId: body.sourceTemplate.templateId,
+        sourceTemplateVersionId: body.sourceTemplate.versionId,
+      }
+    : resource;
   try {
     await db.transaction(async (tx) => {
       await tx
@@ -585,7 +594,7 @@ export async function createResource(
           updatedAt: timestamp,
         })
         .run();
-      if (kind === "page") await tx.insert(pages).values(resource).run();
+      if (kind === "page") await tx.insert(pages).values(persistedResource).run();
       else await tx.insert(templates).values(resource).run();
     });
   } catch (error) {
@@ -595,7 +604,7 @@ export async function createResource(
       ]);
     throw error;
   }
-  return ResourceSchema.parse(resourceRecord(resource));
+  return ResourceSchema.parse(resourceRecord(persistedResource));
 }
 
 export async function getResource(
@@ -1580,6 +1589,13 @@ function resourceRecord(row: ResourceRecordInput): unknown {
     description: row.description,
     categoryId: row.categoryId ?? null,
     documentId: row.documentId,
+    sourceTemplate:
+      row.sourceTemplateId && row.sourceTemplateVersionId
+        ? {
+            templateId: row.sourceTemplateId,
+            versionId: row.sourceTemplateVersionId,
+          }
+        : null,
     status: row.status,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

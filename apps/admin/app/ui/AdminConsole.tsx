@@ -1034,12 +1034,23 @@ function ResourceDetailView() {
   const queryClient = useQueryClient();
   const kind = pathname.startsWith("/pages/") ? "page" : "template";
   const id = pathname.split("/")[2] ?? "";
-  const pageQuery = api.useQuery("get", "/api/v1/apps/{appId}/pages/{pageId}", {
-    params: { path: { appId: context.appId ?? "", pageId: id } },
-  });
-  const templateQuery = api.useQuery("get", "/api/v1/apps/{appId}/templates/{templateId}", {
-    params: { path: { appId: context.appId ?? "", templateId: id } },
-  });
+  const pageQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/pages/{pageId}",
+    { params: { path: { appId: context.appId ?? "", pageId: id } } },
+    { enabled: kind === "page" },
+  );
+  const pageResource = pageQuery.data as Resource | undefined;
+  const sourceTemplateId =
+    kind === "template" ? id : (pageResource?.sourceTemplate?.templateId ?? "");
+  const templateQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/templates/{templateId}",
+    { params: { path: { appId: context.appId ?? "", templateId: sourceTemplateId } } },
+    {
+      enabled: kind === "template" || Boolean(pageResource?.sourceTemplate?.templateId),
+    },
+  );
   const resource = (kind === "page" ? pageQuery.data : templateQuery.data) as Resource | undefined;
   const _documentQuery = api.useQuery(
     "get",

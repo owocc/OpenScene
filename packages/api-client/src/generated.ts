@@ -762,6 +762,10 @@ export interface components {
       description: string;
       categoryId: string | null;
       documentId: string;
+      sourceTemplate: {
+        templateId: string;
+        versionId: string;
+      } | null;
       /** @enum {string} */
       status: "active" | "disabled" | "draft" | "published";
       /** Format: date-time */
@@ -6313,6 +6317,10 @@ export interface operations {
               description: string;
               categoryId: string | null;
               documentId: string;
+              sourceTemplate: {
+                templateId: string;
+                versionId: string;
+              } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
               /** Format: date-time */
@@ -6484,6 +6492,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
@@ -6635,6 +6647,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
@@ -6936,6 +6952,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
@@ -8151,6 +8171,10 @@ export interface operations {
               description: string;
               categoryId: string | null;
               documentId: string;
+              sourceTemplate: {
+                templateId: string;
+                versionId: string;
+              } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
               /** Format: date-time */
@@ -8322,6 +8346,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
@@ -8473,6 +8501,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
@@ -8774,6 +8806,10 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            sourceTemplate: {
+              templateId: string;
+              versionId: string;
+            } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
             /** Format: date-time */
