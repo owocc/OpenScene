@@ -23,21 +23,48 @@ export interface StudioSettings {
 
 const STORAGE_PREFIX = "openscene:studio:settings";
 
+function shortHash(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
 /** Stable short namespace suffix for a server URL. */
 export function namespaceForServer(server: string | null | undefined): string {
   if (!server) return "default";
-  let hash = 0;
-  for (let i = 0; i < server.length; i += 1) {
-    hash = (hash * 31 + server.charCodeAt(i)) | 0;
-  }
-  return `server-${(hash >>> 0).toString(36)}`;
+  return `server-${shortHash(server)}`;
 }
 
-/** Namespace of the current page: derived from the `server-url` query parameter. */
-export function getSettingsNamespace(): string {
+/**
+ * Settings namespace: server-scoped, further split per session so different
+ * sessions (same server) keep separate caches. Falls back to the server
+ * namespace when no session id is present.
+ */
+export function settingsNamespaceFor(
+  server: string | null | undefined,
+  sessionId: string | null | undefined,
+): string {
+  const serverNs = namespaceForServer(server);
+  return sessionId ? `${serverNs}:session-${shortHash(sessionId)}` : serverNs;
+}
+
+/** Server-only namespace (theme scope, user-level preference). */
+export function getServerNamespace(): string {
   if (typeof window === "undefined") return "default";
   const params = new URLSearchParams(window.location.search);
   return namespaceForServer(params.get("server-url") ?? params.get("serverUrl"));
+}
+
+/** Namespace of the current page: server + sessionId query parameters. */
+export function getSettingsNamespace(): string {
+  if (typeof window === "undefined") return "default";
+  const params = new URLSearchParams(window.location.search);
+  return settingsNamespaceFor(
+    params.get("server-url") ?? params.get("serverUrl"),
+    params.get("sessionId"),
+  );
 }
 
 function settingsKey(): string {
@@ -46,7 +73,7 @@ function settingsKey(): string {
 
 /** Theme storage key scoped to the current server namespace. */
 export function getThemeStorageKey(): string {
-  return `${STORAGE_PREFIX}:theme:${getSettingsNamespace()}`;
+  return `${STORAGE_PREFIX}:theme:${getServerNamespace()}`;
 }
 
 export function loadServerSettings(): StudioSettings {

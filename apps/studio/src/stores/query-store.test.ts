@@ -51,6 +51,7 @@ describe("query-store pure functions", () => {
       token: "xyz789",
       surface: "text",
       nodeId: "button-1",
+      tool: "hand",
       zoom: 1.25,
       panX: 50,
       panY: -30,
@@ -62,12 +63,26 @@ describe("query-store pure functions", () => {
     expect(formatted.search).toContain("sessionId=my-session");
     expect(formatted.search).toContain("surface=text");
     expect(formatted.search).toContain("nodeId=button-1");
-    expect(formatted.search).toContain("zoom=1.25");
-    expect(formatted.search).toContain("panX=50");
-    expect(formatted.search).toContain("panY=-30");
     expect(formatted.search).toContain("rotated=true");
     expect(formatted.search).toContain("panel=assets");
     expect(formatted.hash).toBe("#token=xyz789");
+  });
+
+  it("omits transient view state (tool/zoom/pan) from the URL", () => {
+    const formatted = formatQueryParams({
+      ...DEFAULT_QUERY_PARAMS,
+      serverUrl: "https://api.example.com",
+      tool: "hand",
+      zoom: 0.38,
+      panX: 299,
+      panY: -239,
+    });
+
+    expect(formatted.search).toContain("server-url=https%3A%2F%2Fapi.example.com");
+    expect(formatted.search).not.toContain("tool=");
+    expect(formatted.search).not.toContain("zoom=");
+    expect(formatted.search).not.toContain("panX=");
+    expect(formatted.search).not.toContain("panY=");
   });
 
   it("omits default values to keep URL clean", () => {

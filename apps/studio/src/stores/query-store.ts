@@ -158,19 +158,9 @@ export function formatQueryParams(params: StudioQueryParams): { search: string; 
   // Locale
   if (params.locale) searchParams.set("locale", params.locale);
 
-  // Tool
-  if (params.tool && params.tool !== "select") searchParams.set("tool", params.tool);
+  // Note: tool / zoom / panX / panY are session view state and are NOT
+  // written to the URL — they persist per session in local storage.
 
-  // Viewport Zoom & Pan
-  if (params.zoom !== null && params.zoom !== undefined && params.zoom !== 0.85) {
-    searchParams.set("zoom", String(Number(params.zoom.toFixed(2))));
-  }
-  if (params.panX !== null && params.panX !== undefined && params.panX !== 0) {
-    searchParams.set("panX", String(Math.round(params.panX)));
-  }
-  if (params.panY !== null && params.panY !== undefined && params.panY !== 0) {
-    searchParams.set("panY", String(Math.round(params.panY)));
-  }
   if (params.rotated) searchParams.set("rotated", "true");
 
   // Sidebar & Panels
