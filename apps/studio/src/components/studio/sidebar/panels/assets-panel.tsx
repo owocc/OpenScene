@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Plus, Search } from "lucide-react";
 
 import { useI18n } from "@/i18n";
-import type { ComponentItem } from "../types";
+import type { ComponentMeta } from "@/core/meta";
 
 interface AssetsPanelProps {
-  components: ComponentItem[];
+  components: ComponentMeta[];
   onSelectComponent: (type: string) => void;
 }
 
@@ -23,7 +23,7 @@ export function AssetsPanel({ components, onSelectComponent }: AssetsPanelProps)
     <div className="flex flex-col p-3">
       <div className="mb-2">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+          <Search className="absolute top-2 left-2.5 size-3.5 text-muted-foreground" />
           <input
             className="h-8 w-full rounded-lg border border-input bg-background pr-3 pl-8 text-xs outline-none focus-visible:border-ring"
             placeholder={LL.common.searchComponent()}

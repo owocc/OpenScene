@@ -124,7 +124,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   } = editor;
   const { LL } = useI18n();
   const selectedId = selectedNodeId ?? "";
-  const [addType, setAddType] = useState("");
   const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
@@ -302,7 +301,11 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const updateElement = (id: string, updater: (element: EditorElement) => EditorElement) => {
     const element = document.spec.elements[id] as EditorElement | undefined;
     if (!element) return;
-    dispatch({ type: "element.update", elementId: id, element: updater(element) });
+    dispatch({
+      type: "element.update",
+      elementId: id,
+      element: updater(element),
+    });
   };
 
   const updateProp = (name: string, value: JsonValue) => {
@@ -315,12 +318,12 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     });
   };
 
-  const addComponent = () => {
-    const meta = registry.getComponent(addType);
+  const addComponent = (type: string) => {
+    const meta = registry.getComponent(type);
     if (!meta) return;
-    const id = nextElementId(document, addType);
+    const id = nextElementId(document, type);
     const nextElement: EditorElement = {
-      type: addType,
+      type,
       name: meta.title,
       props: defaultProps(meta),
     };
@@ -339,7 +342,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     }
     dispatch({ type: "node.add", elementId: id, element: nextElement, target });
     dispatch({ type: "nodes.select", nodeIds: [id], primaryNodeId: id });
-    setAddType("");
   };
 
   const removeSelected = () => {
@@ -358,14 +360,23 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       onRedo={redo}
       onDeselect={() => dispatch({ type: "nodes.select", nodeIds: [], primaryNodeId: null })}
       onZoomIn={() =>
-        dispatch({ type: "viewport.patch", patch: { zoom: Math.min(viewport.zoom + 0.1, 5) } })
+        dispatch({
+          type: "viewport.patch",
+          patch: { zoom: Math.min(viewport.zoom + 0.1, 5) },
+        })
       }
       onZoomOut={() =>
-        dispatch({ type: "viewport.patch", patch: { zoom: Math.max(viewport.zoom - 0.1, 0.1) } })
+        dispatch({
+          type: "viewport.patch",
+          patch: { zoom: Math.max(viewport.zoom - 0.1, 0.1) },
+        })
       }
       onZoom100={() => dispatch({ type: "viewport.patch", patch: { zoom: 1 } })}
       onResetViewport={() =>
-        dispatch({ type: "viewport.patch", patch: { zoom: 1, panX: 0, panY: 0 } })
+        dispatch({
+          type: "viewport.patch",
+          patch: { zoom: 1, panX: 0, panY: 0 },
+        })
       }
     >
       <div className="relative h-svh w-screen overflow-hidden bg-background text-foreground select-none">
@@ -390,6 +401,8 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           onUndo={undo}
           onRedo={redo}
           onCopyJson={() => void copyJson()}
+          components={components}
+          onAddComponent={addComponent}
           onSave={() => void saveDocument()}
         />
 
@@ -412,8 +425,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             futureLength={future.length}
             viewport={viewport}
             onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
-            addType={addType}
-            onSetAddType={setAddType}
             onAddComponent={addComponent}
             onSelectNode={(nodeId) =>
               dispatch({
@@ -436,7 +447,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         {(surface === "visual" || surface === "developer") && propertiesCollapsed && (
           <div
             className={cn(
-              "fixed z-30 hidden xl:block transition-all",
+              "fixed z-30 hidden transition-all xl:block",
               sidebarCollapsed ? "top-4 right-4" : "top-3 right-3",
             )}
           >
@@ -456,7 +467,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         {(surface === "visual" || surface === "developer") && !propertiesCollapsed && (
           <div
             className={cn(
-              "fixed inset-y-0 right-0 z-30 hidden pointer-events-none xl:flex flex-col items-end transition-all",
+              "pointer-events-none fixed inset-y-0 right-0 z-30 hidden flex-col items-end transition-all xl:flex",
               sidebarCollapsed ? "p-4" : "p-0",
             )}
           >
@@ -490,7 +501,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                   </IconTooltip>
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+              <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {selectedElement && selectedMeta ? (
                   <div className="p-3">
                     <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
@@ -549,7 +560,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                 )}
               </div>
               <div className="border-t border-border/80 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
                   {LL.properties.runtimeTitle()}
                 </div>
                 <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
@@ -584,7 +595,9 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
 }
 
 export function App() {
-  const [state, setState] = useState<StudioBootstrapState>({ status: "loading" });
+  const [state, setState] = useState<StudioBootstrapState>({
+    status: "loading",
+  });
 
   useEffect(() => {
     const controller = new AbortController();

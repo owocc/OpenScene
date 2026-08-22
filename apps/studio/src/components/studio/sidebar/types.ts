@@ -14,14 +14,15 @@ import type { SceneDocument } from "@openscene/protocol";
 
 import type { Surface, ViewportState } from "@/core/editor-state";
 import type { AdapterRegistry } from "@/core/registry";
+import type { ComponentMeta } from "@/core/meta";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 
-export type SidebarTab = "file" | "agents" | "assets" | "tools" | "variables";
+export type SidebarTab = "pages" | "agents" | "assets" | "tools" | "variables";
 
-export interface ComponentItem {
-  type: string;
-  title: string;
-  category?: string;
+export const sidebarTabIds: SidebarTab[] = ["pages", "agents", "assets", "tools", "variables"];
+
+export function isSidebarTab(value: string | null | undefined): value is SidebarTab {
+  return value != null && (sidebarTabIds as readonly string[]).includes(value);
 }
 
 export interface DevicePreset {
@@ -34,7 +35,13 @@ export interface DevicePreset {
 
 export const devicePresets: DevicePreset[] = [
   // Mobile Presets
-  { id: "iphone-16-pro", name: "iPhone 16 Pro", category: "mobile", width: 393, height: 852 },
+  {
+    id: "iphone-16-pro",
+    name: "iPhone 16 Pro",
+    category: "mobile",
+    width: 393,
+    height: 852,
+  },
   {
     id: "iphone-16-pro-max",
     name: "iPhone 16 Pro Max",
@@ -42,15 +49,45 @@ export const devicePresets: DevicePreset[] = [
     width: 440,
     height: 956,
   },
-  { id: "iphone-15", name: "iPhone 14 / 15", category: "mobile", width: 390, height: 844 },
-  { id: "pixel-7", name: "Google Pixel 7", category: "mobile", width: 412, height: 915 },
+  {
+    id: "iphone-15",
+    name: "iPhone 14 / 15",
+    category: "mobile",
+    width: 390,
+    height: 844,
+  },
+  {
+    id: "pixel-7",
+    name: "Google Pixel 7",
+    category: "mobile",
+    width: 412,
+    height: 915,
+  },
 
   // Tablet Presets
-  { id: "ipad-pro-11", name: 'iPad Pro 11"', category: "tablet", width: 834, height: 1194 },
+  {
+    id: "ipad-pro-11",
+    name: 'iPad Pro 11"',
+    category: "tablet",
+    width: 834,
+    height: 1194,
+  },
 
   // Desktop Presets
-  { id: "macbook-air-14", name: 'MacBook Air 14"', category: "desktop", width: 1280, height: 832 },
-  { id: "macbook-pro-16", name: 'MacBook Pro 16"', category: "desktop", width: 1440, height: 900 },
+  {
+    id: "macbook-air-14",
+    name: 'MacBook Air 14"',
+    category: "desktop",
+    width: 1280,
+    height: 832,
+  },
+  {
+    id: "macbook-pro-16",
+    name: 'MacBook Pro 16"',
+    category: "desktop",
+    width: 1440,
+    height: 900,
+  },
   {
     id: "desktop-fhd",
     name: "Desktop (1920×1080)",
@@ -78,15 +115,13 @@ export interface StudioSidebarProps {
   locale: string;
   locales: string[];
   manifestVersion: string;
-  components: ComponentItem[];
+  components: ComponentMeta[];
   diagnostics: Array<{ message: string }>;
   pastLength: number;
   futureLength: number;
   viewport?: ViewportState;
   onPatchViewport?: (patch: Partial<ViewportState>) => void;
-  addType: string;
-  onSetAddType: (type: string) => void;
-  onAddComponent: () => void;
+  onAddComponent: (type: string) => void;
   onSelectNode: (nodeId: string | null) => void;
   onSurfaceChange: (surface: Surface) => void;
   onLocaleChange: (locale: string) => void;
@@ -96,8 +131,12 @@ export interface StudioSidebarProps {
   onSave: () => void;
 }
 
-export const navTabs: Array<{ id: SidebarTab; label: string; icon: LucideIcon }> = [
-  { id: "file", label: "File", icon: FileText },
+export const navTabs: Array<{
+  id: SidebarTab;
+  label: string;
+  icon: LucideIcon;
+}> = [
+  { id: "pages", label: "Pages", icon: FileText },
   { id: "agents", label: "Agents", icon: Sparkles },
   { id: "assets", label: "Assets", icon: PlusCircle },
   { id: "tools", label: "Tools", icon: Briefcase },
@@ -110,7 +149,12 @@ export const modeTabs: Array<{
   shortcut: string;
   icon: LucideIcon;
 }> = [
-  { value: "visual", label: "可视化编辑模式", shortcut: "⌘1", icon: SquareMousePointer },
+  {
+    value: "visual",
+    label: "可视化编辑模式",
+    shortcut: "⌘1",
+    icon: SquareMousePointer,
+  },
   { value: "text", label: "文档编辑模式", shortcut: "⌘2", icon: FileText },
   { value: "developer", label: "开发者模式", shortcut: "⌘3", icon: Code2 },
   { value: "preview", label: "预览模式", shortcut: "", icon: Eye },

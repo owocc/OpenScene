@@ -13,7 +13,7 @@ const zh_CN: BaseTranslation = {
     placeholder: "占位符",
   },
   sidebar: {
-    file: "文件",
+    pages: "页面",
     agents: "物料契约",
     assets: "组件库",
     tools: "模式工具",
@@ -21,14 +21,14 @@ const zh_CN: BaseTranslation = {
     collapse: "收起面板",
     expand: "展开大纲",
     expandProperties: "展开属性面板",
-    fileTabTooltip: "文件与图层大纲",
+    pagesTabTooltip: "页面与图层大纲",
     agentsTabTooltip: "物料契约",
     assetsTabTooltip: "组件物料库",
     toolsTabTooltip: "模式与工具",
     variablesTabTooltip: "变量与国际化",
   },
   panels: {
-    file: {
+    pages: {
       pages: "页面",
       layers: "图层",
       nodeCount: "{count:number} 个节点",
@@ -70,6 +70,10 @@ const zh_CN: BaseTranslation = {
     zoom: "缩放比例",
     rotate: "旋转设备",
     restoreOrientation: "恢复设备方向",
+    actions: "操作",
+    all: "全部",
+    components: "组件",
+    noComponents: "未找到组件。",
   },
   menu: {
     file: "文件",

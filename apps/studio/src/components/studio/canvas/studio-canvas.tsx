@@ -12,7 +12,10 @@ import { WebIframeRenderer } from "./renderers/web-iframe-renderer";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
 export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
-  [APP_TYPE_WEB]: { appType: APP_TYPE_WEB, render: (props) => <WebIframeRenderer {...props} /> },
+  [APP_TYPE_WEB]: {
+    appType: APP_TYPE_WEB,
+    render: (props) => <WebIframeRenderer {...props} />,
+  },
 };
 
 function UnsupportedRenderer({ appType }: { appType: string }) {
@@ -35,6 +38,8 @@ export function StudioCanvas({
   primaryNodeId,
   viewport,
   activeToolMode,
+  components,
+  onAddComponent,
   pastLength,
   futureLength,
   onPatchViewport,
@@ -138,6 +143,8 @@ export function StudioCanvas({
             surface={surface}
             onSurfaceChange={onSurfaceChange}
             onToolChange={onToolChange}
+            components={components}
+            onAddComponent={onAddComponent}
             pastLength={pastLength}
             futureLength={futureLength}
             viewport={viewport}

@@ -13,6 +13,8 @@
     "preview": "vp preview"
   },
   "dependencies": {
+    "@headless-tree/core": "^1.7.0",
+    "@headless-tree/react": "^1.7.0",
     "@openscene/api-client": "workspace:*",
     "@openscene/constants": "workspace:*",
     "@openscene/protocol": "workspace:*",

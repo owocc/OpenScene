@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 import { LogoMenu } from "./logo-menu";
 import { AgentsPanel } from "./panels/agents-panel";
 import { AssetsPanel } from "./panels/assets-panel";
-import { FilePanel } from "./panels/file-panel";
+import { PagesPanel } from "./panels/pages-panel";
 import { ToolsPanel } from "./panels/tools-panel";
 import { VariablesPanel } from "./panels/variables-panel";
-import { navTabs, type SidebarTab, type StudioSidebarProps } from "./types";
+import { isSidebarTab, navTabs, type SidebarTab, type StudioSidebarProps } from "./types";
 
 export function StudioSidebar({
   bootstrap,
@@ -30,8 +30,6 @@ export function StudioSidebar({
   futureLength,
   viewport,
   onPatchViewport,
-  addType,
-  onSetAddType,
   onAddComponent,
   onSelectNode,
   onSurfaceChange,
@@ -44,7 +42,7 @@ export function StudioSidebar({
   const { LL } = useI18n();
   const queryPanel = useQueryStore((s) => s.panel);
   const querySidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
-  const activeTab: SidebarTab = queryPanel || "file";
+  const activeTab: SidebarTab = isSidebarTab(queryPanel) ? queryPanel : "pages";
   const panelCollapsed = querySidebarCollapsed;
 
   const handleTabClick = (tab: SidebarTab) => {
@@ -53,8 +51,8 @@ export function StudioSidebar({
 
   const getTabLabel = (id: SidebarTab) => {
     switch (id) {
-      case "file":
-        return LL.sidebar.file();
+      case "pages":
+        return LL.sidebar.pages();
       case "agents":
         return LL.sidebar.agents();
       case "assets":
@@ -68,8 +66,8 @@ export function StudioSidebar({
 
   const getTabTooltip = (id: SidebarTab) => {
     switch (id) {
-      case "file":
-        return LL.sidebar.fileTabTooltip();
+      case "pages":
+        return LL.sidebar.pagesTabTooltip();
       case "agents":
         return LL.sidebar.agentsTabTooltip();
       case "assets":
@@ -183,7 +181,7 @@ export function StudioSidebar({
                           <Button
                             variant={isActive ? "secondary" : "ghost"}
                             size="icon"
-                            className="size-9 rounded-xl pointer-events-none"
+                            className="pointer-events-none size-9 rounded-xl"
                             tabIndex={-1}
                             aria-hidden="true"
                           >
@@ -192,7 +190,7 @@ export function StudioSidebar({
                         </IconTooltip>
                         <span
                           className={cn(
-                            "text-[10px] font-medium tracking-tight select-none transition-colors",
+                            "text-[10px] font-medium tracking-tight transition-colors select-none",
                             isActive
                               ? "font-semibold text-foreground"
                               : "text-muted-foreground group-hover:text-foreground",
@@ -229,15 +227,13 @@ export function StudioSidebar({
 
               {/* Dynamic Panel Content based on activeTab */}
               <div className="min-h-0 flex-1 overflow-auto">
-                {activeTab === "file" && (
-                  <FilePanel
+                {activeTab === "pages" && (
+                  <PagesPanel
                     title={bootstrap.resource.title}
                     document={document}
                     registry={registry}
                     selectedId={selectedId}
                     components={components}
-                    addType={addType}
-                    onSetAddType={onSetAddType}
                     onAddComponent={onAddComponent}
                     onSelectNode={onSelectNode}
                   />
@@ -255,13 +251,7 @@ export function StudioSidebar({
                 )}
 
                 {activeTab === "assets" && (
-                  <AssetsPanel
-                    components={components}
-                    onSelectComponent={(type) => {
-                      onSetAddType(type);
-                      onAddComponent();
-                    }}
-                  />
+                  <AssetsPanel components={components} onSelectComponent={onAddComponent} />
                 )}
 
                 {activeTab === "tools" && (

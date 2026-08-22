@@ -92,7 +92,7 @@ describe("query-store pure functions", () => {
       sessionId: "local-test",
       surface: "visual", // default -> omitted
       tool: "select", // default -> omitted
-      panel: "file", // default -> omitted
+      panel: "pages", // default -> omitted
     });
 
     expect(formatted.search).toContain("server-url=http%3A%2F%2Flocalhost%3A3000");

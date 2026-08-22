@@ -3,6 +3,7 @@ import type { SceneDocument } from "@openscene/protocol";
 import type { ReactNode } from "react";
 
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
+import type { ComponentMeta } from "@/core/meta";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 
 export type PreviewInteractionMode = "preview" | "select";
@@ -41,6 +42,8 @@ export interface StudioCanvasProps {
   primaryNodeId: string | null;
   viewport: ViewportState;
   activeToolMode: ActiveToolMode;
+  components: ComponentMeta[];
+  onAddComponent: (type: string) => void;
   pastLength?: number;
   futureLength?: number;
   onPatchViewport: (patch: Partial<ViewportState>) => void;

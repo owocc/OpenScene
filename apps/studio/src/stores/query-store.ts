@@ -2,6 +2,8 @@ import { create } from "zustand";
 
 import type { ActiveToolMode, Surface } from "@/core/editor-state";
 import type { SidebarTab } from "@/components/studio/sidebar/types";
+
+const sidebarTabValues: SidebarTab[] = ["pages", "agents", "assets", "tools", "variables"];
 import { loadServerSettings, saveServerSettings } from "./settings-storage";
 
 export interface StudioQueryParams {
@@ -63,7 +65,7 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   panX: null,
   panY: null,
   rotated: false,
-  panel: "file",
+  panel: "pages",
   sidebarCollapsed: false,
   propsCollapsed: false,
 };
@@ -126,9 +128,9 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
     panelRaw === "assets" ||
     panelRaw === "tools" ||
     panelRaw === "variables" ||
-    panelRaw === "file"
+    panelRaw === "pages"
       ? panelRaw
-      : "file";
+      : "pages";
 
   const sidebarCollapsed = searchParams.get("sidebarCollapsed") === "true";
   const propsCollapsed = searchParams.get("propsCollapsed") === "true";
@@ -179,7 +181,7 @@ export function formatQueryParams(params: StudioQueryParams): { search: string; 
   if (params.rotated) searchParams.set("rotated", "true");
 
   // Sidebar & Panels
-  if (params.panel && params.panel !== "file") searchParams.set("panel", params.panel);
+  if (params.panel && params.panel !== "pages") searchParams.set("panel", params.panel);
   if (params.sidebarCollapsed) searchParams.set("sidebarCollapsed", "true");
   if (params.propsCollapsed) searchParams.set("propsCollapsed", "true");
 
@@ -205,6 +207,7 @@ function initialQueryParams(): StudioQueryParams {
   if (typeof window === "undefined") return url;
   const persisted = loadServerSettings();
   const merged: StudioQueryParams = { ...DEFAULT_QUERY_PARAMS, ...persisted };
+  if (merged.panel === null || !sidebarTabValues.includes(merged.panel)) merged.panel = "pages";
   merged.serverUrl = url.serverUrl;
   merged.sessionId = url.sessionId;
   merged.token = url.token;

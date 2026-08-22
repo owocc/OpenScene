@@ -1,4 +1,5 @@
-import type { BaseLocale, Locales, Translation, TranslationFunctions } from "./i18n-types";
+import type { BaseLocale, Locales, TranslationFunctions } from "./i18n-types";
+import type { BaseTranslation } from "typesafe-i18n";
 
 export const baseLocale: BaseLocale = "zh-CN";
 
@@ -20,7 +21,7 @@ function interpolate(template: string, args?: Record<string, unknown>): string {
   });
 }
 
-function createTranslationFunctions(translation: Translation): TranslationFunctions {
+function createTranslationFunctions(translation: BaseTranslation): TranslationFunctions {
   const transform = (obj: unknown): unknown => {
     if (typeof obj === "string") {
       return (args?: Record<string, unknown>) => interpolate(obj, args);

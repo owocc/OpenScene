@@ -13,7 +13,7 @@ const en_US: Translation = {
     placeholder: "Placeholder",
   },
   sidebar: {
-    file: "File",
+    pages: "Pages",
     agents: "Agents",
     assets: "Assets",
     tools: "Tools",
@@ -21,14 +21,14 @@ const en_US: Translation = {
     collapse: "Collapse panel",
     expand: "Expand outline",
     expandProperties: "Expand properties",
-    fileTabTooltip: "Pages & Layers (File)",
+    pagesTabTooltip: "Pages & Layers",
     agentsTabTooltip: "Material Contract (Agents)",
     assetsTabTooltip: "Component Library (Assets)",
     toolsTabTooltip: "Modes & Tools (Tools)",
     variablesTabTooltip: "Variables & i18n (Variables)",
   },
   panels: {
-    file: {
+    pages: {
       pages: "Pages",
       layers: "Layers",
       nodeCount: "{count} nodes",
@@ -71,6 +71,10 @@ const en_US: Translation = {
     zoom: "Zoom",
     rotate: "Rotate device",
     restoreOrientation: "Restore orientation",
+    actions: "Actions",
+    all: "All",
+    components: "Components",
+    noComponents: "No components found.",
   },
   menu: {
     file: "File",

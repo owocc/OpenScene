@@ -24,13 +24,17 @@ import { LogoMenu } from "@/components/studio/sidebar/logo-menu";
 import { useI18n } from "@/i18n";
 import { useQueryStore, useShortcutsStore } from "@/stores";
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
+import type { ComponentMeta } from "@/core/meta";
 import { cn } from "@/lib/utils";
+import { ActionsPopover } from "./actions-popover";
 
 interface CanvasToolbarProps {
   activeToolMode: ActiveToolMode;
   surface: Surface;
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
+  components: ComponentMeta[];
+  onAddComponent: (type: string) => void;
   pastLength?: number;
   futureLength?: number;
   viewport?: ViewportState;
@@ -63,6 +67,8 @@ export function CanvasToolbar({
   surface,
   onSurfaceChange,
   onToolChange,
+  components,
+  onAddComponent,
   pastLength = 0,
   futureLength = 0,
   viewport,
@@ -86,12 +92,26 @@ export function CanvasToolbar({
   const CurrentIcon = currentIconData.icon;
   const currentLabel = toolLabels[activeToolMode] ?? toolLabels.select;
 
-  const tools: Array<{ mode: ActiveToolMode; label: string; shortcut: string; icon: LucideIcon }> =
-    [
-      { mode: "select", label: toolLabels.select, shortcut: "V", icon: MousePointer2 },
-      { mode: "interact", label: toolLabels.interact, shortcut: "I", icon: MousePointerClick },
-      { mode: "hand", label: toolLabels.hand, shortcut: "H", icon: Hand },
-    ];
+  const tools: Array<{
+    mode: ActiveToolMode;
+    label: string;
+    shortcut: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      mode: "select",
+      label: toolLabels.select,
+      shortcut: "V",
+      icon: MousePointer2,
+    },
+    {
+      mode: "interact",
+      label: toolLabels.interact,
+      shortcut: "I",
+      icon: MousePointerClick,
+    },
+    { mode: "hand", label: toolLabels.hand, shortcut: "H", icon: Hand },
+  ];
 
   return (
     <StudioTooltipProvider>
@@ -219,6 +239,10 @@ export function CanvasToolbar({
               );
             })}
           </div>
+
+          {/* 4. Actions Popover */}
+          <div className="mx-0.5 h-4 w-px bg-border/80" />
+          <ActionsPopover components={components} onAddComponent={onAddComponent} />
         </div>
 
         {/* Optional Extensible Children (Stacked in column flow) */}

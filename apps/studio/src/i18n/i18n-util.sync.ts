@@ -1,10 +1,11 @@
 import { createTranslationFunctions, isLocale } from "./i18n-util";
-import type { Locales, Translation, TranslationFunctions } from "./i18n-types";
+import type { Locales, TranslationFunctions } from "./i18n-types";
+import type { BaseTranslation } from "typesafe-i18n";
 
 import en_US from "./en-US";
 import zh_CN from "./zh-CN";
 
-const translations: Record<Locales, Translation> = {
+const translations: Record<Locales, BaseTranslation> = {
   "en-US": en_US,
   "zh-CN": zh_CN,
 };
