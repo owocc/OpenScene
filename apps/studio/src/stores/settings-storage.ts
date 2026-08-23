@@ -30,6 +30,7 @@ export interface StudioViewSettings {
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
   propsCollapsed?: boolean;
+  propertiesWidth?: number;
   showBackgroundPattern?: boolean;
   backgroundTexture?: BackgroundTexture;
 }

@@ -32,6 +32,7 @@ export interface StudioQueryParams {
   sidebarCollapsed: boolean;
   sidebarWidth: number | null;
   propsCollapsed: boolean;
+  propertiesWidth: number | null;
 }
 
 export interface QueryStoreState extends StudioQueryParams {
@@ -62,6 +63,7 @@ export interface QueryStoreState extends StudioQueryParams {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setPropsCollapsed: (collapsed: boolean) => void;
+  setPropertiesWidth: (width: number) => void;
   resetViewportParams: () => void;
 }
 
@@ -85,6 +87,7 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   sidebarCollapsed: false,
   sidebarWidth: null,
   propsCollapsed: false,
+  propertiesWidth: null,
 };
 
 export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
@@ -172,6 +175,7 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
     sidebarCollapsed,
     sidebarWidth: null,
     propsCollapsed,
+    propertiesWidth: null,
   };
 }
 
@@ -298,6 +302,8 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
         sidebarWidth: patch.sidebarWidth !== undefined ? patch.sidebarWidth : current.sidebarWidth,
         propsCollapsed:
           patch.propsCollapsed !== undefined ? patch.propsCollapsed : current.propsCollapsed,
+        propertiesWidth:
+          patch.propertiesWidth !== undefined ? patch.propertiesWidth : current.propertiesWidth,
       };
 
       set(updated);
@@ -323,6 +329,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
           sidebarCollapsed: updated.sidebarCollapsed,
           sidebarWidth: updated.sidebarWidth ?? undefined,
           propsCollapsed: updated.propsCollapsed,
+          propertiesWidth: updated.propertiesWidth ?? undefined,
         });
       }
     },
@@ -406,6 +413,9 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
     setPropsCollapsed: (propsCollapsed) => {
       get().setQuery({ propsCollapsed }, { push: false });
+    },
+    setPropertiesWidth: (propertiesWidth) => {
+      get().setQuery({ propertiesWidth }, { push: false });
     },
 
     resetViewportParams: () => {

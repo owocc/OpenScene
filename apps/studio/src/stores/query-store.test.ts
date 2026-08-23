@@ -118,8 +118,8 @@ describe("useQueryStore state operations", () => {
     useQueryStore.getState().setZoom(2);
     expect(useQueryStore.getState().zoom).toBe(2);
 
-    useQueryStore.getState().setSidebarWidth(420);
-    expect(useQueryStore.getState().sidebarWidth).toBe(420);
+    useQueryStore.getState().setPropertiesWidth(360);
+    expect(useQueryStore.getState().propertiesWidth).toBe(360);
   });
 });
 
@@ -162,13 +162,13 @@ describe("applyAppSettings (bootstrap hydration)", () => {
     expect(state.locale).toBe("zh-CN");
   });
 
-  it("restores the persisted sidebar width per app", () => {
+  it("restores the persisted properties panel width per app", () => {
     stubBrowser({
-      "openscene:studio:view:app-4": JSON.stringify({ sidebarWidth: 520 }),
+      "openscene:studio:view:app-5": JSON.stringify({ propertiesWidth: 420 }),
     });
 
-    useQueryStore.getState().applyAppSettings("app-4");
-    expect(useQueryStore.getState().sidebarWidth).toBe(520);
+    useQueryStore.getState().applyAppSettings("app-5");
+    expect(useQueryStore.getState().propertiesWidth).toBe(420);
   });
 
   it("keys view state by app id so different apps stay isolated", () => {

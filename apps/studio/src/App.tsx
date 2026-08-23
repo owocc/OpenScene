@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { PanelRight, PanelRightClose } from "lucide-react";
+import type { PanelSize } from "react-resizable-panels";
 
 import { StudioCanvas } from "@/components/studio/canvas";
 import { StudioSidebar } from "@/components/studio/sidebar";
 import { ShortcutsProvider } from "@/components/studio/shortcuts";
 import { PropertyEditor } from "@/components/studio/property-editor";
-import { IconTooltip } from "@/components/studio/icon-tooltip";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useQueryStore } from "@/stores";
 import { useI18n } from "@/i18n";
 import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
@@ -30,6 +30,11 @@ function nextElementId(document: SceneDocument, type: string) {
   while (`${base}-${index}` in document.spec.elements) index += 1;
   return `${base}-${index}`;
 }
+
+/** Default right properties panel width in px. */
+const PROPERTIES_DEFAULT_WIDTH = 320;
+/** Minimum properties panel width in px (drag floor; max is 60vw). */
+const PROPERTIES_MIN_WIDTH = 280;
 
 function StatusScreen({
   title,
@@ -130,7 +135,28 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const { LL } = useI18n();
   const selectedId = selectedNodeId ?? "";
   const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
-  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
+  // Right panel is hidden while nothing is selected; width is read once per
+  // shown mount (first show and every hidden→shown transition) rather than
+  // subscribed to: re-rendering mid-drag races react-resizable-panels'
+  // pointer capture and freezes the drag after the first move.
+  const propertiesHidden = !(surface === "visual" || surface === "developer") || !selectedId;
+  const propertiesWidthRef = useRef<number | null>(null);
+  const wasPropertiesHiddenRef = useRef(propertiesHidden);
+  if (
+    propertiesWidthRef.current === null ||
+    (wasPropertiesHiddenRef.current && !propertiesHidden)
+  ) {
+    propertiesWidthRef.current =
+      useQueryStore.getState().propertiesWidth ?? PROPERTIES_DEFAULT_WIDTH;
+  }
+  wasPropertiesHiddenRef.current = propertiesHidden;
+
+  const handlePropertiesResize = ({ inPixels }: PanelSize) => {
+    const width = Math.round(inPixels);
+    if (useQueryStore.getState().propertiesWidth !== width) {
+      useQueryStore.getState().setPropertiesWidth(width);
+    }
+  };
   const [notice, setNotice] = useState<string | undefined>();
   // Element hovered in the preview iframe (select tool): highlights the
   // matching tree row without changing the selection.
@@ -290,11 +316,10 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
         panX: viewport.panX,
         panY: viewport.panY,
         rotated: viewport.isRotated,
-        propsCollapsed: propertiesCollapsed,
       },
       { push: false },
     );
-  }, [surface, selectedNodeId, locale, activeToolMode, viewport, propertiesCollapsed]);
+  }, [surface, selectedNodeId, locale, activeToolMode, viewport]);
 
   // Subscribe to external/browser popstate URL query changes
   useEffect(() => {
@@ -327,8 +352,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           },
         });
       }
-      if (state.propsCollapsed !== prevState.propsCollapsed)
-        setPropertiesCollapsed(state.propsCollapsed);
     });
     return unsub;
   }, []);
@@ -498,132 +521,116 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             onSave={saveDocument}
           />
         )}
-        {/* 3. Floating Collapsed Properties Pill (Minimal Figma style) */}
-        {(surface === "visual" || surface === "developer") && propertiesCollapsed && (
-          <div
-            className={cn(
-              "fixed z-30 hidden transition-all xl:block",
-              sidebarCollapsed ? "top-4 right-4" : "top-3 right-3",
-            )}
+        {/* 4. Right Properties Panel (hidden when nothing is selected; resizable, max 60vw) */}
+        {(surface === "visual" || surface === "developer") && selectedId && (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="pointer-events-none fixed inset-0 z-30 hidden xl:flex"
           >
-            <IconTooltip label={LL.sidebar.expandProperties()} side="bottom">
-              <button
-                className="flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-background/95 px-3 text-xs font-medium text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-                onClick={() => setPropertiesCollapsed(false)}
-                aria-label={LL.sidebar.expandProperties()}
-              >
-                <span>{LL.properties.title()}</span>
-                <PanelRight aria-hidden="true" className="size-4 text-foreground/80" />
-              </button>
-            </IconTooltip>
-          </div>
-        )}
-        {/* 4. Right Properties Panel */}
-        {(surface === "visual" || surface === "developer") && !propertiesCollapsed && (
-          <div
-            className={cn(
-              "pointer-events-none fixed inset-y-0 right-0 z-30 hidden flex-col items-end transition-all xl:flex",
-              sidebarCollapsed ? "p-4" : "p-0",
-            )}
-          >
-            <aside
-              className={cn(
-                "pointer-events-auto flex w-80 flex-col overflow-hidden bg-background/95 backdrop-blur transition-all",
-                sidebarCollapsed
-                  ? "h-full rounded-2xl border border-border/80 shadow-lg"
-                  : "h-full rounded-none border-l border-border/80",
-              )}
+            {/* Transparent remainder: keeps the handle reachable, clicks pass through */}
+            <ResizablePanel minSize={0} className="pointer-events-none" />
+            <ResizableHandle
+              withHandle
+              className={cn("pointer-events-auto", sidebarCollapsed && "opacity-0")}
+            />
+            <ResizablePanel
+              id="studio-properties"
+              defaultSize={propertiesWidthRef.current}
+              minSize={PROPERTIES_MIN_WIDTH}
+              maxSize="60vw"
+              onResize={handlePropertiesResize}
+              className="pointer-events-auto"
             >
-              <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
-                <span className="text-xs font-semibold">{LL.properties.title()}</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                    onClick={removeSelected}
-                    disabled={!selectedId || isSlotNodeId(selectedId)}
-                    aria-label="Delete selected node"
-                  >
-                    {LL.common.delete()}
-                  </button>
-                  <IconTooltip label={LL.sidebar.collapse()} side="left">
+              <div className={cn("h-full", sidebarCollapsed && "py-4 pr-4")}>
+                <aside
+                  className={cn(
+                    "flex h-full w-full flex-col overflow-hidden bg-background/95 backdrop-blur",
+                    sidebarCollapsed
+                      ? "rounded-2xl border border-border/80 shadow-lg"
+                      : "rounded-none border-l border-border/80",
+                  )}
+                >
+                  <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/80 px-3">
+                    <span className="text-xs font-semibold">{LL.properties.title()}</span>
                     <button
-                      className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => setPropertiesCollapsed(true)}
-                      aria-label={LL.sidebar.collapse()}
+                      className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                      onClick={removeSelected}
+                      disabled={!selectedId || isSlotNodeId(selectedId)}
+                      aria-label="Delete selected node"
                     >
-                      <PanelRightClose aria-hidden="true" className="size-4" />
+                      {LL.common.delete()}
                     </button>
-                  </IconTooltip>
-                </div>
-              </div>
-              <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
-                {selectedElement && selectedMeta ? (
-                  <div className="p-3">
-                    <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-semibold">
-                            {selectedElement.name || selectedMeta.title}
-                          </p>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+                    {selectedElement && selectedMeta ? (
+                      <div className="p-3">
+                        <div className="mb-4 rounded-xl border border-border bg-muted/30 p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold">
+                                {selectedElement.name || selectedMeta.title}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                                {selectedElement.type} · #{selectedId}
+                              </p>
+                            </div>
+                            <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
+                              {selectedMeta.category}
+                            </span>
+                          </div>
+                          <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
+                            {LL.properties.layerName()}
+                            <input
+                              className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
+                              value={selectedElement.name ?? ""}
+                              onChange={(event) =>
+                                updateElement(selectedId, (element) => ({
+                                  ...element,
+                                  name: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        </div>
+                        <PropertyEditor
+                          meta={selectedMeta}
+                          componentType={selectedElement.type}
+                          elementId={selectedId}
+                          props={(selectedElement.props ?? {}) as Record<string, JsonValue>}
+                          state={document.spec.state as Record<string, JsonValue> | undefined}
+                          onChange={updateProp}
+                        />
+                      </div>
+                    ) : selectedElement ? (
+                      <div className="p-3">
+                        <div className="mb-3 rounded-xl border border-border bg-muted/30 p-3">
+                          <p className="text-sm font-semibold">{selectedElement.type}</p>
                           <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                            {selectedElement.type} · #{selectedId}
+                            #{selectedId}
                           </p>
                         </div>
-                        <span className="rounded-md bg-primary/10 px-1.5 py-1 text-[9px] font-medium text-primary">
-                          {selectedMeta.category}
-                        </span>
+                        <pre className="overflow-auto rounded-lg border border-border bg-muted/20 p-3 font-mono text-[10px] leading-4 text-foreground">
+                          {JSON.stringify(selectedElement, null, 2)}
+                        </pre>
                       </div>
-                      <label className="mt-3 grid gap-1 text-[10px] font-medium text-muted-foreground">
-                        {LL.properties.layerName()}
-                        <input
-                          className="h-7 rounded-lg border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring"
-                          value={selectedElement.name ?? ""}
-                          onChange={(event) =>
-                            updateElement(selectedId, (element) => ({
-                              ...element,
-                              name: event.target.value,
-                            }))
-                          }
-                        />
-                      </label>
+                    ) : (
+                      <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
+                        <p>{LL.properties.empty()}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="border-t border-border/80 p-3">
+                    <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
+                      {LL.properties.runtimeTitle()}
                     </div>
-                    <PropertyEditor
-                      meta={selectedMeta}
-                      componentType={selectedElement.type}
-                      elementId={selectedId}
-                      props={(selectedElement.props ?? {}) as Record<string, JsonValue>}
-                      state={document.spec.state as Record<string, JsonValue> | undefined}
-                      onChange={updateProp}
-                    />
+                    <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                      {LL.properties.runtimeDesc()}
+                    </p>
                   </div>
-                ) : selectedElement ? (
-                  <div className="p-3">
-                    <div className="mb-3 rounded-xl border border-border bg-muted/30 p-3">
-                      <p className="text-sm font-semibold">{selectedElement.type}</p>
-                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                        #{selectedId}
-                      </p>
-                    </div>
-                    <pre className="overflow-auto rounded-lg border border-border bg-muted/20 p-3 font-mono text-[10px] leading-4 text-foreground">
-                      {JSON.stringify(selectedElement, null, 2)}
-                    </pre>
-                  </div>
-                ) : (
-                  <div className="grid place-items-center p-8 text-center text-xs text-muted-foreground">
-                    <p>{LL.properties.empty()}</p>
-                  </div>
-                )}
+                </aside>
               </div>
-              <div className="border-t border-border/80 p-3">
-                <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                  {LL.properties.runtimeTitle()}
-                </div>
-                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                  {LL.properties.runtimeDesc()}
-                </p>
-              </div>
-            </aside>
-          </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         )}
         {notice && (
           <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
