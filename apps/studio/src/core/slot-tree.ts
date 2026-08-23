@@ -4,26 +4,18 @@ import type { ComponentMeta } from "./meta";
 
 type EditorElement = UIElement & { name?: string };
 
-export type ElementTreeNode = {
-  kind: "element";
-  id: string;
-  type: string;
-  label: string;
-  isRoot: boolean;
-  element: EditorElement;
-  children: TreeNode[];
-};
-
-export type SlotTreeNode = {
-  kind: "slot";
+/** One row of the sidebar tree, computed from the flat `spec.elements` map. */
+export interface SidebarTreeItem {
   id: string;
   label: string;
-  parentId: string;
-  slotName: string;
-  children: ElementTreeNode[];
-};
-
-export type TreeNode = ElementTreeNode | SlotTreeNode;
+  kind: "element" | "slot";
+  /** Element component type; undefined for slot nodes. */
+  type?: string;
+  /** Child item ids: element children plus named-slot nodes. */
+  children?: string[];
+  /** Element contains children or non-empty named slots. */
+  hasContent?: boolean;
+}
 
 export type ChildContainer = { parentId: string; slotName?: string; index?: number };
 
@@ -42,75 +34,75 @@ export function isSlotNodeId(id: string) {
   return parseSlotNodeId(id) !== undefined;
 }
 
-function childIds(element: UIElement, slotName?: string) {
-  return slotName ? (element.slots?.[slotName] ?? []) : (element.children ?? []);
-}
-
-function buildElement(
+/**
+ * Computes the sidebar tree directly from the flat `spec.elements` map:
+ * element `children` resolve to child items, and named slots (declared in the
+ * manifest or present on the element) become virtual slot nodes. Returns null
+ * when the document has no resolvable root element.
+ */
+export function buildPageTreeItems(
   document: SceneDocument,
-  id: string,
   getMeta: (type: string) => ComponentMeta | undefined,
-  path: Set<string>,
-  isRoot = false,
-): ElementTreeNode | undefined {
-  const element = document.spec.elements[id] as EditorElement | undefined;
-  if (!element || path.has(id)) return undefined;
+): Record<string, SidebarTreeItem> | null {
+  const elements = document.spec.elements as Record<string, EditorElement | undefined>;
+  const rootId = document.spec.root;
+  if (!rootId || !elements[rootId]) return null;
 
-  const nextPath = new Set(path).add(id);
-  const meta = getMeta(element.type);
-  const children: TreeNode[] = childIds(element).flatMap((childId) => {
-    const child = buildElement(document, childId, getMeta, nextPath);
-    return child ? [child] : [];
-  });
+  const items: Record<string, SidebarTreeItem> = {};
 
-  for (const slotName of Object.keys(meta?.slots ?? {})) {
-    if (slotName === "default") continue;
-    const slotChildren = childIds(element, slotName).flatMap((childId) => {
-      const child = buildElement(document, childId, getMeta, nextPath);
-      return child ? [child] : [];
-    });
-    children.push({
-      kind: "slot",
-      id: slotNodeId(id, slotName),
-      label: meta?.slots?.[slotName]?.title || slotName,
-      parentId: id,
-      slotName,
-      children: slotChildren,
-    });
-  }
+  /** Visits the element and its subtree; returns false when unresolved or cyclic. */
+  const visitElement = (id: string, path: Set<string>): boolean => {
+    if (path.has(id)) return false;
+    const element = elements[id];
+    if (!element) return false;
+    const nextPath = new Set(path).add(id);
+    const meta = getMeta(element.type);
+    const childItemIds: string[] = [];
+    let elementChildCount = 0;
 
-  for (const [slotName, ids] of Object.entries(element.slots ?? {})) {
-    if (slotName === "default" || meta?.slots?.[slotName]) continue;
-    const slotChildren = ids.flatMap((childId) => {
-      const child = buildElement(document, childId, getMeta, nextPath);
-      return child ? [child] : [];
-    });
-    children.push({
-      kind: "slot",
-      id: slotNodeId(id, slotName),
-      label: slotName,
-      parentId: id,
-      slotName,
-      children: slotChildren,
-    });
-  }
+    for (const childId of element.children ?? []) {
+      if (!elements[childId]) continue;
+      if (visitElement(childId, nextPath)) {
+        elementChildCount += 1;
+        childItemIds.push(childId);
+      }
+    }
 
-  return {
-    kind: "element",
-    id,
-    type: element.type,
-    label: element.name || meta?.title || element.type,
-    isRoot,
-    element,
-    children,
+    const slotNames = new Set<string>();
+    for (const slotName of Object.keys(meta?.slots ?? {})) {
+      if (slotName !== "default") slotNames.add(slotName);
+    }
+    for (const slotName of Object.keys(element.slots ?? {})) {
+      if (slotName !== "default") slotNames.add(slotName);
+    }
+
+    for (const slotName of slotNames) {
+      const slotChildIds = (element.slots?.[slotName] ?? []).filter((childId) =>
+        visitElement(childId, nextPath),
+      );
+      items[slotNodeId(id, slotName)] = {
+        id: slotNodeId(id, slotName),
+        label: meta?.slots?.[slotName]?.title ?? slotName,
+        kind: "slot",
+        children: slotChildIds,
+      };
+      childItemIds.push(slotNodeId(id, slotName));
+    }
+
+    const hasSlotContent = Object.values(element.slots ?? {}).some((ids) => (ids?.length ?? 0) > 0);
+    items[id] = {
+      id,
+      label: element.name || meta?.title || element.type,
+      type: element.type,
+      kind: "element",
+      children: childItemIds,
+      hasContent: elementChildCount > 0 || hasSlotContent,
+    };
+    return true;
   };
-}
 
-export function buildTree(
-  document: SceneDocument,
-  getMeta: (type: string) => ComponentMeta | undefined,
-) {
-  return buildElement(document, document.spec.root, getMeta, new Set(), true);
+  visitElement(rootId, new Set());
+  return items;
 }
 
 export function getElementLocation(document: SceneDocument, elementId: string) {

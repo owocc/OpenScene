@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, FileText, FolderOpen } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Component, CornerDownRight, FileText, SquareDashed } from "lucide-react";
 import { hotkeysCoreFeature, syncDataLoaderFeature } from "@headless-tree/core";
 import { useTree } from "@headless-tree/react";
 
@@ -9,7 +9,7 @@ import { useI18n } from "@/i18n";
 import type { SceneDocument } from "@openscene/protocol";
 import type { AdapterRegistry } from "@/core/registry";
 import type { ComponentMeta } from "@/core/meta";
-import { buildTree, type TreeNode } from "@/core/slot-tree";
+import { buildPageTreeItems, type SidebarTreeItem } from "@/core/slot-tree";
 import { cn } from "@/lib/utils";
 
 interface PagesPanelProps {
@@ -22,28 +22,117 @@ interface PagesPanelProps {
   onSelectNode: (nodeId: string | null) => void;
 }
 
-interface PageTreeItem {
-  id: string;
-  label: string;
-  type?: string;
-  kind: "element" | "slot";
-  children?: string[];
+function folderIds(items: Record<string, SidebarTreeItem> | null): string[] {
+  if (!items) return [];
+  return Object.values(items)
+    .filter((item) => (item.children?.length ?? 0) > 0)
+    .map((item) => item.id);
 }
 
-function flattenTree(tree: TreeNode): Record<string, PageTreeItem> {
-  const items: Record<string, PageTreeItem> = {};
-  const visit = (node: TreeNode) => {
-    items[node.id] = {
-      id: node.id,
-      label: node.label,
-      type: node.kind === "element" ? node.type : undefined,
-      kind: node.kind,
-      children: node.children.map((child) => child.id),
-    };
-    node.children.forEach(visit);
-  };
-  visit(tree);
-  return items;
+/** Structural signature: remounts the tree only when the element set changes. */
+function structureSignature(document: SceneDocument): string {
+  return `${document.spec.root}|${Object.keys(document.spec.elements).sort().join(",")}`;
+}
+
+/**
+ * Virtual tree root above the scene root. headless-tree always renders the
+ * root item's children (its root cannot be collapsed), so the real scene root
+ * is mounted one level below this virtual node and folds like any other
+ * folder.
+ */
+const VIRTUAL_ROOT = "__document__";
+
+function DocumentTree({
+  document,
+  registry,
+  selectedId,
+  onSelectNode,
+}: {
+  document: SceneDocument;
+  registry: AdapterRegistry;
+  selectedId: string;
+  onSelectNode: (nodeId: string | null) => void;
+}) {
+  const treeData = useMemo(
+    () => buildPageTreeItems(document, (type) => registry.getComponent(type)),
+    [document, registry],
+  );
+  const sceneRoot = document.spec.root;
+
+  const tree = useTree<SidebarTreeItem>({
+    rootItemId: VIRTUAL_ROOT,
+    getItemName: (item) => item.getItemData().label,
+    isItemFolder: (item) => (item.getItemData().children?.length ?? 0) > 0,
+    dataLoader: {
+      getItem: (itemId) =>
+        itemId === VIRTUAL_ROOT
+          ? {
+              id: VIRTUAL_ROOT,
+              label: "Document",
+              kind: "element",
+              children: sceneRoot ? [sceneRoot] : [],
+            }
+          : (treeData?.[itemId] ?? { id: itemId, label: itemId, kind: "element" }),
+      getChildren: (itemId) =>
+        itemId === VIRTUAL_ROOT
+          ? sceneRoot && treeData?.[sceneRoot]
+            ? [sceneRoot]
+            : []
+          : (treeData?.[itemId]?.children ?? []),
+    },
+    // Everything starts expanded so the full hierarchy (children + slots) is
+    // visible; collapsing is fully managed by the tree (uncontrolled).
+    initialState: {
+      expandedItems: [VIRTUAL_ROOT, ...folderIds(treeData)],
+    },
+    features: [syncDataLoaderFeature, hotkeysCoreFeature],
+  });
+
+  return (
+    <Tree tree={tree} indent={16} toggleIconType="chevron" className="px-1">
+      {tree.getItems().map((item) => {
+        const data = item.getItemData();
+        const isSlot = data.kind === "slot";
+        const selected = !isSlot && selectedId === data.id;
+        return (
+          <TreeItem key={item.getId()} item={item}>
+            <TreeItemLabel
+              className={cn(
+                selected && "bg-accent text-accent-foreground",
+                isSlot && "text-muted-foreground",
+              )}
+              onClick={() => onSelectNode(data.id)}
+            >
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                {isSlot ? (
+                  <CornerDownRight
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-muted-foreground/70"
+                  />
+                ) : data.hasContent ? (
+                  <SquareDashed
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                  />
+                ) : (
+                  <Component
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                  />
+                )}
+                <span className="truncate">{data.label}</span>
+                {!isSlot && (
+                  <span className="ml-auto shrink-0 font-mono text-[9px] text-muted-foreground opacity-70">
+                    {data.type}
+                  </span>
+                )}
+              </span>
+            </TreeItemLabel>
+          </TreeItem>
+        );
+      })}
+    </Tree>
+  );
 }
 
 export function PagesPanel({
@@ -59,31 +148,7 @@ export function PagesPanel({
   const [addType, setAddType] = useState("");
   const nodeCount = Object.keys(document.spec.elements).length;
 
-  const treeData = useMemo(() => {
-    const root = buildTree(document, (type) => registry.getComponent(type));
-    return root ? flattenTree(root) : null;
-  }, [document, registry]);
-
-  const rootId = document.spec.root;
-  const itemsRef = useRef(treeData);
-  itemsRef.current = treeData;
-
-  const tree = useTree<PageTreeItem>({
-    rootItemId: rootId ?? "root",
-    getItemName: (item) => item.getItemData().label,
-    isItemFolder: (item) => (item.getItemData().children?.length ?? 0) > 0,
-    dataLoader: {
-      getItem: (itemId) =>
-        itemsRef.current?.[itemId] ?? { id: itemId, label: itemId, kind: "element" },
-      getChildren: (itemId) => itemsRef.current?.[itemId]?.children ?? [],
-    },
-    initialState: { expandedItems: rootId ? [rootId] : [] },
-    features: [syncDataLoaderFeature, hotkeysCoreFeature],
-  });
-
-  useEffect(() => {
-    if (treeData) tree.rebuildTree();
-  }, [tree, treeData]);
+  const hasRoot = document.spec.root != null && document.spec.root in document.spec.elements;
 
   return (
     <div className="flex flex-col p-2">
@@ -110,51 +175,14 @@ export function PagesPanel({
           </span>
         </div>
 
-        {document.spec.root && treeData ? (
-          <Tree tree={tree} indent={16} toggleIconType="chevron" className="px-1">
-            {[tree.getRootItem(), ...tree.getItems()].map((item) => {
-              const data = item.getItemData();
-              const isSlot = data.kind === "slot";
-              const selected = !isSlot && selectedId === data.id;
-              return (
-                <TreeItem
-                  key={item.getId()}
-                  item={item}
-                  indentOffset={item.getItemMeta().level === -1 ? 1 : 0}
-                >
-                  <TreeItemLabel
-                    className={cn(
-                      selected && "bg-accent text-accent-foreground",
-                      isSlot && "text-muted-foreground",
-                    )}
-                    onClick={() => onSelectNode(data.id)}
-                  >
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      {isSlot ? (
-                        <FolderOpen
-                          aria-hidden="true"
-                          className="size-3.5 shrink-0 text-muted-foreground/70"
-                        />
-                      ) : (
-                        <Box
-                          aria-hidden="true"
-                          className="size-3.5 shrink-0 text-muted-foreground"
-                        />
-                      )}
-                      <span className={cn("truncate", isSlot && "text-xs")}>
-                        {isSlot ? `slot: ${data.label}` : data.label}
-                      </span>
-                      {!isSlot && (
-                        <span className="ml-auto shrink-0 font-mono text-[9px] text-muted-foreground opacity-70">
-                          {data.type}
-                        </span>
-                      )}
-                    </span>
-                  </TreeItemLabel>
-                </TreeItem>
-              );
-            })}
-          </Tree>
+        {hasRoot ? (
+          <DocumentTree
+            key={structureSignature(document)}
+            document={document}
+            registry={registry}
+            selectedId={selectedId}
+            onSelectNode={onSelectNode}
+          />
         ) : (
           <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
             {LL.panels.pages.emptyDoc()}
