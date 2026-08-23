@@ -9,6 +9,7 @@ import {
   getEditorConnection,
   type AppManifest,
   type EditorConnection,
+  type ElementRect,
   type RendererPortMessage,
   type SceneDocument,
   type StudioPortMessage,
@@ -47,6 +48,8 @@ export interface SelectionReport {
   elementIds: string[];
   primaryElementId: string | null;
   source: "click" | "marquee";
+  /** Bounding boxes relative to the iframe viewport, keyed by element id. */
+  rects?: Record<string, ElementRect>;
 }
 
 export interface OpenSceneClient {
@@ -57,9 +60,15 @@ export interface OpenSceneClient {
   loadPage(pageKey?: string): Promise<void>;
   reportRendered(): void;
   reportSelection(payload: SelectionReport): void;
-  reportHover(elementId: string | null): void;
+  reportHover(elementId: string | null, rect?: ElementRect | null): void;
   reportRendererError(error: unknown): void;
   destroy(): void;
+  /**
+   * Registered by the renderer layer: computes an element's bounding box
+   * relative to the frame viewport. Studio requests it via
+   * ELEMENT_GEOMETRY_REQUEST when it needs geometry for a tree selection.
+   */
+  onGeometryRequest?: ((elementId: string) => ElementRect | null) | null;
 }
 
 const emptyState = (): OpenSceneClientState => ({
@@ -122,6 +131,7 @@ export class OpenSceneController implements OpenSceneClient {
   private readonly onWindowMessage = (event: MessageEvent<unknown>) =>
     this.handleWindowMessage(event);
   private readonly onPortMessage = (event: MessageEvent<unknown>) => this.handlePortMessage(event);
+  onGeometryRequest?: ((elementId: string) => ElementRect | null) | null = null;
 
   constructor(
     options: OpenSceneClientOptions,
@@ -206,10 +216,16 @@ export class OpenSceneController implements OpenSceneClient {
       payload.primaryElementId && elementIds.includes(payload.primaryElementId)
         ? payload.primaryElementId
         : (elementIds[0] ?? null);
+    const rects = Object.fromEntries(
+      elementIds
+        .map((id) => [id, payload.rects?.[id]])
+        .filter((entry): entry is [string, ElementRect] => entry[1] != null),
+    );
     const message = createBridgeEnvelope(this.editorConnection.sessionId, "SELECTION_CHANGED", {
       elementIds,
       primaryElementId,
       source: payload.source,
+      rects,
     });
     const parsed = RendererPortMessageSchema.safeParse(message);
     if (!parsed.success) return;
@@ -217,10 +233,11 @@ export class OpenSceneController implements OpenSceneClient {
     this.sendPortMessage(parsed.data);
   }
 
-  reportHover(elementId: string | null): void {
+  reportHover(elementId: string | null, rect: ElementRect | null = null): void {
     if (!this.editorConnection || !this.port) return;
     const message = createBridgeEnvelope(this.editorConnection.sessionId, "ELEMENT_HOVER", {
       elementId,
+      rect,
     });
     const parsed = RendererPortMessageSchema.safeParse(message);
     if (parsed.success) this.sendPortMessage(parsed.data);
@@ -297,6 +314,15 @@ export class OpenSceneController implements OpenSceneClient {
   private handleStudioMessage(message: StudioPortMessage): void {
     if (message.type === "DOCUMENT_SET") {
       this.replaceDocument(message.payload.document, message.payload.revision);
+    } else if (message.type === "ELEMENT_GEOMETRY_REQUEST") {
+      const rect = this.onGeometryRequest?.(message.payload.elementId) ?? null;
+      if (!rect || !this.editorConnection || !this.port) return;
+      const reply = createBridgeEnvelope(this.editorConnection.sessionId, "ELEMENT_GEOMETRY", {
+        elementId: message.payload.elementId,
+        rect,
+      });
+      const parsed = RendererPortMessageSchema.safeParse(reply);
+      if (parsed.success) this.sendPortMessage(parsed.data);
     } else {
       this.setState({
         interactionMode: message.payload.interactionMode,

@@ -49,6 +49,15 @@ describe("Studio Web iframe bridge v2 handshake", () => {
           elementIds: ["root"],
           primaryElementId: "root",
           source: "click",
+          rects: { root: { left: 0, top: 0, width: 100, height: 50 } },
+        }),
+      ).success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(
+        createBridgeEnvelope("s", "ELEMENT_HOVER", {
+          elementId: "root",
+          rect: { left: 1, top: 2, width: 10, height: 10 },
         }),
       ).success,
     ).toBe(true);

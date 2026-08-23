@@ -120,17 +120,61 @@ describe("bridge v2 directional schemas", () => {
     ).toBe(true);
     expect(
       RendererPortMessageSchema.safeParse(
-        bridge("SELECTION_CHANGED", { elementIds: [], primaryElementId: null, source: "click" }),
+        bridge("SELECTION_CHANGED", {
+          elementIds: [],
+          primaryElementId: null,
+          source: "click",
+          rects: {},
+        }),
       ).success,
     ).toBe(true);
     expect(
-      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: "text-1" })).success,
+      RendererPortMessageSchema.safeParse(
+        bridge("SELECTION_CHANGED", {
+          elementIds: ["text-1"],
+          primaryElementId: "text-1",
+          source: "click",
+          rects: { "text-1": { left: 0, top: 0, width: 10, height: 20 } },
+        }),
+      ).success,
     ).toBe(true);
     expect(
-      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: null })).success,
+      RendererPortMessageSchema.safeParse(
+        bridge("ELEMENT_HOVER", {
+          elementId: "text-1",
+          rect: { left: 5, top: 5, width: 40, height: 16 },
+        }),
+      ).success,
     ).toBe(true);
     expect(
-      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: "" })).success,
+      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: null, rect: null }))
+        .success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: "", rect: null }))
+        .success,
+    ).toBe(false);
+    expect(
+      RendererPortMessageSchema.safeParse(
+        bridge("ELEMENT_GEOMETRY", {
+          elementId: "text-1",
+          rect: { left: 0, top: 0, width: 100, height: 50 },
+        }),
+      ).success,
+    ).toBe(true);
+    expect(
+      StudioPortMessageSchema.safeParse(bridge("ELEMENT_GEOMETRY_REQUEST", { elementId: "text-1" }))
+        .success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(
+        bridge("SELECTION_CHANGED", {
+          elementIds: ["text-1"],
+          primaryElementId: "text-1",
+          source: "click",
+          rects: { "text-1": { left: 0, top: 0, width: -5, height: 20 } },
+        }),
+      ).success,
     ).toBe(false);
     expect(
       RendererPortMessageSchema.safeParse(bridge("RENDERER_ERROR", { message: "render failed" }))

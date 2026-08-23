@@ -44,14 +44,31 @@ export interface SceneNodeSnapshot {
   slots: Record<string, string[]>;
 }
 
-/**
- * Serializable JSON-render tree snapshot sent when a renderer connects.
- */
+/** Serializable JSON-render tree snapshot sent when a renderer connects. */
 export interface SceneDocumentSnapshot {
   root: string;
   elements: Record<string, SceneNodeSnapshot>;
   state: Record<string, unknown>;
 }
+
+/**
+ * Bounding box of a rendered element, relative to the iframe viewport.
+ * Studio draws the selection/hover outlines on top of the frame from these
+ * coordinates, so the iframe content itself stays untouched.
+ */
+export interface ElementRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const ElementRectSchema = z.object({
+  left: z.number().nonnegative(),
+  top: z.number().nonnegative(),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+});
 
 const nonEmptyString = z.string().min(1);
 
@@ -97,6 +114,7 @@ export const StudioPortMessageSchema = z.discriminatedUnion("type", [
       selectedElementIds: z.array(nonEmptyString),
     }),
   ),
+  envelope("ELEMENT_GEOMETRY_REQUEST", z.object({ elementId: nonEmptyString })),
 ]);
 
 /** Renderer client → Studio MessagePort. */
@@ -114,9 +132,14 @@ export const RendererPortMessageSchema = z.discriminatedUnion("type", [
       elementIds: z.array(nonEmptyString),
       primaryElementId: nonEmptyString.nullable(),
       source: z.enum(["click", "marquee"]),
+      rects: z.record(z.string(), ElementRectSchema),
     }),
   ),
-  envelope("ELEMENT_HOVER", z.object({ elementId: nonEmptyString.nullable() })),
+  envelope(
+    "ELEMENT_HOVER",
+    z.object({ elementId: nonEmptyString.nullable(), rect: ElementRectSchema.nullable() }),
+  ),
+  envelope("ELEMENT_GEOMETRY", z.object({ elementId: nonEmptyString, rect: ElementRectSchema })),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
 ]);
 

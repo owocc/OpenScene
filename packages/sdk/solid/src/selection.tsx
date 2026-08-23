@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, Show, onCleanup, type JSX } from "solid-js";
+import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
 import type { SelectionReport } from "@openscene/javascript";
 import { useOpenScene } from "./provider.js";
 
@@ -42,7 +42,6 @@ function orderedNodeIds(canvas: HTMLElement, box: SelectionBox): string[] {
 
 function rectForNode(canvas: HTMLElement, id: string, revision: () => number): SelectionBox | null {
   revision();
-  const canvasRect = canvas.getBoundingClientRect();
   const nodes = [...canvas.querySelectorAll<HTMLElement>(`[data-node-id="${CSS.escape(id)}"]`)];
   const rects = nodes.flatMap((node) => {
     const direct = node.getBoundingClientRect();
@@ -51,14 +50,21 @@ function rectForNode(canvas: HTMLElement, id: string, revision: () => number): S
     );
     return [direct, ...descendants];
   });
-  if (rects.length === 0) return null;
-  const left = Math.min(...rects.map((rect) => rect.left));
-  const top = Math.min(...rects.map((rect) => rect.top));
-  const right = Math.max(...rects.map((rect) => rect.right));
-  const bottom = Math.max(...rects.map((rect) => rect.bottom));
+  // Ignore zero-sized boxes (e.g. display:contents marker spans): they sit at
+  // the origin and would pull the union to negative coordinates.
+  const visible = rects.filter((rect) => rect.width > 0 && rect.height > 0);
+  if (visible.length === 0) return null;
+  const left = Math.min(...visible.map((rect) => rect.left));
+  const top = Math.min(...visible.map((rect) => rect.top));
+  const right = Math.max(...visible.map((rect) => rect.right));
+  const bottom = Math.max(...visible.map((rect) => rect.bottom));
+  // Coordinates are relative to the iframe viewport (getBoundingClientRect
+  // already is), which is exactly the frame Studio draws its overlay against —
+  // translating into the canvas frame would shift the outline by the canvas's
+  // own offset (body margin/padding).
   return {
-    x: left - canvasRect.left,
-    y: top - canvasRect.top,
+    x: Math.max(0, left),
+    y: Math.max(0, top),
     width: right - left,
     height: bottom - top,
   };
@@ -103,13 +109,44 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
   const interactionMode = () => context.snapshot().interactionMode;
   const emitSelection = (report: SelectionReport) => {
     setSelection(report.elementIds);
-    context.client.reportSelection(report);
+    // Report bounding boxes (relative to this frame) so Studio can draw the
+    // selection outline on its own overlay instead of touching our DOM.
+    const rects = Object.fromEntries(
+      report.elementIds
+        .map((id) => {
+          const rect = rectForNode(canvas, id, geometryRevision);
+          return rect
+            ? [id, { left: rect.x, top: rect.y, width: rect.width, height: rect.height }]
+            : null;
+        })
+        .filter(
+          (
+            entry,
+          ): entry is [string, { left: number; top: number; width: number; height: number }] =>
+            entry != null,
+        ),
+    );
+    context.client.reportSelection({ ...report, rects });
   };
   const [hovered, setHovered] = createSignal<string | null>(null);
+  createEffect(() => {
+    // Serve geometry requests from Studio (tree selection → overlay outline).
+    context.client.onGeometryRequest = (elementId) => {
+      const rect = rectForNode(canvas, elementId, geometryRevision);
+      return rect ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height } : null;
+    };
+    onCleanup(() => {
+      context.client.onGeometryRequest = null;
+    });
+  });
   const updateHover = (elementId: string | null) => {
     if (hovered() === elementId) return;
     setHovered(elementId);
-    context.client.reportHover(elementId);
+    const rect = elementId ? rectForNode(canvas, elementId, geometryRevision) : null;
+    context.client.reportHover(
+      elementId,
+      rect ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height } : null,
+    );
   };
   const point = (event: PointerEvent): Point => {
     const rect = canvas?.getBoundingClientRect();
@@ -211,47 +248,6 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
           "z-index": "2147483647",
         }}
       >
-        <Show when={!dragged() && interactionMode() === "select" && hovered()} keyed>
-          {(id) => (
-            <Show when={canvas ? rectForNode(canvas, id, geometryRevision) : null}>
-              {(value) => (
-                <div
-                  data-open-scene-hover={id}
-                  style={{
-                    position: "absolute",
-                    left: `${value().x}px`,
-                    top: `${value().y}px`,
-                    width: `${value().width}px`,
-                    height: `${value().height}px`,
-                    border: "1px dashed rgba(13, 138, 255, 0.85)",
-                    background: "rgba(13, 138, 255, 0.06)",
-                    "pointer-events": "none",
-                  }}
-                />
-              )}
-            </Show>
-          )}
-        </Show>
-        <For each={selection()}>
-          {(id) => (
-            <Show when={canvas ? rectForNode(canvas, id, geometryRevision) : null}>
-              {(value) => (
-                <div
-                  data-open-scene-outline={id}
-                  style={{
-                    position: "absolute",
-                    left: `${value().x}px`,
-                    top: `${value().y}px`,
-                    width: `${value().width}px`,
-                    height: `${value().height}px`,
-                    border: "2px solid #0d8aff",
-                    "pointer-events": "none",
-                  }}
-                />
-              )}
-            </Show>
-          )}
-        </For>
         {(() => {
           const box = overlayBox();
           return box ? (

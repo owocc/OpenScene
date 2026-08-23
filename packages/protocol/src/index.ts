@@ -34,6 +34,7 @@ export {
 } from "./bridge.js";
 export type {
   EditorConnection,
+  ElementRect,
   RendererPortMessage,
   RendererWindowMessage,
   SceneDocumentSnapshot,
