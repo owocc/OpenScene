@@ -38,6 +38,8 @@ interface OpenSceneContextValue {
   client: OpenSceneClient;
   app: OpenSceneSolidApp;
   snapshot: Accessor<OpenSceneClientState>;
+  /** Live document revision pushed by the Studio over the bridge. */
+  revision: Accessor<number | null>;
 }
 
 const OpenSceneContext = createContext<OpenSceneContextValue>();
@@ -97,8 +99,9 @@ export function OpenSceneProvider(props: OpenSceneProviderProps): JSX.Element {
   createEffect(() => onCleanup(subscribeClient(client, setSnapshot)));
   const store = createMemo(() => snapshot().runtimeStore ?? undefined);
   const handlers = createMemo(() => createRuntimeHandlers(props.app, store() ?? null));
+  const revision = createMemo(() => snapshot().revision ?? null);
   return (
-    <OpenSceneContext.Provider value={{ client, app: props.app, snapshot }}>
+    <OpenSceneContext.Provider value={{ client, app: props.app, snapshot, revision }}>
       <JSONUIProvider
         registry={props.app.registry as ComponentRegistry}
         store={store()}
@@ -169,6 +172,9 @@ function prepareSpec(document: SceneDocument, app: OpenSceneSolidApp): PreparedS
     if (slots) delete (element as { slots?: unknown }).slots;
     cleanElements[nodeId] = {
       ...element,
+      // Normalize: json-render requires an explicit children array on every
+      // element, while the protocol schema allows omitting it for leaves.
+      children: sourceElement.children ?? [],
       props: { ...(sourceElement.props as Record<string, unknown>) },
     };
   }
@@ -223,6 +229,10 @@ export function OpenSceneRenderer(): JSX.Element {
     }
   });
   const statusError = createMemo(() => (snapshot().status === "error" ? snapshot().error : null));
+  // Solid has no keyed reconciliation, so every document push swaps between
+  // two Renderer mounts (even/odd revision) to force a fresh render of the
+  // latest JSON. json-render builds its element tree once on mount.
+  const renderSlot = createMemo(() => ((snapshot().revision ?? 0) % 2 === 0 ? 0 : 1));
   return (
     <Show when={snapshot().status !== "loading"} fallback={<div data-open-scene-loading="true" />}>
       <Show
@@ -233,7 +243,12 @@ export function OpenSceneRenderer(): JSX.Element {
           {(spec) => (
             <SelectionCanvas>
               <ErrorBoundary fallback={(error) => <ErrorSurface error={error} />}>
-                <Renderer spec={spec()} registry={identityRegistry()} />
+                <Show when={renderSlot() === 0}>
+                  <Renderer spec={spec()} registry={identityRegistry()} />
+                </Show>
+                <Show when={renderSlot() === 1}>
+                  <Renderer spec={spec()} registry={identityRegistry()} />
+                </Show>
               </ErrorBoundary>
             </SelectionCanvas>
           )}

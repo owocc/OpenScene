@@ -38,14 +38,6 @@ type RootTranslation = {
      */
     done: string;
     /**
-     * 添​加
-     */
-    add: string;
-    /**
-     * 选​择​组​件​…
-     */
-    selectComponent: string;
-    /**
      * 搜​索​物​料​组​件​…
      */
     searchComponent: string;
@@ -127,10 +119,6 @@ type RootTranslation = {
        * 当​前​文​档​为​空​。​添​加​第​一​个​ ​A​p​p​ ​节​点​后​，​它​会​成​为​ ​r​o​o​t​。
        */
       emptyDoc: string;
-      /**
-       * 添​加​组​件
-       */
-      addComponent: string;
     };
     agents: {
       /**
@@ -556,14 +544,6 @@ export type TranslationFunctions = {
      */
     done: () => LocalizedString;
     /**
-     * 添加
-     */
-    add: () => LocalizedString;
-    /**
-     * 选择组件…
-     */
-    selectComponent: () => LocalizedString;
-    /**
      * 搜索物料组件…
      */
     searchComponent: () => LocalizedString;
@@ -644,10 +624,6 @@ export type TranslationFunctions = {
        * 当前文档为空。添加第一个 App 节点后，它会成为 root。
        */
       emptyDoc: () => LocalizedString;
-      /**
-       * 添加组件
-       */
-      addComponent: () => LocalizedString;
     };
     agents: {
       /**

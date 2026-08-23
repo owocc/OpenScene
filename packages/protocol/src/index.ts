@@ -43,4 +43,7 @@ export type {
   StudioWindowMessage,
 } from "./bridge.js";
 
+export { DraftRecordSchema } from "./draft-store.js";
+export type { DocumentDraftStore, DraftRecord } from "./draft-store.js";
+
 export type { DirectiveDefinition } from "@json-render/core";

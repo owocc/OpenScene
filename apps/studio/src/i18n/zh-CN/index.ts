@@ -7,8 +7,6 @@ const zh_CN: BaseTranslation = {
     redo: "重做",
     delete: "删除",
     done: "完成",
-    add: "添加",
-    selectComponent: "选择组件…",
     searchComponent: "搜索物料组件…",
     placeholder: "占位符",
   },
@@ -33,7 +31,6 @@ const zh_CN: BaseTranslation = {
       layers: "图层",
       nodeCount: "{count:number} 个节点",
       emptyDoc: "当前文档为空。添加第一个 App 节点后，它会成为 root。",
-      addComponent: "添加组件",
     },
     agents: {
       title: "App Material 契约",

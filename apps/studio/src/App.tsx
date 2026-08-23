@@ -16,6 +16,7 @@ import { defaultProps } from "@/core/meta";
 import { materialManifestToAdapterMeta } from "@/core/material-manifest";
 import { AdapterRegistry } from "@/core/registry";
 import { getElementLocation, isSlotNodeId, parseSlotNodeId } from "@/core/slot-tree";
+import { clearLocalDraft, readLocalDraft, writeLocalDraft } from "@/core/draft-storage";
 import {
   loadStudioBootstrap,
   type StudioBootstrap,
@@ -132,6 +133,32 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const [, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const localRevisionRef = useRef(revision);
   localRevisionRef.current = revision;
+  const sessionId = bootstrap.session.id;
+
+  // Local-first draft restore: prefer the IndexedDB draft for this session
+  // over the server snapshot, then enable write-through once resolved.
+  const writeThroughRef = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    void readLocalDraft(sessionId).then((local) => {
+      if (cancelled) return;
+      if (local) dispatch({ type: "document.replace", document: local.document });
+      writeThroughRef.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // Persist every edit locally (debounced) so reloads restore the latest
+  // state; the iframe is already kept in sync via DOCUMENT_SET on change.
+  useEffect(() => {
+    if (!writeThroughRef.current) return;
+    const timer = window.setTimeout(() => {
+      void writeLocalDraft(sessionId, revision, document);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [document, revision, sessionId]);
 
   const validationResult = useMemo(() => SceneDocumentSchema.safeParse(document), [document]);
   const validation = useMemo(
@@ -225,6 +252,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       }
       serverRevisionRef.current = result.data.revision;
       setSaveState("saved");
+      void clearLocalDraft(sessionId);
       showNotice(
         capturedRevision === localRevisionRef.current
           ? "Saved"
@@ -326,6 +354,9 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       type,
       name: meta.title,
       props: defaultProps(meta),
+      // json-render requires an explicit children array on every element;
+      // the protocol schema tolerates its absence, but the runtime rejects it.
+      children: [],
     };
     let target: { parentId: string; slotName?: string; index?: number } | undefined;
     if (document.spec.root) {
@@ -432,6 +463,9 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                 nodeIds: nodeId ? [nodeId] : [],
                 primaryNodeId: nodeId,
               })
+            }
+            onReorder={(elementId, parentId, index) =>
+              dispatch({ type: "node.reorder", elementId, parentId, index })
             }
             onSurfaceChange={(nextSurface) =>
               dispatch({ type: "surface.set", surface: nextSurface })

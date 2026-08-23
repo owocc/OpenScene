@@ -165,6 +165,21 @@ export function removeElementFromContainer(document: SceneDocument, elementId: s
   return { ...document, spec: { ...document.spec, elements } };
 }
 
+/**
+ * Moves an element from its current container into `target` (children or a
+ * named slot) at `index`, defaulting to the end. No-op when the element or
+ * target does not exist.
+ */
+export function moveElement(
+  document: SceneDocument,
+  elementId: string,
+  target: ChildContainer & { index?: number },
+): SceneDocument {
+  const without = removeElementFromContainer(document, elementId);
+  const inserted = insertElement(without, elementId, target);
+  return inserted === without ? document : inserted;
+}
+
 export function collectDescendants(document: SceneDocument, rootId: string) {
   const removed = new Set<string>();
   const visit = (id: string) => {

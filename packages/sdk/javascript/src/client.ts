@@ -64,7 +64,9 @@ export interface OpenSceneClient {
 const emptyState = (): OpenSceneClientState => ({
   status: "loading",
   document: null,
-  runtimeStore: null,
+  // Always provide a store so json-render's StateProvider stays controlled;
+  // switching from null to a real store (uncontrolled → controlled) is unsupported.
+  runtimeStore: createStateStore({}),
   interactionMode: "select",
   selectedElementIds: [],
   primaryElementId: null,

@@ -10,6 +10,7 @@ export type {
   OpenSceneStatus,
   SelectionReport,
 } from "./client.js";
+export { createIndexedDbDraftStore } from "./draft-store.js";
 export { defineAppManifest, defineComponentManifest } from "./manifest.js";
 export {
   directives,

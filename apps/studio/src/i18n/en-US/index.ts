@@ -7,8 +7,6 @@ const en_US: Translation = {
     redo: "Redo",
     delete: "Delete",
     done: "Done",
-    add: "Add",
-    selectComponent: "Select component…",
     searchComponent: "Search components…",
     placeholder: "Placeholder",
   },
@@ -33,7 +31,6 @@ const en_US: Translation = {
       layers: "Layers",
       nodeCount: "{count} nodes",
       emptyDoc: "Current document is empty. Add the first App node to make it root.",
-      addComponent: "Add Component",
     },
     agents: {
       title: "App Material Contract",

@@ -5,6 +5,7 @@ import {
   getElementLocation,
   insertElement,
   isSlotNodeId,
+  moveElement,
 } from "./slot-tree";
 
 export type EditorElement = UIElement & { name?: string };
@@ -42,6 +43,7 @@ export type EditorAction =
       element: EditorElement;
       target?: Parameters<typeof insertElement>[2];
     }
+  | { type: "node.reorder"; elementId: string; parentId: string; index?: number }
   | { type: "node.delete"; elementId: string }
   | { type: "nodes.select"; nodeIds: string[]; primaryNodeId: string | null }
   | { type: "document.replace"; document: SceneDocument }
@@ -124,13 +126,23 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         },
       });
     case "node.add": {
-      const elements = { ...state.document.spec.elements, [action.elementId]: action.element };
+      // json-render requires an explicit children array on every element;
+      // default it here so no insertion path can produce a malformed node.
+      const element = { children: [], ...action.element };
+      const elements = { ...state.document.spec.elements, [action.elementId]: element };
       const next = insertElement(
         { ...state.document, spec: { ...state.document.spec, elements } },
         action.elementId,
         action.target,
       );
       return commit(state, next, selectedForDocument(next, [action.elementId], action.elementId));
+    }
+    case "node.reorder": {
+      const next = moveElement(state.document, action.elementId, {
+        parentId: action.parentId,
+        index: action.index,
+      });
+      return commit(state, next);
     }
     case "node.delete": {
       if (isSlotNodeId(action.elementId) || !state.document.spec.elements[action.elementId])

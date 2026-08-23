@@ -1,14 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Component, CornerDownRight, FileText, SquareDashed } from "lucide-react";
-import { hotkeysCoreFeature, syncDataLoaderFeature } from "@headless-tree/core";
+import {
+  dragAndDropFeature,
+  hotkeysCoreFeature,
+  syncDataLoaderFeature,
+  type DragTarget,
+  type ItemInstance,
+} from "@headless-tree/core";
 import { useTree } from "@headless-tree/react";
 
-import { Button } from "@/components/ui/button";
-import { Tree, TreeItem, TreeItemLabel } from "@/components/reui/tree";
+import { Tree, TreeDragLine, TreeItem, TreeItemLabel } from "@/components/reui/tree";
 import { useI18n } from "@/i18n";
 import type { SceneDocument } from "@openscene/protocol";
 import type { AdapterRegistry } from "@/core/registry";
-import type { ComponentMeta } from "@/core/meta";
 import { buildPageTreeItems, type SidebarTreeItem } from "@/core/slot-tree";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +21,9 @@ interface PagesPanelProps {
   document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
-  components: ComponentMeta[];
-  onAddComponent: (type: string) => void;
   onSelectNode: (nodeId: string | null) => void;
+  /** Move `elementId` under `parentId` (children) at `index` (append when omitted). */
+  onReorder: (elementId: string, parentId: string, index?: number) => void;
 }
 
 function folderIds(items: Record<string, SidebarTreeItem> | null): string[] {
@@ -29,9 +33,22 @@ function folderIds(items: Record<string, SidebarTreeItem> | null): string[] {
     .map((item) => item.id);
 }
 
-/** Structural signature: remounts the tree only when the element set changes. */
+/**
+ * Structural signature: includes children order and slot contents so any
+ * reorder/move remounts the tree, while pure prop edits keep it mounted.
+ */
 function structureSignature(document: SceneDocument): string {
-  return `${document.spec.root}|${Object.keys(document.spec.elements).sort().join(",")}`;
+  const entries = Object.entries(document.spec.elements)
+    .map(([id, element]) => {
+      const children = (element.children ?? []).join(",");
+      const slots = Object.entries(element.slots ?? {})
+        .map(([name, ids]) => `${name}:${ids.join(",")}`)
+        .join("|");
+      return `${id}->${children}${slots ? `[${slots}]` : ""}`;
+    })
+    .sort()
+    .join(";");
+  return `${document.spec.root}|${entries}`;
 }
 
 /**
@@ -47,11 +64,13 @@ function DocumentTree({
   registry,
   selectedId,
   onSelectNode,
+  onReorder,
 }: {
   document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
   onSelectNode: (nodeId: string | null) => void;
+  onReorder: (elementId: string, parentId: string, index?: number) => void;
 }) {
   const treeData = useMemo(
     () => buildPageTreeItems(document, (type) => registry.getComponent(type)),
@@ -85,7 +104,21 @@ function DocumentTree({
     initialState: {
       expandedItems: [VIRTUAL_ROOT, ...folderIds(treeData)],
     },
-    features: [syncDataLoaderFeature, hotkeysCoreFeature],
+    features: [syncDataLoaderFeature, hotkeysCoreFeature, dragAndDropFeature],
+    // Allow dropping into any element (not just folders): the middle zone of a
+    // row makes it a child (appended), the top/bottom zones reorder siblings.
+    canDrop: () => true,
+    onDrop: (items: ItemInstance<SidebarTreeItem>[], target: DragTarget<SidebarTreeItem>) => {
+      const dragged = items[0];
+      if (!dragged || dragged.getId() === VIRTUAL_ROOT) return;
+      // `target.item` is the new parent; `insertionIndex` positions the item
+      // within that parent's children (defaults to append when dropped on the
+      // item itself).
+      const parentId = target.item.getId();
+      if (parentId === VIRTUAL_ROOT) return;
+      const index = "childIndex" in target ? target.insertionIndex : undefined;
+      onReorder(dragged.getId(), parentId, index);
+    },
   });
 
   return (
@@ -131,6 +164,7 @@ function DocumentTree({
           </TreeItem>
         );
       })}
+      <TreeDragLine />
     </Tree>
   );
 }
@@ -140,12 +174,10 @@ export function PagesPanel({
   document,
   registry,
   selectedId,
-  components,
-  onAddComponent,
   onSelectNode,
+  onReorder,
 }: PagesPanelProps) {
   const { LL } = useI18n();
-  const [addType, setAddType] = useState("");
   const nodeCount = Object.keys(document.spec.elements).length;
 
   const hasRoot = document.spec.root != null && document.spec.root in document.spec.elements;
@@ -182,45 +214,13 @@ export function PagesPanel({
             registry={registry}
             selectedId={selectedId}
             onSelectNode={onSelectNode}
+            onReorder={onReorder}
           />
         ) : (
           <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">
             {LL.panels.pages.emptyDoc()}
           </div>
         )}
-      </div>
-
-      {/* Quick Add Node Bar */}
-      <div className="mt-4 border-t border-border/80 pt-3">
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {LL.panels.pages.addComponent()}
-        </div>
-        <div className="mt-2 flex gap-1.5">
-          <select
-            className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            value={addType}
-            onChange={(event) => setAddType(event.target.value)}
-            aria-label={LL.panels.pages.addComponent()}
-          >
-            <option value="">{LL.common.selectComponent()}</option>
-            {components.map((component) => (
-              <option key={component.type} value={component.type}>
-                {component.title}
-              </option>
-            ))}
-          </select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              onAddComponent(addType);
-              setAddType("");
-            }}
-            disabled={!addType}
-          >
-            {LL.common.add()}
-          </Button>
-        </div>
       </div>
     </div>
   );

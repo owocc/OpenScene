@@ -123,6 +123,7 @@ export interface StudioSidebarProps {
   onPatchViewport?: (patch: Partial<ViewportState>) => void;
   onAddComponent: (type: string) => void;
   onSelectNode: (nodeId: string | null) => void;
+  onReorder: (elementId: string, parentId: string, index?: number) => void;
   onSurfaceChange: (surface: Surface) => void;
   onLocaleChange: (locale: string) => void;
   onUndo: () => void;

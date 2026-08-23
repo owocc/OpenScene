@@ -32,6 +32,7 @@ export function StudioSidebar({
   onPatchViewport,
   onAddComponent,
   onSelectNode,
+  onReorder,
   onSurfaceChange,
   onLocaleChange,
   onUndo,
@@ -233,9 +234,8 @@ export function StudioSidebar({
                     document={document}
                     registry={registry}
                     selectedId={selectedId}
-                    components={components}
-                    onAddComponent={onAddComponent}
                     onSelectNode={onSelectNode}
+                    onReorder={onReorder}
                   />
                 )}
 

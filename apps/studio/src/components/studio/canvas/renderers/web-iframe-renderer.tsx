@@ -36,10 +36,23 @@ export function WebIframeRenderer({
   const callbacksRef = useRef({ onSelectionChange, onError });
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
+  // Tracks the last revision pushed to the renderer so every document change
+  // is forwarded deterministically at render time (no effect scheduling).
+  const sentRevisionRef = useRef<number | null>(null);
   const editorUrl = useMemo(
     () => withEditorConnection(url, { studioOrigin: window.location.origin, sessionId }),
     [url, sessionId],
   );
+
+  if (connected && portRef.current && sentRevisionRef.current !== revision) {
+    sentRevisionRef.current = revision;
+    const message = createBridgeEnvelope(sessionIdRef.current, "DOCUMENT_SET", {
+      document,
+      revision,
+    });
+    const parsed = StudioPortMessageSchema.safeParse(message);
+    if (parsed.success) portRef.current.postMessage(parsed.data);
+  }
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -77,19 +90,10 @@ export function WebIframeRenderer({
     return () => {
       window.removeEventListener("message", receiveReady);
       portRef.current?.close();
+      portRef.current = null;
       setConnected(false);
     };
   }, [allowedOrigin, appType, sessionId]);
-
-  useEffect(() => {
-    if (!connected || !portRef.current) return;
-    const message = createBridgeEnvelope(sessionIdRef.current, "DOCUMENT_SET", {
-      document,
-      revision,
-    });
-    const parsed = StudioPortMessageSchema.safeParse(message);
-    if (parsed.success) portRef.current.postMessage(parsed.data);
-  }, [connected, document, revision]);
 
   useEffect(() => {
     if (!connected || !portRef.current) return;

@@ -78,6 +78,7 @@
         "@headless-tree/react": "^1.7.0",
         "@openscene/api-client": "workspace:*",
         "@openscene/constants": "workspace:*",
+        "@openscene/javascript": "workspace:*",
         "@openscene/protocol": "workspace:*",
         "@tailwindcss/vite": "^4",
         "class-variance-authority": "^0.7.1",
