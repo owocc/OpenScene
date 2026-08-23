@@ -24,6 +24,8 @@ export interface CanvasRendererProps {
   selectedNodeIds: string[];
   primaryNodeId: string | null;
   interactionMode: PreviewInteractionMode;
+  /** Canvas device size; changes (device preset switch) re-request geometry. */
+  viewportSize?: { width: number; height: number };
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onHoverElement?: (nodeId: string | null) => void;
   onError?: (message: string) => void;

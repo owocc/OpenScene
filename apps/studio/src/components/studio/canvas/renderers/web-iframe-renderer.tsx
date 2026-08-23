@@ -25,6 +25,7 @@ export function WebIframeRenderer({
   revision,
   selectedNodeIds,
   interactionMode,
+  viewportSize,
   onSelectionChange,
   onHoverElement,
   onError,
@@ -130,7 +131,27 @@ export function WebIframeRenderer({
       const valid = StudioPortMessageSchema.safeParse(request);
       if (valid.success) portRef.current.postMessage(valid.data);
     }
-  }, [connected, interactionMode, selectedNodeIds]);
+  }, [connected, interactionMode, selectedNodeIds, viewportSize?.width, viewportSize?.height]);
+
+  // Re-request geometry when the frame resizes (canvas size change re-lays out
+  // the iframe content, shifting element positions).
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || !connected || !portRef.current) return undefined;
+    const requestGeometry = () => {
+      setSelectionRects({});
+      for (const id of selectedNodeIds) {
+        const request = createBridgeEnvelope(sessionIdRef.current, "ELEMENT_GEOMETRY_REQUEST", {
+          elementId: id,
+        });
+        const valid = StudioPortMessageSchema.safeParse(request);
+        if (valid.success) portRef.current?.postMessage(valid.data);
+      }
+    };
+    const observer = new ResizeObserver(requestGeometry);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [connected, selectedNodeIds]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -189,7 +210,17 @@ export function WebIframeRenderer({
               width: `${rect.width}px`,
               height: `${rect.height}px`,
             }}
-          />
+          >
+            {/* Corner handles (Figma-style resize grips) */}
+            <span className="absolute -left-1 -top-1 size-2 border-2 border-sky-600 bg-white" />
+            <span className="absolute -right-1 -top-1 size-2 border-2 border-sky-600 bg-white" />
+            <span className="absolute -left-1 -bottom-1 size-2 border-2 border-sky-600 bg-white" />
+            <span className="absolute -right-1 -bottom-1 size-2 border-2 border-sky-600 bg-white" />
+            {/* Element name label above the frame */}
+            <span className="absolute left-0 -translate-y-full -mt-1.5 max-w-48 truncate rounded-sm bg-sky-600 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+              {document.spec.elements[id]?.type ?? id}
+            </span>
+          </div>
         ))}
       </div>
     </div>

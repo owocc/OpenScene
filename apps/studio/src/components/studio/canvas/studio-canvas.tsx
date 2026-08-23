@@ -70,6 +70,10 @@ export function StudioCanvas({
     selectedNodeIds,
     primaryNodeId,
     interactionMode: activeToolMode === "select" ? "select" : "preview",
+    viewportSize: {
+      width: viewport.currentDeviceWidth ?? 0,
+      height: viewport.currentDeviceHeight ?? 0,
+    },
     onSelectionChange,
     onHoverElement,
   };
