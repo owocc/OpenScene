@@ -116,6 +116,7 @@ export const RendererPortMessageSchema = z.discriminatedUnion("type", [
       source: z.enum(["click", "marquee"]),
     }),
   ),
+  envelope("ELEMENT_HOVER", z.object({ elementId: nonEmptyString.nullable() })),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
 ]);
 

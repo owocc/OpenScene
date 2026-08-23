@@ -105,6 +105,12 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
     setSelection(report.elementIds);
     context.client.reportSelection(report);
   };
+  const [hovered, setHovered] = createSignal<string | null>(null);
+  const updateHover = (elementId: string | null) => {
+    if (hovered() === elementId) return;
+    setHovered(elementId);
+    context.client.reportHover(elementId);
+  };
   const point = (event: PointerEvent): Point => {
     const rect = canvas?.getBoundingClientRect();
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
@@ -117,6 +123,9 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
     setDragged(false);
   };
   const pointerMove = (event: PointerEvent) => {
+    if (interactionMode() === "select") {
+      updateHover(nodeIdFromTarget(event.target));
+    }
     const active = drag();
     if (!active || !canvas) return;
     const current = point(event);
@@ -124,36 +133,49 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
       setDragged(true);
     setDrag({ start: active.start, current });
   };
+  const pointerLeave = () => {
+    updateHover(null);
+  };
+  // Hit-test by coordinates: pointer capture retargets pointer events to the
+  // canvas, so event.target is unusable here.
+  const nodeIdAt = (clientX: number, clientY: number): string | null => {
+    const element = document.elementFromPoint(clientX, clientY);
+    return nodeIdFromTarget(element);
+  };
   const pointerUp = (event: PointerEvent) => {
     const active = drag();
     if (!active || !canvas) return;
     const current = point(event);
     const wasDragged = dragged();
     setDrag(null);
-    if (!wasDragged) return;
-    const box: SelectionBox = {
-      x: Math.min(active.start.x, current.x),
-      y: Math.min(active.start.y, current.y),
-      width: Math.abs(current.x - active.start.x),
-      height: Math.abs(current.y - active.start.y),
-    };
-    const ids = orderedNodeIds(canvas, box);
-    emitSelection(normalizeReport(ids, ids[0] ?? null, "marquee"));
-  };
-  const click = (event: MouseEvent) => {
-    if (interactionMode() !== "select" || dragged()) return;
-    const id = nodeIdFromTarget(event.target);
+    if (wasDragged) {
+      const box: SelectionBox = {
+        x: Math.min(active.start.x, current.x),
+        y: Math.min(active.start.y, current.y),
+        width: Math.abs(current.x - active.start.x),
+        height: Math.abs(current.y - active.start.y),
+      };
+      const ids = orderedNodeIds(canvas, box);
+      emitSelection(normalizeReport(ids, ids[0] ?? null, "marquee"));
+      return;
+    }
+    // Click-select on pointerup instead of the synthetic click event, so
+    // element-level click handlers cannot swallow the selection.
+    if (interactionMode() !== "select") return;
+    const id = nodeIdAt(event.clientX, event.clientY);
     if (!id) {
       emitSelection({ elementIds: [], primaryElementId: null, source: "click" });
       return;
     }
-    const current = selection();
+    const currentSelection = selection();
     const additive = event.shiftKey || event.metaKey;
     if (!additive) {
       emitSelection({ elementIds: [id], primaryElementId: id, source: "click" });
       return;
     }
-    const next = current.includes(id) ? current.filter((value) => value !== id) : [...current, id];
+    const next = currentSelection.includes(id)
+      ? currentSelection.filter((value) => value !== id)
+      : [...currentSelection, id];
     emitSelection(normalizeReport(next, next.includes(id) ? id : (next[0] ?? null), "click"));
   };
   const overlayBox = () => {
@@ -177,7 +199,7 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
       onPointerDown={pointerDown}
       onPointerMove={pointerMove}
       onPointerUp={pointerUp}
-      onClick={click}
+      onPointerLeave={pointerLeave}
     >
       {props.children}
       <div
@@ -189,6 +211,27 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
           "z-index": "2147483647",
         }}
       >
+        <Show when={!dragged() && interactionMode() === "select" && hovered()} keyed>
+          {(id) => (
+            <Show when={canvas ? rectForNode(canvas, id, geometryRevision) : null}>
+              {(value) => (
+                <div
+                  data-open-scene-hover={id}
+                  style={{
+                    position: "absolute",
+                    left: `${value().x}px`,
+                    top: `${value().y}px`,
+                    width: `${value().width}px`,
+                    height: `${value().height}px`,
+                    border: "1px dashed rgba(13, 138, 255, 0.85)",
+                    background: "rgba(13, 138, 255, 0.06)",
+                    "pointer-events": "none",
+                  }}
+                />
+              )}
+            </Show>
+          )}
+        </Show>
         <For each={selection()}>
           {(id) => (
             <Show when={canvas ? rectForNode(canvas, id, geometryRevision) : null}>

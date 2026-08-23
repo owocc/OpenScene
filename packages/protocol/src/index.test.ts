@@ -124,6 +124,15 @@ describe("bridge v2 directional schemas", () => {
       ).success,
     ).toBe(true);
     expect(
+      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: "text-1" })).success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: null })).success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(bridge("ELEMENT_HOVER", { elementId: "" })).success,
+    ).toBe(false);
+    expect(
       RendererPortMessageSchema.safeParse(bridge("RENDERER_ERROR", { message: "render failed" }))
         .success,
     ).toBe(true);

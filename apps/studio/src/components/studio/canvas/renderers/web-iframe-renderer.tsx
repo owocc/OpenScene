@@ -25,6 +25,7 @@ export function WebIframeRenderer({
   selectedNodeIds,
   interactionMode,
   onSelectionChange,
+  onHoverElement,
   onError,
 }: CanvasRendererProps) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
@@ -33,7 +34,7 @@ export function WebIframeRenderer({
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  const callbacksRef = useRef({ onSelectionChange, onError });
+  const callbacksRef = useRef({ onSelectionChange, onHoverElement, onError });
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
   // Tracks the last revision pushed to the renderer so every document change
@@ -73,6 +74,8 @@ export function WebIframeRenderer({
             message.data.payload.elementIds,
             message.data.payload.primaryElementId,
           );
+        } else if (message.data.type === "ELEMENT_HOVER") {
+          callbacksRef.current.onHoverElement?.(message.data.payload.elementId);
         } else if (message.data.type === "RENDERER_ERROR") {
           callbacksRef.current.onError?.(message.data.payload.message);
         }

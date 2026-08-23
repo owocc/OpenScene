@@ -25,6 +25,7 @@ export interface CanvasRendererProps {
   primaryNodeId: string | null;
   interactionMode: PreviewInteractionMode;
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
+  onHoverElement?: (nodeId: string | null) => void;
   onError?: (message: string) => void;
 }
 
@@ -50,6 +51,7 @@ export interface StudioCanvasProps {
   onSurfaceChange: (surface: Surface) => void;
   onToolChange: (mode: ActiveToolMode) => void;
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
+  onHoverElement?: (nodeId: string | null) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onCopyJson?: () => void;

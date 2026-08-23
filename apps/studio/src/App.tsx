@@ -132,6 +132,9 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
+  // Element hovered in the preview iframe (select tool): highlights the
+  // matching tree row without changing the selection.
+  const [hoverNodeId, setHoverNodeId] = useState<string | null>(null);
   const serverRevisionRef = useRef(bootstrap.draft.revision);
   const savingRef = useRef(false);
   const [, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -433,6 +436,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           onSelectionChange={(nodeIds, primaryNodeId) =>
             dispatch({ type: "nodes.select", nodeIds, primaryNodeId })
           }
+          onHoverElement={setHoverNodeId}
           onUndo={undo}
           onRedo={redo}
           onCopyJson={() => void copyJson()}
@@ -448,6 +452,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             document={document}
             registry={registry}
             selectedId={selectedId}
+            hoverNodeId={hoverNodeId}
             surface={surface}
             revision={revision}
             valid={validation.valid}

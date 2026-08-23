@@ -46,6 +46,7 @@ export function StudioCanvas({
   onSurfaceChange,
   onToolChange,
   onSelectionChange,
+  onHoverElement,
   onUndo,
   onRedo,
   onCopyJson,
@@ -70,6 +71,7 @@ export function StudioCanvas({
     primaryNodeId,
     interactionMode: activeToolMode === "select" ? "select" : "preview",
     onSelectionChange,
+    onHoverElement,
   };
   const adapter = canvasRendererRegistry[bootstrap.app.type];
   const previewElement = adapter ? (

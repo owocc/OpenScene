@@ -57,6 +57,7 @@ export interface OpenSceneClient {
   loadPage(pageKey?: string): Promise<void>;
   reportRendered(): void;
   reportSelection(payload: SelectionReport): void;
+  reportHover(elementId: string | null): void;
   reportRendererError(error: unknown): void;
   destroy(): void;
 }
@@ -214,6 +215,15 @@ export class OpenSceneController implements OpenSceneClient {
     if (!parsed.success) return;
     this.setState({ selectedElementIds: elementIds, primaryElementId });
     this.sendPortMessage(parsed.data);
+  }
+
+  reportHover(elementId: string | null): void {
+    if (!this.editorConnection || !this.port) return;
+    const message = createBridgeEnvelope(this.editorConnection.sessionId, "ELEMENT_HOVER", {
+      elementId,
+    });
+    const parsed = RendererPortMessageSchema.safeParse(message);
+    if (parsed.success) this.sendPortMessage(parsed.data);
   }
 
   reportRendererError(error: unknown): void {

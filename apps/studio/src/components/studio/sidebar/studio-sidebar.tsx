@@ -18,6 +18,7 @@ export function StudioSidebar({
   document,
   registry,
   selectedId,
+  hoverNodeId,
   surface,
   revision,
   valid,
@@ -234,6 +235,7 @@ export function StudioSidebar({
                     document={document}
                     registry={registry}
                     selectedId={selectedId}
+                    hoverNodeId={hoverNodeId}
                     onSelectNode={onSelectNode}
                     onReorder={onReorder}
                   />

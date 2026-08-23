@@ -21,6 +21,7 @@ interface PagesPanelProps {
   document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
+  hoverNodeId?: string | null;
   onSelectNode: (nodeId: string | null) => void;
   /** Move `elementId` under `parentId` (children) at `index` (append when omitted). */
   onReorder: (elementId: string, parentId: string, index?: number) => void;
@@ -63,12 +64,14 @@ function DocumentTree({
   document,
   registry,
   selectedId,
+  hoverNodeId,
   onSelectNode,
   onReorder,
 }: {
   document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
+  hoverNodeId?: string | null;
   onSelectNode: (nodeId: string | null) => void;
   onReorder: (elementId: string, parentId: string, index?: number) => void;
 }) {
@@ -127,11 +130,13 @@ function DocumentTree({
         const data = item.getItemData();
         const isSlot = data.kind === "slot";
         const selected = !isSlot && selectedId === data.id;
+        const hovered = !isSlot && hoverNodeId != null && hoverNodeId === data.id;
         return (
           <TreeItem key={item.getId()} item={item}>
             <TreeItemLabel
               className={cn(
                 selected && "bg-accent text-accent-foreground",
+                hovered && !selected && "bg-accent/40",
                 isSlot && "text-muted-foreground",
               )}
               onClick={() => onSelectNode(data.id)}
@@ -174,6 +179,7 @@ export function PagesPanel({
   document,
   registry,
   selectedId,
+  hoverNodeId,
   onSelectNode,
   onReorder,
 }: PagesPanelProps) {
@@ -213,6 +219,7 @@ export function PagesPanel({
             document={document}
             registry={registry}
             selectedId={selectedId}
+            hoverNodeId={hoverNodeId}
             onSelectNode={onSelectNode}
             onReorder={onReorder}
           />
