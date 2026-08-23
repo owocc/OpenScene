@@ -139,7 +139,19 @@ export const RendererPortMessageSchema = z.discriminatedUnion("type", [
     "ELEMENT_HOVER",
     z.object({ elementId: nonEmptyString.nullable(), rect: ElementRectSchema.nullable() }),
   ),
-  envelope("ELEMENT_GEOMETRY", z.object({ elementId: nonEmptyString, rect: ElementRectSchema })),
+  envelope(
+    "ELEMENT_GEOMETRY",
+    z.object({
+      elementId: nonEmptyString,
+      rect: ElementRectSchema,
+      scrollLeft: z.number().nonnegative(),
+      scrollTop: z.number().nonnegative(),
+    }),
+  ),
+  envelope(
+    "FRAME_SCROLL",
+    z.object({ scrollLeft: z.number().nonnegative(), scrollTop: z.number().nonnegative() }),
+  ),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
 ]);
 

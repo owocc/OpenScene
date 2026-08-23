@@ -98,10 +98,16 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
   createEffect(() => {
     void context.snapshot().document;
     const invalidate = () => setGeometryRevision((value) => value + 1);
-    window.addEventListener("scroll", invalidate, true);
+    const onScroll = () => {
+      invalidate();
+      // Keep Studio's outlines aligned with the frame while it scrolls:
+      // report the absolute offset; Studio renders at content − scroll.
+      context.client.reportScroll(Math.max(0, window.scrollX), Math.max(0, window.scrollY));
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", invalidate);
     onCleanup(() => {
-      window.removeEventListener("scroll", invalidate, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", invalidate);
     });
   });

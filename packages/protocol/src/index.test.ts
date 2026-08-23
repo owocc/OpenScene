@@ -159,7 +159,14 @@ describe("bridge v2 directional schemas", () => {
         bridge("ELEMENT_GEOMETRY", {
           elementId: "text-1",
           rect: { left: 0, top: 0, width: 100, height: 50 },
+          scrollLeft: 0,
+          scrollTop: 0,
         }),
+      ).success,
+    ).toBe(true);
+    expect(
+      RendererPortMessageSchema.safeParse(
+        bridge("FRAME_SCROLL", { scrollLeft: 40, scrollTop: 120 }),
       ).success,
     ).toBe(true);
     expect(

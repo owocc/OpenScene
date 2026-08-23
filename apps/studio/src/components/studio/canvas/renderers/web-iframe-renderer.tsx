@@ -38,6 +38,11 @@ export function WebIframeRenderer({
   // drawn on a Studio-owned overlay so the iframe content stays untouched.
   const [hoverRect, setHoverRect] = useState<ElementRect | null>(null);
   const [selectionRects, setSelectionRects] = useState<Record<string, ElementRect>>({});
+  // Current scroll offset of the iframe document; outlines render at
+  // content coordinates minus this offset so they follow scrolling.
+  const [frameScroll, setFrameScroll] = useState({ left: 0, top: 0 });
+  const frameScrollRef = useRef(frameScroll);
+  frameScrollRef.current = frameScroll;
   // Component-card drag in progress: shows a transparent accept layer over
   // the frame so a drop lands here (same-origin) instead of the cross-origin
   // iframe content, which never surfaces drop events to the parent.
@@ -92,14 +97,41 @@ export function WebIframeRenderer({
           );
           setSelectionRects(message.data.payload.rects);
         } else if (message.data.type === "ELEMENT_HOVER") {
-          setHoverRect(message.data.payload.rect);
+          // Hover rect is viewport-relative; shift into content coordinates
+          // using the last known scroll so it tracks the frame.
+          const rect = message.data.payload.rect;
+          setHoverRect(
+            rect
+              ? {
+                  left: rect.left + frameScrollRef.current.left,
+                  top: rect.top + frameScrollRef.current.top,
+                  width: rect.width,
+                  height: rect.height,
+                }
+              : null,
+          );
           callbacksRef.current.onHoverElement?.(message.data.payload.elementId);
         } else if (message.data.type === "ELEMENT_GEOMETRY") {
-          const { elementId, rect } = message.data.payload as {
+          const { elementId, rect, scrollLeft, scrollTop } = message.data.payload as {
             elementId: string;
             rect: ElementRect;
+            scrollLeft: number;
+            scrollTop: number;
           };
-          setSelectionRects((prev) => ({ ...prev, [elementId]: rect }));
+          // Translate viewport rect into content coordinates so the outline
+          // stays glued to the element as the frame scrolls.
+          const content: ElementRect = {
+            left: rect.left + scrollLeft,
+            top: rect.top + scrollTop,
+            width: rect.width,
+            height: rect.height,
+          };
+          setSelectionRects((prev) => ({ ...prev, [elementId]: content }));
+        } else if (message.data.type === "FRAME_SCROLL") {
+          setFrameScroll({
+            left: message.data.payload.scrollLeft,
+            top: message.data.payload.scrollTop,
+          });
         } else if (message.data.type === "RENDERER_ERROR") {
           callbacksRef.current.onError?.(message.data.payload.message);
         }
@@ -218,8 +250,8 @@ export function WebIframeRenderer({
             data-open-scene-hover="true"
             className="absolute border border-dashed border-sky-500/90 bg-sky-500/5"
             style={{
-              left: `${hoverRect.left}px`,
-              top: `${hoverRect.top}px`,
+              left: `${hoverRect.left - frameScroll.left}px`,
+              top: `${hoverRect.top - frameScroll.top}px`,
               width: `${hoverRect.width}px`,
               height: `${hoverRect.height}px`,
             }}
@@ -232,8 +264,8 @@ export function WebIframeRenderer({
             data-open-scene-outline={id}
             className="absolute border-2 border-sky-600"
             style={{
-              left: `${rect.left}px`,
-              top: `${rect.top}px`,
+              left: `${rect.left - frameScroll.left}px`,
+              top: `${rect.top - frameScroll.top}px`,
               width: `${rect.width}px`,
               height: `${rect.height}px`,
             }}

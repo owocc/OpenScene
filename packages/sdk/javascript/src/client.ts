@@ -61,6 +61,8 @@ export interface OpenSceneClient {
   reportRendered(): void;
   reportSelection(payload: SelectionReport): void;
   reportHover(elementId: string | null, rect?: ElementRect | null): void;
+  /** The frame scrolled; Studio shifts outlines by the delta. */
+  reportScroll(scrollLeft: number, scrollTop: number): void;
   reportRendererError(error: unknown): void;
   destroy(): void;
   /**
@@ -243,6 +245,16 @@ export class OpenSceneController implements OpenSceneClient {
     if (parsed.success) this.sendPortMessage(parsed.data);
   }
 
+  reportScroll(scrollLeft: number, scrollTop: number): void {
+    if (!this.editorConnection || !this.port) return;
+    const message = createBridgeEnvelope(this.editorConnection.sessionId, "FRAME_SCROLL", {
+      scrollLeft,
+      scrollTop,
+    });
+    const parsed = RendererPortMessageSchema.safeParse(message);
+    if (parsed.success) this.sendPortMessage(parsed.data);
+  }
+
   reportFrameComponentDrop(): void {
     if (!this.editorConnection || !this.port) return;
     const message = createBridgeEnvelope(
@@ -331,6 +343,8 @@ export class OpenSceneController implements OpenSceneClient {
       const reply = createBridgeEnvelope(this.editorConnection.sessionId, "ELEMENT_GEOMETRY", {
         elementId: message.payload.elementId,
         rect,
+        scrollLeft: Math.max(0, this.targetWindow?.scrollX ?? 0),
+        scrollTop: Math.max(0, this.targetWindow?.scrollY ?? 0),
       });
       const parsed = RendererPortMessageSchema.safeParse(reply);
       if (parsed.success) this.sendPortMessage(parsed.data);
