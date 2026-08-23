@@ -28,6 +28,7 @@ export interface StudioViewSettings {
   rotated?: boolean;
   panel?: SidebarTab | null;
   sidebarCollapsed?: boolean;
+  sidebarWidth?: number;
   propsCollapsed?: boolean;
   showBackgroundPattern?: boolean;
   backgroundTexture?: BackgroundTexture;

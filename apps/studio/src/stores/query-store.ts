@@ -30,6 +30,7 @@ export interface StudioQueryParams {
   rotated: boolean;
   panel: SidebarTab | null;
   sidebarCollapsed: boolean;
+  sidebarWidth: number | null;
   propsCollapsed: boolean;
 }
 
@@ -59,6 +60,7 @@ export interface QueryStoreState extends StudioQueryParams {
   setRotated: (rotated: boolean) => void;
   setPanel: (panel: SidebarTab | null) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarWidth: (width: number) => void;
   setPropsCollapsed: (collapsed: boolean) => void;
   resetViewportParams: () => void;
 }
@@ -81,6 +83,7 @@ export const DEFAULT_QUERY_PARAMS: StudioQueryParams = {
   rotated: false,
   panel: "pages",
   sidebarCollapsed: false,
+  sidebarWidth: null,
   propsCollapsed: false,
 };
 
@@ -167,6 +170,7 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
     rotated,
     panel,
     sidebarCollapsed,
+    sidebarWidth: null,
     propsCollapsed,
   };
 }
@@ -189,8 +193,8 @@ export function formatQueryParams(params: StudioQueryParams): { search: string; 
   // Locale
   if (params.locale) searchParams.set("locale", params.locale);
 
-  // Note: tool / zoom / panX / panY are session view state and are NOT
-  // written to the URL — they persist per session in local storage.
+  // Note: tool / zoom / panX / panY / sidebarWidth are session view state
+  // and are NOT written to the URL — they persist per app in local storage.
 
   if (params.rotated) searchParams.set("rotated", "true");
 
@@ -291,6 +295,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
         panel: patch.panel !== undefined ? patch.panel : current.panel,
         sidebarCollapsed:
           patch.sidebarCollapsed !== undefined ? patch.sidebarCollapsed : current.sidebarCollapsed,
+        sidebarWidth: patch.sidebarWidth !== undefined ? patch.sidebarWidth : current.sidebarWidth,
         propsCollapsed:
           patch.propsCollapsed !== undefined ? patch.propsCollapsed : current.propsCollapsed,
       };
@@ -316,6 +321,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
           rotated: updated.rotated,
           panel: updated.panel,
           sidebarCollapsed: updated.sidebarCollapsed,
+          sidebarWidth: updated.sidebarWidth ?? undefined,
           propsCollapsed: updated.propsCollapsed,
         });
       }
@@ -393,6 +399,9 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
     setSidebarCollapsed: (sidebarCollapsed) => {
       get().setQuery({ sidebarCollapsed }, { push: false });
+    },
+    setSidebarWidth: (sidebarWidth) => {
+      get().setQuery({ sidebarWidth }, { push: false });
     },
 
     setPropsCollapsed: (propsCollapsed) => {
