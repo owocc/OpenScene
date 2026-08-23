@@ -86,7 +86,7 @@ function normalizeReport(
 export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
   const context = useOpenScene();
   let canvas!: HTMLDivElement;
-  const [selection, setSelection] = createSignal<string[]>([]);
+  const [, setSelection] = createSignal<string[]>([]);
   const [drag, setDrag] = createSignal<{ start: Point; current: Point } | null>(null);
   const [dragged, setDragged] = createSignal(false);
 
@@ -193,27 +193,19 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
         height: Math.abs(current.y - active.start.y),
       };
       const ids = orderedNodeIds(canvas, box);
-      emitSelection(normalizeReport(ids, ids[0] ?? null, "marquee"));
+      emitSelection(normalizeReport([ids[0] ?? ""].filter(Boolean), ids[0] ?? null, "marquee"));
       return;
     }
     // Click-select on pointerup instead of the synthetic click event, so
-    // element-level click handlers cannot swallow the selection.
+    // element-level click handlers cannot swallow the selection. Studio is
+    // single-selection, so a click always picks exactly one element.
     if (interactionMode() !== "select") return;
     const id = nodeIdAt(event.clientX, event.clientY);
     if (!id) {
       emitSelection({ elementIds: [], primaryElementId: null, source: "click" });
       return;
     }
-    const currentSelection = selection();
-    const additive = event.shiftKey || event.metaKey;
-    if (!additive) {
-      emitSelection({ elementIds: [id], primaryElementId: id, source: "click" });
-      return;
-    }
-    const next = currentSelection.includes(id)
-      ? currentSelection.filter((value) => value !== id)
-      : [...currentSelection, id];
-    emitSelection(normalizeReport(next, next.includes(id) ? id : (next[0] ?? null), "click"));
+    emitSelection({ elementIds: [id], primaryElementId: id, source: "click" });
   };
   const overlayBox = () => {
     const active = drag();

@@ -7,6 +7,7 @@ import {
   type DragTarget,
   type ItemInstance,
 } from "@headless-tree/core";
+import { COMPONENT_DRAG_MIME } from "@openscene/constants";
 import { useTree } from "@headless-tree/react";
 
 import { Tree, TreeDragLine, TreeItem, TreeItemLabel } from "@/components/reui/tree";
@@ -25,6 +26,8 @@ interface PagesPanelProps {
   onSelectNode: (nodeId: string | null) => void;
   /** Move `elementId` under `parentId` (children) at `index` (append when omitted). */
   onReorder: (elementId: string, parentId: string, index?: number) => void;
+  /** Insert a new component; optional drop target from tree drag-and-drop. */
+  onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
 }
 
 function folderIds(items: Record<string, SidebarTreeItem> | null): string[] {
@@ -67,6 +70,7 @@ function DocumentTree({
   hoverNodeId,
   onSelectNode,
   onReorder,
+  onAddComponent,
 }: {
   document: SceneDocument;
   registry: AdapterRegistry;
@@ -74,6 +78,7 @@ function DocumentTree({
   hoverNodeId?: string | null;
   onSelectNode: (nodeId: string | null) => void;
   onReorder: (elementId: string, parentId: string, index?: number) => void;
+  onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
 }) {
   const treeData = useMemo(
     () => buildPageTreeItems(document, (type) => registry.getComponent(type)),
@@ -111,6 +116,19 @@ function DocumentTree({
     // Allow dropping into any element (not just folders): the middle zone of a
     // row makes it a child (appended), the top/bottom zones reorder siblings.
     canDrop: () => true,
+    // Accept component cards dragged from the Actions panel: drop creates the
+    // node under the target item (appended, or positioned by insertionIndex).
+    canDropForeignDragObject: (dataTransfer) => dataTransfer.types.includes(COMPONENT_DRAG_MIME),
+    onDropForeignDragObject: (dataTransfer, target) => {
+      const type =
+        dataTransfer.getData(COMPONENT_DRAG_MIME) ??
+        (window as unknown as Record<string, string | null>).__opensceneDraggingComponent;
+      if (!type) return;
+      const parentId = target.item.getId();
+      if (parentId === VIRTUAL_ROOT) return;
+      const index = "childIndex" in target ? target.insertionIndex : undefined;
+      onAddComponent(type, { parentId, index });
+    },
     onDrop: (items: ItemInstance<SidebarTreeItem>[], target: DragTarget<SidebarTreeItem>) => {
       const dragged = items[0];
       if (!dragged || dragged.getId() === VIRTUAL_ROOT) return;
@@ -182,6 +200,7 @@ export function PagesPanel({
   hoverNodeId,
   onSelectNode,
   onReorder,
+  onAddComponent,
 }: PagesPanelProps) {
   const { LL } = useI18n();
   const nodeCount = Object.keys(document.spec.elements).length;
@@ -222,6 +241,7 @@ export function PagesPanel({
             hoverNodeId={hoverNodeId}
             onSelectNode={onSelectNode}
             onReorder={onReorder}
+            onAddComponent={onAddComponent}
           />
         ) : (
           <div className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground">

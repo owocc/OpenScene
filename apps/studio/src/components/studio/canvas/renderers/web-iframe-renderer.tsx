@@ -28,6 +28,7 @@ export function WebIframeRenderer({
   viewportSize,
   onSelectionChange,
   onHoverElement,
+  onFrameDrop,
   onError,
 }: CanvasRendererProps) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
@@ -37,10 +38,19 @@ export function WebIframeRenderer({
   // drawn on a Studio-owned overlay so the iframe content stays untouched.
   const [hoverRect, setHoverRect] = useState<ElementRect | null>(null);
   const [selectionRects, setSelectionRects] = useState<Record<string, ElementRect>>({});
+  // Component-card drag in progress: shows a transparent accept layer over
+  // the frame so a drop lands here (same-origin) instead of the cross-origin
+  // iframe content, which never surfaces drop events to the parent.
+  const [acceptingDrop, setAcceptingDrop] = useState(false);
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  const callbacksRef = useRef({ onSelectionChange, onHoverElement, onError });
+  const callbacksRef = useRef({ onSelectionChange, onHoverElement, onFrameDrop, onError });
+  // Keep the ref pointing at the latest props: the initial capture would
+  // otherwise freeze stale closures (e.g. addComponent over an old document).
+  useEffect(() => {
+    callbacksRef.current = { onSelectionChange, onHoverElement, onFrameDrop, onError };
+  }, [onSelectionChange, onHoverElement, onFrameDrop, onError]);
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
   // Tracks the last revision pushed to the renderer so every document change
@@ -111,6 +121,23 @@ export function WebIframeRenderer({
       setConnected(false);
     };
   }, [allowedOrigin, appType, sessionId]);
+
+  useEffect(() => {
+    const showDropLayer = () => {
+      const pending = (window as unknown as Record<string, string | null>)
+        .__opensceneDraggingComponent;
+      if (pending) setAcceptingDrop(true);
+    };
+    const hideDropLayer = () => setAcceptingDrop(false);
+    window.document.addEventListener("dragstart", showDropLayer);
+    window.document.addEventListener("dragend", hideDropLayer);
+    window.document.addEventListener("drop", hideDropLayer);
+    return () => {
+      window.document.removeEventListener("dragstart", showDropLayer);
+      window.document.removeEventListener("dragend", hideDropLayer);
+      window.document.removeEventListener("drop", hideDropLayer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!connected || !portRef.current) return;
@@ -223,6 +250,22 @@ export function WebIframeRenderer({
           </div>
         ))}
       </div>
+      {/* Component-card drop accept layer: covers the frame only while a
+          component drag is active, so drops land here instead of the
+          cross-origin iframe. Placement lives in Studio (current selection). */}
+      {acceptingDrop && (
+        <div
+          id="openscene-drop-layer"
+          data-open-scene-drop-layer="true"
+          className="absolute inset-0 z-40"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            setAcceptingDrop(false);
+            onFrameDrop?.();
+          }}
+        />
+      )}
     </div>
   );
 }

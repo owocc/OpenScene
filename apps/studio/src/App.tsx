@@ -353,7 +353,10 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     });
   };
 
-  const addComponent = (type: string) => {
+  const addComponent = (
+    type: string,
+    dropTarget?: { parentId: string; index?: number; slotName?: string },
+  ) => {
     const meta = registry.getComponent(type);
     if (!meta) return;
     const id = nextElementId(document, type);
@@ -365,8 +368,8 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       // the protocol schema tolerates its absence, but the runtime rejects it.
       children: [],
     };
-    let target: { parentId: string; slotName?: string; index?: number } | undefined;
-    if (document.spec.root) {
+    let target = dropTarget;
+    if (!target && document.spec.root) {
       const slot = parseSlotNodeId(selectedId);
       if (slot) target = { parentId: slot.parentId, slotName: slot.slotName };
       else if (selectedElement && (!selectedMeta?.slots || selectedMeta.slots.default))
@@ -437,6 +440,15 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             dispatch({ type: "nodes.select", nodeIds, primaryNodeId })
           }
           onHoverElement={setHoverNodeId}
+          onFrameDrop={() => {
+            const pending = (window as unknown as Record<string, string | null>)
+              .__opensceneDraggingComponent;
+            if (!pending) return;
+            // Drop over the canvas lands on the currently selected element
+            // (single selection is enforced), falling back to the default
+            // target (root) when nothing is selected.
+            addComponent(pending, selectedId ? { parentId: selectedId } : undefined);
+          }}
           onUndo={undo}
           onRedo={redo}
           onCopyJson={() => void copyJson()}

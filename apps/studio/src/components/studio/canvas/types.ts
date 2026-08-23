@@ -28,6 +28,8 @@ export interface CanvasRendererProps {
   viewportSize?: { width: number; height: number };
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onHoverElement?: (nodeId: string | null) => void;
+  /** A component card was dropped anywhere over the preview frame. */
+  onFrameDrop?: () => void;
   onError?: (message: string) => void;
 }
 
@@ -54,6 +56,7 @@ export interface StudioCanvasProps {
   onToolChange: (mode: ActiveToolMode) => void;
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onHoverElement?: (nodeId: string | null) => void;
+  onFrameDrop?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onCopyJson?: () => void;

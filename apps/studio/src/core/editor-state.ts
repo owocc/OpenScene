@@ -151,11 +151,19 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       const next = deleteElementRecursive(state.document, action.elementId);
       return commit(state, next, selectedForDocument(next, parent ? [parent] : [], parent ?? null));
     }
-    case "nodes.select":
+    case "nodes.select": {
+      // Studio selection is single: the primary node wins; when it is
+      // unknown, fall back to the first valid node id.
+      const primary = action.primaryNodeId ?? action.nodeIds[0] ?? null;
+      const single =
+        primary && primary in state.document.spec.elements
+          ? [primary]
+          : action.nodeIds.filter((id) => id in state.document.spec.elements).slice(0, 1);
       return {
         ...state,
-        ...selectedForDocument(state.document, action.nodeIds, action.primaryNodeId),
+        ...selectedForDocument(state.document, single, single[0] ?? null),
       };
+    }
     case "document.replace":
       return {
         ...state,

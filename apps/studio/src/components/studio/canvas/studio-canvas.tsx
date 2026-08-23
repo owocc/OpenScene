@@ -47,6 +47,7 @@ export function StudioCanvas({
   onToolChange,
   onSelectionChange,
   onHoverElement,
+  onFrameDrop,
   onUndo,
   onRedo,
   onCopyJson,
@@ -76,6 +77,7 @@ export function StudioCanvas({
     },
     onSelectionChange,
     onHoverElement,
+    onFrameDrop,
   };
   const adapter = canvasRendererRegistry[bootstrap.app.type];
   const previewElement = adapter ? (

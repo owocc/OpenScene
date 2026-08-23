@@ -238,6 +238,7 @@ export function StudioSidebar({
                     hoverNodeId={hoverNodeId}
                     onSelectNode={onSelectNode}
                     onReorder={onReorder}
+                    onAddComponent={onAddComponent}
                   />
                 )}
 

@@ -121,7 +121,7 @@ export interface StudioSidebarProps {
   futureLength: number;
   viewport?: ViewportState;
   onPatchViewport?: (patch: Partial<ViewportState>) => void;
-  onAddComponent: (type: string) => void;
+  onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
   onSelectNode: (nodeId: string | null) => void;
   hoverNodeId?: string | null;
   onReorder: (elementId: string, parentId: string, index?: number) => void;

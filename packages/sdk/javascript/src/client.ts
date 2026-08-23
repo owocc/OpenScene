@@ -243,6 +243,17 @@ export class OpenSceneController implements OpenSceneClient {
     if (parsed.success) this.sendPortMessage(parsed.data);
   }
 
+  reportFrameComponentDrop(): void {
+    if (!this.editorConnection || !this.port) return;
+    const message = createBridgeEnvelope(
+      this.editorConnection.sessionId,
+      "FRAME_COMPONENT_DROP",
+      {},
+    );
+    const parsed = RendererPortMessageSchema.safeParse(message);
+    if (parsed.success) this.sendPortMessage(parsed.data);
+  }
+
   reportRendererError(error: unknown): void {
     const message = errorMessage(error);
     if (this.editorConnection && this.port) {

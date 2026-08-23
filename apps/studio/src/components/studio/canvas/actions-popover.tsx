@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Zap } from "lucide-react";
 
+import { COMPONENT_DRAG_MIME } from "@openscene/constants";
 import { useI18n } from "@/i18n";
 import type { ComponentMeta } from "@/core/meta";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -116,11 +117,34 @@ export function ActionsPopover({ components, onAddComponent }: ActionsPopoverPro
                   {LL.toolbar.noComponents()}
                 </div>
               ) : (
-                <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto p-1">
+                <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto p-1">
                   {filteredComponents.map((component) => (
                     <button
                       key={component.type}
                       type="button"
+                      draggable
+                      ref={(element) => {
+                        // The popover renders in a portal; React's delegated
+                        // drag handlers miss events dispatched there, so bind
+                        // the data transfer natively on the element itself.
+                        if (element && !element.dataset.dragBound) {
+                          element.dataset.dragBound = "true";
+                          element.addEventListener("dragstart", (event) => {
+                            event.dataTransfer?.setData(COMPONENT_DRAG_MIME, component.type);
+                            if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+                            // Cross-origin iframes can't read the drag data,
+                            // so Studio also keeps the pending type globally.
+                            (
+                              window as unknown as Record<string, string | null>
+                            ).__opensceneDraggingComponent = component.type;
+                          });
+                          element.addEventListener("dragend", () => {
+                            (
+                              window as unknown as Record<string, string | null>
+                            ).__opensceneDraggingComponent = null;
+                          });
+                        }
+                      }}
                       className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card p-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none"
                       onClick={() => insertComponent(component.type)}
                     >

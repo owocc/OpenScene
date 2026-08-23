@@ -6,7 +6,7 @@ import { createEditorState, editorReducer } from "./editor-state";
 const emptyDocument = createEmptySceneDocument();
 
 describe("Studio editor state", () => {
-  it("normalizes multi-selection to known unique IDs and a valid primary", () => {
+  it("collapses multi-selection to a single valid node", () => {
     const state = createEditorState(
       {
         ...emptyDocument,
@@ -25,7 +25,7 @@ describe("Studio editor state", () => {
       nodeIds: ["button", "missing", "button", "root"],
       primaryNodeId: "missing",
     });
-    expect(next.selectedNodeIds).toEqual(["button", "root"]);
+    expect(next.selectedNodeIds).toEqual(["button"]);
     expect(next.selectedNodeId).toBe("button");
   });
 
