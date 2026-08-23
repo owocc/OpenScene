@@ -80,6 +80,10 @@ function MissingServerUrlScreen() {
 }
 
 function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
+  // Per-app view settings are keyed by the app id, which is only known after
+  // bootstrap; preferences are global. Applies them before the editor state
+  // is initialized so the first render already sees persisted values.
+  useQueryStore.getState().applyAppSettings(bootstrap.app.id);
   const adapterMeta = useMemo(
     () => materialManifestToAdapterMeta(bootstrap.manifest),
     [bootstrap.manifest],

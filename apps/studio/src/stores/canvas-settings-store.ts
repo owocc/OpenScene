@@ -1,6 +1,8 @@
 import { create } from "zustand";
 
-import { loadServerSettings, saveServerSettings } from "./settings-storage";
+import { saveAppViewSettings } from "./settings-storage";
+import { useQueryStore } from "./query-store";
+import type { StudioViewSettings } from "./settings-storage";
 
 /**
  * Canvas texture rendered behind the artboard when the pattern is shown.
@@ -17,26 +19,34 @@ interface CanvasSettingsState {
   backgroundTexture: BackgroundTexture;
   isSettingsOpen: boolean;
 
+  /** Applies persisted per-app view settings (called after bootstrap). */
+  applyPersisted: (view: StudioViewSettings) => void;
   setShowBackgroundPattern: (show: boolean) => void;
   setBackgroundTexture: (texture: BackgroundTexture) => void;
   openSettings: () => void;
   closeSettings: () => void;
 }
 
-const persisted = loadServerSettings();
-
 export const useCanvasSettingsStore = create<CanvasSettingsState>()((set) => ({
-  showBackgroundPattern: persisted.showBackgroundPattern ?? true,
-  backgroundTexture: persisted.backgroundTexture ?? "dots",
+  showBackgroundPattern: true,
+  backgroundTexture: "dots",
   isSettingsOpen: false,
+
+  applyPersisted: (view) =>
+    set({
+      showBackgroundPattern: view.showBackgroundPattern ?? true,
+      backgroundTexture: view.backgroundTexture ?? "dots",
+    }),
 
   setShowBackgroundPattern: (showBackgroundPattern) => {
     set({ showBackgroundPattern });
-    saveServerSettings({ showBackgroundPattern });
+    const appId = useQueryStore.getState().appId;
+    if (appId) saveAppViewSettings(appId, { showBackgroundPattern });
   },
   setBackgroundTexture: (backgroundTexture) => {
     set({ backgroundTexture });
-    saveServerSettings({ backgroundTexture });
+    const appId = useQueryStore.getState().appId;
+    if (appId) saveAppViewSettings(appId, { backgroundTexture });
   },
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),

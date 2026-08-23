@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
   DEFAULT_QUERY_PARAMS,
@@ -120,5 +120,73 @@ describe("useQueryStore state operations", () => {
 
     useQueryStore.getState().setPanel("variables");
     expect(useQueryStore.getState().panel).toBe("variables");
+  });
+});
+
+describe("applyAppSettings (bootstrap hydration)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubBrowser(seed: Record<string, string>) {
+    const store = new Map<string, string>(Object.entries(seed));
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => void store.set(key, value),
+        removeItem: (key: string) => void store.delete(key),
+        clear: () => store.clear(),
+        key: (index: number) => [...store.keys()][index] ?? null,
+        get length() {
+          return store.size;
+        },
+      },
+      location: { search: "", hash: "" },
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      history: { replaceState: () => undefined, pushState: () => undefined },
+    } as unknown as Window & typeof globalThis);
+  }
+
+  it("loads per-app view settings and global preferences after bootstrap", () => {
+    stubBrowser({
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets", zoom: 2 }),
+      "openscene:studio:preferences": JSON.stringify({ locale: "zh-CN" }),
+    });
+
+    useQueryStore.getState().applyAppSettings("app-1");
+    const state = useQueryStore.getState();
+    expect(state.appId).toBe("app-1");
+    expect(state.panel).toBe("assets");
+    expect(state.zoom).toBe(2);
+    expect(state.locale).toBe("zh-CN");
+  });
+
+  it("keys view state by app id so different apps stay isolated", () => {
+    stubBrowser({
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets" }),
+      "openscene:studio:view:app-2": JSON.stringify({ panel: "pages", rotated: true }),
+      "openscene:studio:preferences": JSON.stringify({ locale: "en-US" }),
+    });
+
+    useQueryStore.getState().applyAppSettings("app-2");
+    const state = useQueryStore.getState();
+    expect(state.appId).toBe("app-2");
+    expect(state.panel).toBe("pages");
+    expect(state.rotated).toBe(true);
+  });
+
+  it("keeps URL query parameters authoritative over persisted values", () => {
+    stubBrowser({
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets", zoom: 2 }),
+    });
+    const url = new URLSearchParams();
+    url.set("panel", "tools");
+    // Re-stub with an explicit URL param so the store sees it.
+    const params = window.location as unknown as { search: string; hash: string };
+    params.search = `?${url.toString()}`;
+
+    useQueryStore.getState().applyAppSettings("app-3");
+    expect(useQueryStore.getState().panel).toBe("tools");
   });
 });

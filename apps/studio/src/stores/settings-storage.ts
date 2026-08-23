@@ -3,12 +3,21 @@ import type { SidebarTab } from "@/components/studio/sidebar/types";
 import type { BackgroundTexture } from "./canvas-settings-store";
 
 /**
- * Persisted Studio UI settings, keyed per server (from the `server-url`
- * query parameter; "default" namespace when absent).
+ * User-level preferences shared across the whole application: never scoped
+ * per app, per server, or per session. Currently the editor language.
  */
-export interface StudioSettings {
-  surface?: Surface;
+export interface StudioPreferences {
   locale?: string;
+}
+
+/**
+ * Per-app view state: editor surface, canvas viewport, sidebar/panel layout,
+ * and canvas texture. Persisted per app id (known only after bootstrap), so
+ * editing different apps keeps independent workspaces while the same app
+ * restores its view across sessions.
+ */
+export interface StudioViewSettings {
+  surface?: Surface;
   tool?: ActiveToolMode;
   selectedDeviceId?: string;
   currentDeviceWidth?: number;
@@ -24,79 +33,63 @@ export interface StudioSettings {
   backgroundTexture?: BackgroundTexture;
 }
 
-const STORAGE_PREFIX = "openscene:studio:settings";
+const PREFERENCES_KEY = "openscene:studio:preferences";
+const VIEW_PREFIX = "openscene:studio:view";
 
-function shortHash(value: string): string {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+function viewKeyFor(appId: string): string {
+  return `${VIEW_PREFIX}:${appId}`;
+}
+
+function readJson<T>(key: string): T | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as T) : null;
+  } catch {
+    return null;
   }
-  return (hash >>> 0).toString(36);
 }
 
-/** Stable short namespace suffix for a server URL. */
-export function namespaceForServer(server: string | null | undefined): string {
-  if (!server) return "default";
-  return `server-${shortHash(server)}`;
+function writeJson(key: string, value: unknown): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage unavailable (private mode / quota): persistence is best-effort
+  }
 }
 
-/**
- * Settings namespace: server-scoped, further split per session so different
- * sessions (same server) keep separate caches. Falls back to the server
- * namespace when no session id is present.
- */
-export function settingsNamespaceFor(
-  server: string | null | undefined,
-  sessionId: string | null | undefined,
-): string {
-  const serverNs = namespaceForServer(server);
-  return sessionId ? `${serverNs}:session-${shortHash(sessionId)}` : serverNs;
+/** Global, app-wide preferences (language, …). */
+export function loadPreferences(): StudioPreferences {
+  if (typeof window === "undefined") return {};
+  return readJson<StudioPreferences>(PREFERENCES_KEY) ?? {};
 }
 
-/** Server-only namespace (theme scope, user-level preference). */
-export function getServerNamespace(): string {
-  if (typeof window === "undefined") return "default";
-  const params = new URLSearchParams(window.location.search);
-  return namespaceForServer(params.get("server-url") ?? params.get("serverUrl"));
+export function savePreferences(patch: StudioPreferences): void {
+  if (typeof window === "undefined") return;
+  writeJson(PREFERENCES_KEY, { ...loadPreferences(), ...patch });
 }
 
-/** Namespace of the current page: server + sessionId query parameters. */
-export function getSettingsNamespace(): string {
-  if (typeof window === "undefined") return "default";
-  const params = new URLSearchParams(window.location.search);
-  return settingsNamespaceFor(
-    params.get("server-url") ?? params.get("serverUrl"),
-    params.get("sessionId"),
-  );
+/** View state for a specific app, keyed by its app id. */
+export function loadAppViewSettings(appId: string): StudioViewSettings {
+  if (typeof window === "undefined") return {};
+  return readJson<StudioViewSettings>(viewKeyFor(appId)) ?? {};
 }
 
-function settingsKey(): string {
-  return `${STORAGE_PREFIX}:${getSettingsNamespace()}`;
+export function saveAppViewSettings(appId: string, patch: StudioViewSettings): void {
+  if (typeof window === "undefined") return;
+  writeJson(viewKeyFor(appId), { ...loadAppViewSettings(appId), ...patch });
 }
 
 /** Theme storage key scoped to the current server namespace. */
 export function getThemeStorageKey(): string {
-  return `${STORAGE_PREFIX}:theme:${getServerNamespace()}`;
-}
-
-export function loadServerSettings(): StudioSettings {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(settingsKey());
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as StudioSettings) : {};
-  } catch {
-    return {};
+  if (typeof window === "undefined") return "openscene:studio:settings:theme:default";
+  const params = new URLSearchParams(window.location.search);
+  const server = params.get("server-url") ?? params.get("serverUrl");
+  if (!server) return "openscene:studio:settings:theme:default";
+  let hash = 0;
+  for (let i = 0; i < server.length; i += 1) {
+    hash = (hash * 31 + server.charCodeAt(i)) | 0;
   }
-}
-
-export function saveServerSettings(patch: StudioSettings): void {
-  if (typeof window === "undefined") return;
-  try {
-    const next = { ...loadServerSettings(), ...patch };
-    window.localStorage.setItem(settingsKey(), JSON.stringify(next));
-  } catch {
-    // storage unavailable (private mode / quota): persistence is best-effort
-  }
+  return `openscene:studio:settings:theme:server-${(hash >>> 0).toString(36)}`;
 }

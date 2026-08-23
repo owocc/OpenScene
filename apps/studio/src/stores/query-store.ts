@@ -4,7 +4,13 @@ import type { ActiveToolMode, Surface } from "@/core/editor-state";
 import type { SidebarTab } from "@/components/studio/sidebar/types";
 
 const sidebarTabValues: SidebarTab[] = ["pages", "agents", "assets", "tools", "variables"];
-import { loadServerSettings, saveServerSettings } from "./settings-storage";
+import {
+  loadAppViewSettings,
+  loadPreferences,
+  saveAppViewSettings,
+  savePreferences,
+} from "./settings-storage";
+import { useCanvasSettingsStore } from "./canvas-settings-store";
 
 export interface StudioQueryParams {
   serverUrl: string | null;
@@ -28,9 +34,17 @@ export interface StudioQueryParams {
 }
 
 export interface QueryStoreState extends StudioQueryParams {
+  /** App id from bootstrap (null until the app data is fetched). View state
+   *  is persisted per app id; preferences are global and app-independent. */
+  appId: string | null;
+
   // Sync Actions
   syncFromUrl: () => void;
   setQuery: (patch: Partial<StudioQueryParams>, options?: { push?: boolean }) => void;
+
+  /** Loads persisted preferences + per-app view settings once the app id is
+   *  known (after bootstrap); URL query parameters still win when explicit. */
+  applyAppSettings: (appId: string) => void;
 
   // Granular Actions
   setServerUrl: (serverUrl: string | null) => void;
@@ -198,26 +212,16 @@ function parseQueryFromUrl(): StudioQueryParams {
 }
 
 /**
- * Initial params: per-server persisted settings as the base; launch
- * credentials always come from the URL; explicitly present URL params
- * override persisted values (absent params fall back to persistence).
+ * Initial params come straight from the URL: persisted preferences and
+ * per-app view settings are applied later by `applyAppSettings`, once the
+ * app id is known from bootstrap.
  */
 function initialQueryParams(): StudioQueryParams {
   const url = parseQueryFromUrl();
   if (typeof window === "undefined") return url;
-  const persisted = loadServerSettings();
-  const merged: StudioQueryParams = { ...DEFAULT_QUERY_PARAMS, ...persisted };
+  const merged: StudioQueryParams = { ...DEFAULT_QUERY_PARAMS, ...url };
   if (merged.panel === null || !sidebarTabValues.includes(merged.panel)) merged.panel = "pages";
-  merged.serverUrl = url.serverUrl;
-  merged.sessionId = url.sessionId;
-  merged.token = url.token;
-  merged.previewUrl = url.previewUrl;
-  const present = new Set(new URLSearchParams(window.location.search).keys());
-  const overrides: Record<string, unknown> = {};
-  for (const key of Object.keys(url)) {
-    if (present.has(key)) overrides[key] = url[key as keyof StudioQueryParams];
-  }
-  return { ...merged, ...(overrides as Partial<StudioQueryParams>) };
+  return merged;
 }
 
 function writeQueryToUrl(params: StudioQueryParams, push = false) {
@@ -252,6 +256,7 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
   return {
     ...initial,
+    appId: null,
 
     syncFromUrl: () => {
       const next = parseQueryFromUrl();
@@ -292,21 +297,55 @@ export const useQueryStore = create<QueryStoreState>()((set, get) => {
 
       set(updated);
       writeQueryToUrl(updated, options?.push ?? false);
-      saveServerSettings({
-        surface: updated.surface,
-        locale: updated.locale ?? undefined,
-        tool: updated.tool,
-        selectedDeviceId: updated.selectedDeviceId ?? undefined,
-        currentDeviceWidth: updated.currentDeviceWidth ?? undefined,
-        currentDeviceHeight: updated.currentDeviceHeight ?? undefined,
-        zoom: updated.zoom ?? undefined,
-        panX: updated.panX ?? undefined,
-        panY: updated.panY ?? undefined,
-        rotated: updated.rotated,
-        panel: updated.panel,
-        sidebarCollapsed: updated.sidebarCollapsed,
-        propsCollapsed: updated.propsCollapsed,
-      });
+      // Preferences are app-wide; view state persists per app id (known
+      // after bootstrap, so view writes are skipped until then).
+      if (patch.locale !== undefined) {
+        savePreferences({ locale: patch.locale ?? undefined });
+      }
+      const appId = get().appId;
+      if (appId) {
+        saveAppViewSettings(appId, {
+          surface: updated.surface,
+          tool: updated.tool,
+          selectedDeviceId: updated.selectedDeviceId ?? undefined,
+          currentDeviceWidth: updated.currentDeviceWidth ?? undefined,
+          currentDeviceHeight: updated.currentDeviceHeight ?? undefined,
+          zoom: updated.zoom ?? undefined,
+          panX: updated.panX ?? undefined,
+          panY: updated.panY ?? undefined,
+          rotated: updated.rotated,
+          panel: updated.panel,
+          sidebarCollapsed: updated.sidebarCollapsed,
+          propsCollapsed: updated.propsCollapsed,
+        });
+      }
+    },
+
+    applyAppSettings: (appId) => {
+      const state = get();
+      if (state.appId === appId) return;
+      const view = loadAppViewSettings(appId);
+      const prefs = loadPreferences();
+      const url = parseQueryFromUrl();
+      const present = new Set(new URLSearchParams(window.location.search).keys());
+      const merged: StudioQueryParams = {
+        ...DEFAULT_QUERY_PARAMS,
+        ...view,
+        locale: prefs.locale ?? null,
+        serverUrl: state.serverUrl,
+        sessionId: state.sessionId,
+        token: state.token,
+        previewUrl: state.previewUrl,
+      };
+      // Explicit URL params still win over persisted values.
+      const overrides: Record<string, unknown> = {};
+      for (const key of Object.keys(url)) {
+        if (present.has(key)) overrides[key] = url[key as keyof StudioQueryParams];
+      }
+      const next = { ...merged, ...(overrides as Partial<StudioQueryParams>), appId };
+      if (next.panel === null || !sidebarTabValues.includes(next.panel)) next.panel = "pages";
+      set(next);
+      useCanvasSettingsStore.getState().applyPersisted(view);
     },
 
     setServerUrl: (serverUrl) => {
