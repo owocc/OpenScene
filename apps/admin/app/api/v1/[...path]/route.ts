@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import {
+  assertAppContext,
   assertManagementCsrf,
   authenticate,
   clearUiSessionCookie,
@@ -16,6 +17,7 @@ import {
   completeAsset,
   createApp,
   createAppOpenApiDoc,
+  createAppPrompt,
   createCategory,
   createLocale,
   createPreviewProfile,
@@ -26,6 +28,7 @@ import {
   createVersion,
   deleteApp,
   deleteAppOpenApiDoc,
+  deleteAppPrompt,
   deleteAsset,
   deleteCategory,
   deleteLocale,
@@ -33,6 +36,7 @@ import {
   deleteResource,
   getApp,
   getAppOpenApiDoc,
+  getAppPrompt,
   getAsset,
   getCategory,
   getDocument,
@@ -45,6 +49,7 @@ import {
   getResource,
   getVersion,
   listAppOpenApiDocs,
+  listAppPrompts,
   listApps,
   listAssets,
   listCategories,
@@ -62,6 +67,7 @@ import {
   syncManifest,
   updateApp,
   updateAppOpenApiDoc,
+  updateAppPrompt,
   updateCategory,
   updateDraft,
   updateLocale,
@@ -69,12 +75,21 @@ import {
   updateResource,
   updateStudioDraft,
 } from "../../../../server/services";
-
-import { chatWithAi, getAiConfig, testAiConfig, upsertAiConfig } from "../../../../server/ai";
+import {
+  chatWithAi,
+  getAiConfig,
+  getSystemPrompt,
+  testAiConfig,
+  upsertAiConfig,
+  upsertSystemPrompt,
+} from "../../../../server/ai";
 import {
   AiChatRequestSchema,
   AiConfigUpdateSchema,
   AppManifestSchema,
+  AppPromptCreateSchema,
+  AppPromptPatchSchema,
+  SystemPromptUpdateSchema,
   UiSessionCreateSchema,
   UiSessionSchema,
 } from "../../../../server/validation/schemas";
@@ -220,6 +235,8 @@ async function handleRequest(
 
     if (path[2] === "preview-profiles") return await previewRoutes(request, db, method, path);
     if (path[2] === "app-keys") return await appKeyRoutes(db, method, path);
+    if (path[2] === "prompts" || path[2] === "prompt")
+      return await promptRoutes(request, db, method, path);
     if (path[2] === "manifest") return await manifestRoutes(request, db, method, path);
     if (path[2] === "openapi-docs") return await openApiDocRoutes(request, db, method, path);
     if (path[2] === "pages" || path[2] === "templates")
@@ -263,6 +280,33 @@ async function appKeyRoutes(
   if (path.length !== 4 || path[3] !== "rotate" || method !== "POST") throw notFound();
   return json(await rotateAppKey(db, path[1]));
 }
+async function promptRoutes(
+  request: NextRequest,
+  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
+  method: Method,
+  path: string[],
+): Promise<Response> {
+  const appId = path[1];
+  if (path.length === 3 && method === "GET") {
+    return json(await listAppPrompts(db, appId));
+  }
+  if (path.length === 3 && method === "POST") {
+    const input = await parseBody(request, AppPromptCreateSchema);
+    return json(await createAppPrompt(db, appId, input), 201);
+  }
+  if (path.length === 4 && method === "GET") {
+    return json(await getAppPrompt(db, appId, path[3]));
+  }
+  if (path.length === 4 && method === "PATCH") {
+    const input = await parseBody(request, AppPromptPatchSchema);
+    return json(await updateAppPrompt(db, appId, path[3], input));
+  }
+  if (path.length === 4 && method === "DELETE") {
+    await deleteAppPrompt(db, appId, path[3]);
+    return noContent();
+  }
+  throw notFound();
+}
 
 async function aiRoutes(
   request: NextRequest,
@@ -290,10 +334,24 @@ async function aiRoutes(
     }
     throw notFound();
   }
-  // Client consumption endpoint: every call must present a valid App Key to prevent abuse.
+  if (path[1] === "system-prompt") {
+    if (method === "GET") {
+      await authenticate(request, db, "management");
+      return json(await getSystemPrompt(db));
+    }
+    if (method === "PATCH") {
+      await authenticate(request, db, "management");
+      assertManagementCsrf(request, method);
+      const input = await parseBody(request, SystemPromptUpdateSchema);
+      return json(await upsertSystemPrompt(db, input));
+    }
+    throw notFound();
+  }
+  // Client consumption endpoint: every call must present a valid App Key and its app id.
   if (path[1] === "chat" && method === "POST") {
-    await authenticate(request, db, "app-key");
+    const authContext = await authenticate(request, db, "app-key");
     const input = await parseBody(request, AiChatRequestSchema);
+    assertAppContext(authContext, input.appId);
     return await chatWithAi(db, input);
   }
   throw notFound();

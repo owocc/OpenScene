@@ -44,6 +44,11 @@ import {
   AiConfigSchema,
   AiConfigStatusSchema,
   AiConfigUpdateSchema,
+  AppPromptCreateSchema,
+  AppPromptPatchSchema,
+  AppPromptSchema,
+  SystemPromptSchema,
+  SystemPromptUpdateSchema,
   AiTestSchema,
 } from "../validation/schemas";
 
@@ -74,6 +79,11 @@ const schemas = [
   ["AiChatRequest", AiChatRequestSchema],
   ["AiChatResponse", AiChatResponseSchema],
   ["AiConfigStatus", AiConfigStatusSchema],
+  ["AppPrompt", AppPromptSchema],
+  ["AppPromptCreate", AppPromptCreateSchema],
+  ["AppPromptPatch", AppPromptPatchSchema],
+  ["SystemPrompt", SystemPromptSchema],
+  ["SystemPromptUpdate", SystemPromptUpdateSchema],
 ] as const;
 for (const [name, schema] of [...schemas].sort(([a], [b]) => a.localeCompare(b)))
   registry.register(name, schema);
@@ -506,7 +516,66 @@ const operations: Operation[] = [
     body: AiChatRequestSchema,
     headers: AppKeyHeaderSchema,
   },
-];
+  {
+    method: "get",
+    path: "/api/v1/apps/{appId}/prompts",
+    operationId: "listAppPrompts",
+    tag: "AI",
+    response: z.array(AppPromptSchema),
+    params: true,
+  },
+  {
+    method: "post",
+    path: "/api/v1/apps/{appId}/prompts",
+    operationId: "createAppPrompt",
+    tag: "AI",
+    response: AppPromptSchema,
+    body: AppPromptCreateSchema,
+    params: true,
+    status: 201,
+  },
+  {
+    method: "get",
+    path: "/api/v1/apps/{appId}/prompts/{promptId}",
+    operationId: "getAppPrompt",
+    tag: "AI",
+    response: AppPromptSchema,
+    params: true,
+  },
+  {
+    method: "patch",
+    path: "/api/v1/apps/{appId}/prompts/{promptId}",
+    operationId: "updateAppPrompt",
+    tag: "AI",
+    response: AppPromptSchema,
+    body: AppPromptPatchSchema,
+    params: true,
+  },
+  {
+    method: "delete",
+    path: "/api/v1/apps/{appId}/prompts/{promptId}",
+    operationId: "deleteAppPrompt",
+    tag: "AI",
+    response: z.void(),
+    params: true,
+    status: 204,
+  },
+  {
+    method: "get",
+    path: "/api/v1/ai/system-prompt",
+    operationId: "getSystemPrompt",
+    tag: "AI",
+    response: SystemPromptSchema,
+  },
+  {
+    method: "patch",
+    path: "/api/v1/ai/system-prompt",
+    operationId: "patchSystemPrompt",
+    tag: "AI",
+    response: SystemPromptSchema,
+    body: SystemPromptUpdateSchema,
+  },
+] as const;
 
 for (const operation of operations.sort((a, b) => a.operationId.localeCompare(b.operationId))) {
   registry.registerPath({

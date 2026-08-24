@@ -62,6 +62,29 @@ export const appOpenApiDocs = sqliteTable(
   },
   (table) => [index("app_openapi_docs_app_index").on(table.appId)],
 );
+export const appPrompts = sqliteTable(
+  "app_prompts",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id")
+      .notNull()
+      .references(() => apps.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    system: text("system").notNull(),
+    sections: text("sections").notNull().default("[]"),
+    injectedComponents: text("injected_components").notNull().default("[]"),
+    injectedOpenApiDocIds: text("injected_openapi_doc_ids").notNull().default("[]"),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("app_prompts_app_key_unique").on(table.appId, table.key),
+    index("app_prompts_app_index").on(table.appId),
+  ],
+);
 
 export const manifestRevisions = sqliteTable(
   "manifest_revisions",
@@ -329,6 +352,13 @@ export const aiConfig = sqliteTable(
   (table) => [index("ai_config_provider_index").on(table.provider)],
 );
 
+export const systemPrompts = sqliteTable("system_prompts", {
+  id: text("id").primaryKey(),
+  prompt: text("prompt").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  ...timestamps,
+});
+
 export const schema = {
   apps,
   previewProfiles,
@@ -345,6 +375,8 @@ export const schema = {
   assets,
   studioSessions,
   aiConfig,
+  appPrompts,
+  systemPrompts,
 };
 
 export type AppRow = typeof apps.$inferSelect;
@@ -356,6 +388,8 @@ export type DocumentRow = typeof documents.$inferSelect;
 export type DocumentVersionRow = typeof documentVersions.$inferSelect;
 export type ReleaseRow = typeof releases.$inferSelect;
 export type AssetRow = typeof assets.$inferSelect;
+export type AppPromptRow = typeof appPrompts.$inferSelect;
 export type StudioSessionRow = typeof studioSessions.$inferSelect;
 
 export type AiConfigRow = typeof aiConfig.$inferSelect;
+export type SystemPromptRow = typeof systemPrompts.$inferSelect;

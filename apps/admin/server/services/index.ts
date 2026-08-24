@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, isNull, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, ne, or } from "drizzle-orm";
 import type { AppDatabase } from "../db/client";
 import { hashSecret, newId, newSecret, nowIso } from "../db/ids";
 import {
   appKeys,
   appOpenApiDocs,
+  appPrompts,
   apps,
   assets,
   categories,
@@ -39,6 +40,9 @@ import {
   AppCreateSchema,
   AppKeyRotationSchema,
   AppPatchSchema,
+  AppPromptCreateSchema,
+  AppPromptPatchSchema,
+  AppPromptSchema,
   AppSchema,
   AssetCompleteSchema,
   AssetSchema,
@@ -63,8 +67,9 @@ import {
   StudioSessionCreateSchema,
   UploadIntentSchema,
   VersionCreateSchema,
-  VersionSchema,
+  DEFAULT_APP_SYSTEM_PROMPT,
   type ResourceKind,
+  VersionSchema,
 } from "../validation/schemas";
 import { z } from "zod";
 type ResourceRow = typeof pages.$inferSelect | typeof templates.$inferSelect;
@@ -265,8 +270,210 @@ export async function deleteApp(db: AppDatabase, appId: string): Promise<void> {
     await tx.delete(categories).where(eq(categories.appId, appId)).run();
     await tx.delete(locales).where(eq(locales.appId, appId)).run();
     await tx.delete(documents).where(eq(documents.appId, appId)).run();
+    await tx.delete(appPrompts).where(eq(appPrompts.appId, appId)).run();
     await tx.delete(apps).where(eq(apps.id, appId)).run();
   });
+}
+
+function appPromptRecord(row: typeof appPrompts.$inferSelect) {
+  return {
+    id: row.id,
+    appId: row.appId,
+    key: row.key,
+    name: row.name,
+    description: row.description,
+    system: row.system,
+    sections: parseJson(z.array(z.string()), row.sections),
+    injectedComponents: parseJson(z.array(z.string()), row.injectedComponents),
+    injectedOpenApiDocIds: parseJson(z.array(z.string()), row.injectedOpenApiDocIds),
+    isDefault: row.isDefault,
+    enabled: row.enabled,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export async function listAppPrompts(db: AppDatabase, appId: string): Promise<unknown[]> {
+  await getAppRow(db, appId);
+  let rows = await db
+    .select()
+    .from(appPrompts)
+    .where(eq(appPrompts.appId, appId))
+    .orderBy(desc(appPrompts.isDefault), asc(appPrompts.createdAt))
+    .all();
+
+  if (rows.length === 0) {
+    const timestamp = nowIso();
+    const defaultRow = {
+      id: newId("prompt"),
+      appId,
+      key: "default",
+      name: "Default",
+      description: "Default app AI prompt profile",
+      system: DEFAULT_APP_SYSTEM_PROMPT,
+      sections: "[]",
+      injectedComponents: "[]",
+      injectedOpenApiDocIds: "[]",
+      isDefault: true,
+      enabled: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    await db.insert(appPrompts).values(defaultRow).run();
+    rows = [defaultRow];
+  }
+
+  return rows.map((r) => AppPromptSchema.parse(appPromptRecord(r)));
+}
+
+export async function createAppPrompt(
+  db: AppDatabase,
+  appId: string,
+  input: unknown,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const body = AppPromptCreateSchema.parse(input);
+  const timestamp = nowIso();
+  const existingKey = await db
+    .select({ id: appPrompts.id })
+    .from(appPrompts)
+    .where(and(eq(appPrompts.appId, appId), eq(appPrompts.key, body.key)))
+    .get();
+  if (existingKey) {
+    throw conflict("A prompt profile with this key already exists for the app");
+  }
+
+  const existingCount = (
+    await db.select({ id: appPrompts.id }).from(appPrompts).where(eq(appPrompts.appId, appId)).all()
+  ).length;
+
+  const isDefault = body.isDefault || existingCount === 0;
+  const row = {
+    id: newId("prompt"),
+    appId,
+    key: body.key,
+    name: body.name,
+    description: body.description ?? "",
+    system: body.system ?? DEFAULT_APP_SYSTEM_PROMPT,
+    sections: JSON.stringify(body.sections ?? []),
+    injectedComponents: JSON.stringify(body.injectedComponents ?? []),
+    injectedOpenApiDocIds: JSON.stringify(body.injectedOpenApiDocIds ?? []),
+    isDefault,
+    enabled: body.enabled ?? true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+
+  await db.transaction(async (tx) => {
+    if (isDefault) {
+      await tx
+        .update(appPrompts)
+        .set({ isDefault: false, updatedAt: timestamp })
+        .where(eq(appPrompts.appId, appId))
+        .run();
+    }
+    await tx.insert(appPrompts).values(row).run();
+  });
+
+  return AppPromptSchema.parse(appPromptRecord(row));
+}
+
+export async function getAppPrompt(
+  db: AppDatabase,
+  appId: string,
+  promptId: string,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const row = await db
+    .select()
+    .from(appPrompts)
+    .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, promptId)))
+    .get();
+  if (!row) throw notFound();
+  return AppPromptSchema.parse(appPromptRecord(row));
+}
+
+export async function updateAppPrompt(
+  db: AppDatabase,
+  appId: string,
+  promptId: string,
+  input: unknown,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const existing = await db
+    .select()
+    .from(appPrompts)
+    .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, promptId)))
+    .get();
+  if (!existing) throw notFound();
+
+  const body = AppPromptPatchSchema.parse(input);
+  const timestamp = nowIso();
+
+  await db.transaction(async (tx) => {
+    if (body.isDefault) {
+      await tx
+        .update(appPrompts)
+        .set({ isDefault: false, updatedAt: timestamp })
+        .where(eq(appPrompts.appId, appId))
+        .run();
+    }
+    await tx
+      .update(appPrompts)
+      .set({
+        name: body.name ?? existing.name,
+        description: body.description ?? existing.description,
+        system: body.system ?? existing.system,
+        sections: body.sections !== undefined ? JSON.stringify(body.sections) : existing.sections,
+        injectedComponents:
+          body.injectedComponents !== undefined
+            ? JSON.stringify(body.injectedComponents)
+            : existing.injectedComponents,
+        injectedOpenApiDocIds:
+          body.injectedOpenApiDocIds !== undefined
+            ? JSON.stringify(body.injectedOpenApiDocIds)
+            : existing.injectedOpenApiDocIds,
+        isDefault: body.isDefault ?? existing.isDefault,
+        enabled: body.enabled ?? existing.enabled,
+        updatedAt: timestamp,
+      })
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, promptId)))
+      .run();
+  });
+
+  return getAppPrompt(db, appId, promptId);
+}
+
+export async function deleteAppPrompt(
+  db: AppDatabase,
+  appId: string,
+  promptId: string,
+): Promise<void> {
+  await getAppRow(db, appId);
+  const row = await db
+    .select()
+    .from(appPrompts)
+    .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, promptId)))
+    .get();
+  if (!row) throw notFound();
+  if (row.isDefault) {
+    const others = await db
+      .select({ id: appPrompts.id })
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), ne(appPrompts.id, promptId)))
+      .limit(1)
+      .all();
+    if (others.length > 0) {
+      throw conflict(
+        "The default prompt profile cannot be deleted without setting another as default first",
+      );
+    }
+  }
+
+  await db
+    .delete(appPrompts)
+    .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, promptId)))
+    .run();
 }
 
 export async function listPreviewProfiles(db: AppDatabase, appId: string): Promise<unknown[]> {

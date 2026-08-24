@@ -30,6 +30,7 @@ import { Switch } from "@cloudflare/kumo/components/switch";
 import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
+import { Checkbox } from "@cloudflare/kumo/components/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -143,10 +144,13 @@ export function AdminConsole() {
   if (pathname === "/openapi-docs") return <OpenApiDocsView />;
   if (pathname === "/manifest") return <ManifestView />;
   if (pathname === "/components") return <ComponentsView />;
-  if (pathname.startsWith("/components/")) return <ComponentDetailView />;
   if (pathname === "/settings") return <SettingsView />;
+  if (pathname === "/prompts" || pathname === "/prompt") return <PromptsListView />;
+  if (pathname.startsWith("/prompts/") || pathname.startsWith("/prompt/"))
+    return <PromptEditorView />;
 
   if (pathname === "/ai") return <AiView />;
+  if (pathname === "/system-prompt") return <SystemPromptView />;
   return <NotFoundView />;
 }
 
@@ -2817,6 +2821,747 @@ function AiView() {
           <Text variant="secondary">{t("aiConsumptionHint")}</Text>
         </LayerCard.Primary>
       </LayerCard>
+    </>
+  );
+}
+function SystemPromptView() {
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [enabled, setEnabled] = useState(true);
+
+  const query = api.useQuery("get", "/api/v1/ai/system-prompt");
+  const data = query.data;
+
+  useEffect(() => {
+    if (data) {
+      setPrompt(data.prompt);
+      setEnabled(data.enabled);
+    }
+  }, [data]);
+
+  const update = api.useMutation("patch", "/api/v1/ai/system-prompt", {
+    onSuccess: () => {
+      setConfirmOpen(false);
+      toast.add({ title: t("systemPromptSaved") });
+      void queryClient.invalidateQueries();
+    },
+  });
+
+  function applyChanges() {
+    update.mutate({
+      body: {
+        prompt: prompt || undefined,
+        enabled,
+      },
+    });
+  }
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.error) return <ErrorState error={query.error} />;
+
+  return (
+    <>
+      <PageHeader title={t("systemPrompt")} description={t("systemPromptDescription")}>
+        <Button variant="primary" onClick={() => setConfirmOpen(true)}>
+          {t("save")}
+        </Button>
+      </PageHeader>
+
+      <Surface className="mb-4 max-w-3xl border border-red-500/20 bg-red-500/5 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Badge variant="red">{t("systemPromptHighRiskBadge")}</Badge>
+        </div>
+        <Text variant="secondary">{t("systemPromptHighRiskWarning")}</Text>
+      </Surface>
+
+      <LayerCard className="mb-4 max-w-3xl">
+        <LayerCard.Secondary>{t("systemPromptEnabled")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-3">
+          <Switch checked={enabled} onCheckedChange={setEnabled} label={t("systemPromptEnabled")} />
+          <Text variant="secondary">{t("systemPromptEnabledDescription")}</Text>
+        </LayerCard.Primary>
+      </LayerCard>
+
+      <LayerCard className="mb-4 max-w-3xl">
+        <LayerCard.Secondary>{t("systemPromptPrompt")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-3">
+          <Textarea
+            label={t("systemPromptPrompt")}
+            rows={12}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+          />
+        </LayerCard.Primary>
+      </LayerCard>
+
+      <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <Dialog size="base" className="px-6 py-6">
+          <Dialog.Title>{t("systemPromptConfirmTitle")}</Dialog.Title>
+          <div className="grid gap-4 py-4">
+            <Text>{t("systemPromptConfirmDescription")}</Text>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+                {t("cancel")}
+              </Button>
+              <Button variant="primary" loading={update.isPending} onClick={applyChanges}>
+                {t("systemPromptConfirmButton")}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+    </>
+  );
+}
+
+const PROMPT_DEFAULT_SYSTEM = [
+  "You are the AI assistant embedded in an OpenScene application.",
+  "Help users accomplish tasks using the components and APIs available to the app.",
+  "Be concise, accurate, and follow the application's conventions.",
+].join("\n");
+
+function PromptsListView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const toast = useKumoToastManager();
+  const appId = context.appId ?? "";
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const query = api.useQuery("get", "/api/v1/apps/{appId}/prompts", {
+    params: { path: { appId } },
+  });
+
+  const update = api.useMutation("patch", "/api/v1/apps/{appId}/prompts/{promptId}", {
+    onSuccess: () => {
+      toast.add({ title: t("updated") });
+      void queryClient.invalidateQueries();
+    },
+  });
+
+  const remove = api.useMutation("delete", "/api/v1/apps/{appId}/prompts/{promptId}", {
+    onSuccess: () => {
+      setDeleteId(null);
+      toast.add({ title: t("deleted") });
+      void queryClient.invalidateQueries();
+    },
+  });
+
+  const items = query.data ?? [];
+
+  if (query.isLoading) return <LoadingState />;
+  if (query.error) return <ErrorState error={query.error} />;
+
+  return (
+    <>
+      <PageHeader title={t("prompts")} description={t("promptsDescription")}>
+        <LinkButton variant="primary" icon={Plus} href={context.href("/prompts/new")}>
+          {t("promptCreate")}
+        </LinkButton>
+      </PageHeader>
+      {items.length === 0 ? (
+        <Empty title={t("noResults")} description={t("noResultsDescription")} />
+      ) : (
+        <LayerCard className="w-full overflow-x-auto p-0">
+          <Table layout="fixed">
+            <colgroup>
+              <col style={{ width: "220px" }} />
+              <col />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "140px" }} />
+              <col style={{ width: "56px" }} />
+            </colgroup>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>{t("promptName")}</Table.Head>
+                <Table.Head>{t("promptDescriptionLabel")}</Table.Head>
+                <Table.Head>{t("promptComponentsCount")}</Table.Head>
+                <Table.Head>{t("promptOpenApiCount")}</Table.Head>
+                <Table.Head>{t("status")}</Table.Head>
+                <Table.Head sticky="right">
+                  <span className="sr-only">{t("actions")}</span>
+                </Table.Head>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {items.map((item) => (
+                <Table.Row key={item.id}>
+                  <Table.Cell>
+                    <div className="flex flex-col">
+                      <LinkButton
+                        variant="ghost"
+                        className="justify-start p-0 font-medium text-kumo-foreground hover:underline"
+                        href={context.href(`/prompts/${encodeURIComponent(item.id)}`)}
+                      >
+                        {item.name}
+                      </LinkButton>
+                      <span className="font-mono text-xs text-kumo-subtle">{item.key}</span>
+                    </div>
+                  </Table.Cell>
+                  <Table.Cell className="truncate text-kumo-subtle">
+                    {item.description || "—"}
+                  </Table.Cell>
+                  <Table.Cell>{item.injectedComponents.length}</Table.Cell>
+                  <Table.Cell>{item.injectedOpenApiDocIds.length}</Table.Cell>
+                  <Table.Cell>
+                    <div className="flex items-center gap-1.5">
+                      {item.isDefault ? <Badge variant="green">{t("default")}</Badge> : null}
+                      <Badge variant={item.enabled ? "blue" : "neutral"}>
+                        {item.enabled ? t("active") : t("disabled")}
+                      </Badge>
+                    </div>
+                  </Table.Cell>
+                  <Table.Cell sticky="right" className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            shape="square"
+                            aria-label={t("moreOptions")}
+                          >
+                            <DotsThree weight="bold" size={16} />
+                          </Button>
+                        }
+                      />
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Item
+                          icon={PencilSimple}
+                          onClick={() => {
+                            context.router.push(
+                              context.href(`/prompts/${encodeURIComponent(item.id)}`),
+                            );
+                          }}
+                        >
+                          {t("edit")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={Star}
+                          onClick={() =>
+                            update.mutate({
+                              params: { path: { appId, promptId: item.id } },
+                              body: { isDefault: !item.isDefault },
+                            })
+                          }
+                        >
+                          {item.isDefault ? t("promptRemoveDefault") : t("promptSetDefault")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          icon={Trash}
+                          variant="danger"
+                          onClick={() => setDeleteId(item.id)}
+                        >
+                          {t("delete")}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
+        </LayerCard>
+      )}
+
+      <Dialog.Root open={Boolean(deleteId)} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <Dialog size="sm" className="px-6 py-6">
+          <Dialog.Title>{t("promptDeleteConfirmTitle")}</Dialog.Title>
+          <div className="grid gap-4 py-4">
+            <Text>{t("promptDeleteConfirmDescription")}</Text>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteId(null)}>
+                {t("cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                loading={remove.isPending}
+                onClick={() => {
+                  if (deleteId) {
+                    remove.mutate({ params: { path: { appId, promptId: deleteId } } });
+                  }
+                }}
+              >
+                {t("delete")}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+    </>
+  );
+}
+
+function PromptEditorView() {
+  const pathname = usePathname();
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const toast = useKumoToastManager();
+  const appId = context.appId ?? "";
+
+  const rawId = decodeURIComponent(
+    pathname.startsWith("/prompts/")
+      ? pathname.slice("/prompts/".length)
+      : pathname.slice("/prompt/".length),
+  );
+  const isNew = rawId === "new";
+  const promptId = isNew ? "" : rawId;
+
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [form, setForm] = useState({
+    key: "",
+    name: "",
+    description: "",
+    system: PROMPT_DEFAULT_SYSTEM,
+    sections: [] as string[],
+    injectedComponents: [] as string[],
+    injectedOpenApiDocIds: [] as string[],
+    isDefault: false,
+    enabled: true,
+  });
+
+  const promptQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/prompts/{promptId}",
+    {
+      params: { path: { appId, promptId } },
+    },
+    {
+      enabled: !isNew && Boolean(appId) && Boolean(promptId),
+    },
+  );
+
+  const manifestQuery = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
+    params: { path: { appId } },
+  });
+  const openApiQuery = api.useQuery("get", "/api/v1/apps/{appId}/openapi-docs", {
+    params: { path: { appId } },
+  });
+
+  const item = promptQuery.data;
+  useEffect(() => {
+    if (item && !isNew) {
+      setForm({
+        key: item.key,
+        name: item.name,
+        description: item.description,
+        system: item.system,
+        sections: [...item.sections],
+        injectedComponents: [...item.injectedComponents],
+        injectedOpenApiDocIds: [...item.injectedOpenApiDocIds],
+        isDefault: item.isDefault,
+        enabled: item.enabled,
+      });
+    }
+  }, [item, isNew]);
+
+  const create = api.useMutation("post", "/api/v1/apps/{appId}/prompts", {
+    onSuccess: (created) => {
+      toast.add({ title: t("created") });
+      void queryClient.invalidateQueries();
+      context.router.push(context.href(`/prompts/${encodeURIComponent(created.id)}`));
+    },
+  });
+
+  const update = api.useMutation("patch", "/api/v1/apps/{appId}/prompts/{promptId}", {
+    onSuccess: () => {
+      toast.add({ title: t("updated") });
+      void queryClient.invalidateQueries();
+    },
+  });
+
+  const remove = api.useMutation("delete", "/api/v1/apps/{appId}/prompts/{promptId}", {
+    onSuccess: () => {
+      setDeleteConfirm(false);
+      toast.add({ title: t("deleted") });
+      void queryClient.invalidateQueries();
+      context.router.push(context.href("/prompts"));
+    },
+  });
+
+  const manifest = getActiveManifest(manifestQuery.data);
+  const componentEntries = useMemo(() => {
+    if (!manifest) return [];
+    return Object.entries(manifest.components)
+      .map(([key, component]) => ({
+        key,
+        title: component.title,
+        category: component.category,
+      }))
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  }, [manifest]);
+
+  const openApiDocs = (openApiQuery.data ?? []) as Array<{
+    id: string;
+    name: string;
+    json: unknown;
+  }>;
+
+  const preview = useMemo(() => {
+    const parts: string[] = [];
+    if (form.system.trim()) parts.push(form.system.trim());
+    for (const section of form.sections) if (section.trim()) parts.push(section.trim());
+    if (form.injectedComponents.length > 0 && manifest) {
+      const lines = form.injectedComponents
+        .filter((key) => manifest.components[key])
+        .map((key) => {
+          const component = manifest.components[key];
+          const props =
+            (component.props as { properties?: Record<string, unknown> } | undefined)?.properties ??
+            {};
+          const propText = Object.keys(props).length
+            ? ` (props: ${Object.keys(props).join(", ")})`
+            : "";
+          const description = component.description ? ` — ${component.description}` : "";
+          return `- \`${key}\`: ${component.title ?? key}${description}${propText}`;
+        });
+      if (lines.length)
+        parts.push(
+          `## Available Components\nThe following components are published for this app:\n${lines.join("\n")}`,
+        );
+    }
+    if (form.injectedOpenApiDocIds.length > 0) {
+      const blocks = openApiDocs
+        .filter((doc) => form.injectedOpenApiDocIds.includes(doc.id))
+        .map((doc) => `### ${doc.name}\n${JSON.stringify(doc.json, null, 2)}`);
+      if (blocks.length) parts.push(`## OpenAPI Specifications\n${blocks.join("\n\n")}`);
+    }
+    return parts.join("\n\n");
+  }, [form, manifest, openApiDocs]);
+
+  function toggleComponent(key: string, checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      injectedComponents: checked
+        ? prev.injectedComponents.includes(key)
+          ? prev.injectedComponents
+          : [...prev.injectedComponents, key]
+        : prev.injectedComponents.filter((k) => k !== key),
+    }));
+  }
+
+  function toggleOpenApi(docId: string, checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      injectedOpenApiDocIds: checked
+        ? prev.injectedOpenApiDocIds.includes(docId)
+          ? prev.injectedOpenApiDocIds
+          : [...prev.injectedOpenApiDocIds, docId]
+        : prev.injectedOpenApiDocIds.filter((k) => k !== docId),
+    }));
+  }
+  const isAllComponentsSelected =
+    componentEntries.length > 0 &&
+    componentEntries.every(({ key }) => form.injectedComponents.includes(key));
+  const isSomeComponentsSelected =
+    !isAllComponentsSelected &&
+    componentEntries.some(({ key }) => form.injectedComponents.includes(key));
+
+  function handleToggleAllComponents(checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      injectedComponents: checked ? componentEntries.map(({ key }) => key) : [],
+    }));
+  }
+
+  const isAllOpenApiSelected =
+    openApiDocs.length > 0 &&
+    openApiDocs.every((doc) => form.injectedOpenApiDocIds.includes(doc.id));
+  const isSomeOpenApiSelected =
+    !isAllOpenApiSelected && openApiDocs.some((doc) => form.injectedOpenApiDocIds.includes(doc.id));
+
+  function handleToggleAllOpenApi(checked: boolean) {
+    setForm((prev) => ({
+      ...prev,
+      injectedOpenApiDocIds: checked ? openApiDocs.map((doc) => doc.id) : [],
+    }));
+  }
+
+  function save() {
+    if (isNew) {
+      create.mutate({
+        params: { path: { appId } },
+        body: {
+          key: form.key,
+          name: form.name,
+          description: form.description,
+          system: form.system,
+          sections: form.sections.filter((s) => s.trim() !== ""),
+          injectedComponents: form.injectedComponents,
+          injectedOpenApiDocIds: form.injectedOpenApiDocIds,
+          isDefault: form.isDefault,
+          enabled: form.enabled,
+        },
+      });
+    } else {
+      update.mutate({
+        params: { path: { appId, promptId } },
+        body: {
+          name: form.name,
+          description: form.description,
+          system: form.system,
+          sections: form.sections.filter((s) => s.trim() !== ""),
+          injectedComponents: form.injectedComponents,
+          injectedOpenApiDocIds: form.injectedOpenApiDocIds,
+          isDefault: form.isDefault,
+          enabled: form.enabled,
+        },
+      });
+    }
+  }
+
+  if (!isNew && promptQuery.isLoading) return <LoadingState />;
+  if (!isNew && promptQuery.error) return <ErrorState error={promptQuery.error} />;
+
+  const isSaving = create.isPending || update.isPending;
+
+  return (
+    <>
+      <PageHeader
+        title={isNew ? t("promptCreate") : form.name || form.key || t("promptEdit")}
+        description={t("promptDescription")}
+      >
+        <LinkButton href={context.href("/prompts")}>{t("prompts")}</LinkButton>
+        <Button variant="primary" loading={isSaving} onClick={save}>
+          {t("save")}
+        </Button>
+        {!isNew && (
+          <Button variant="ghost" icon={Trash} onClick={() => setDeleteConfirm(true)}>
+            {t("delete")}
+          </Button>
+        )}
+      </PageHeader>
+
+      <div className="grid max-w-5xl gap-6">
+        <LayerCard>
+          <LayerCard.Secondary>{t("details")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label={t("promptKey")}
+                value={form.key}
+                disabled={!isNew}
+                placeholder="e.g. payment, campaign, core"
+                onChange={(e) => setForm({ ...form, key: e.target.value })}
+              />
+              <Input
+                label={t("promptName")}
+                value={form.name}
+                placeholder="e.g. 支付模块专用"
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <Input
+              label={t("promptDescriptionLabel")}
+              value={form.description}
+              placeholder="Optional description of this module prompt profile"
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+            <div className="flex gap-6 pt-1">
+              <Switch
+                checked={form.isDefault}
+                label={t("default")}
+                onCheckedChange={(isDefault) => setForm({ ...form, isDefault })}
+              />
+              <Switch
+                checked={form.enabled}
+                label={t("promptEnabled")}
+                onCheckedChange={(enabled) => setForm({ ...form, enabled })}
+              />
+            </div>
+          </LayerCard.Primary>
+        </LayerCard>
+
+        <LayerCard>
+          <LayerCard.Secondary>{t("promptBase")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-3">
+            <Text variant="secondary">{t("promptBaseDescription")}</Text>
+            <Textarea
+              label={t("promptBase")}
+              rows={10}
+              className="font-mono text-sm"
+              value={form.system}
+              onChange={(e) => setForm({ ...form, system: e.target.value })}
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setForm({ ...form, system: PROMPT_DEFAULT_SYSTEM })}
+              >
+                {t("promptReset")}
+              </Button>
+            </div>
+          </LayerCard.Primary>
+        </LayerCard>
+
+        <LayerCard>
+          <LayerCard.Secondary>{t("promptSections")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-4">
+            {form.sections.map((section, index) => (
+              <div key={index} className="grid gap-2 rounded-md border border-kumo-subtle/20 p-4">
+                <Text variant="secondary">
+                  {t("promptSections")} #{index + 1}
+                </Text>
+                <Textarea
+                  aria-label={`${t("promptSections")} #${index + 1}`}
+                  rows={3}
+                  placeholder={t("promptSectionPlaceholder")}
+                  value={section}
+                  onChange={(e) => {
+                    const next = [...form.sections];
+                    next[index] = e.target.value;
+                    setForm({ ...form, sections: next });
+                  }}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        sections: form.sections.filter((_, i) => i !== index),
+                      })
+                    }
+                  >
+                    {t("promptRemoveSection")}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Plus}
+                onClick={() => setForm({ ...form, sections: [...form.sections, ""] })}
+              >
+                {t("promptAddSection")}
+              </Button>
+            </div>
+          </LayerCard.Primary>
+        </LayerCard>
+
+        <LayerCard>
+          <LayerCard.Secondary>{t("promptInjection")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-6">
+            <Text variant="secondary">{t("promptInjectionDescription")}</Text>
+
+            {/* Components Injection */}
+            <div className="grid gap-2.5">
+              <div className="flex items-center justify-between border-b border-kumo-line/40 pb-2">
+                <Text variant="heading" as="h3">
+                  {t("promptComponents")}
+                </Text>
+                {componentEntries.length > 0 && (
+                  <Checkbox
+                    label={t("selectAll")}
+                    checked={isAllComponentsSelected}
+                    indeterminate={isSomeComponentsSelected}
+                    onCheckedChange={(checked) => handleToggleAllComponents(Boolean(checked))}
+                  />
+                )}
+              </div>
+              {componentEntries.length === 0 ? (
+                <Empty title={t("promptNoManifest")} />
+              ) : (
+                <div className="grid max-h-64 gap-1 overflow-y-auto p-2">
+                  {componentEntries.map(({ key, title, category }) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-kumo-subtle/5"
+                    >
+                      <Checkbox
+                        label={`${title} (${key})`}
+                        checked={form.injectedComponents.includes(key)}
+                        onCheckedChange={(checked) => toggleComponent(key, Boolean(checked))}
+                      />
+                      {category && <span className="text-xs text-kumo-subtle">{category}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* OpenAPI Injection */}
+            <div className="grid gap-2.5">
+              <div className="flex items-center justify-between border-b border-kumo-line/40 pb-2">
+                <Text variant="heading" as="h3">
+                  {t("promptOpenApi")}
+                </Text>
+                {openApiDocs.length > 0 && (
+                  <Checkbox
+                    label={t("selectAll")}
+                    checked={isAllOpenApiSelected}
+                    indeterminate={isSomeOpenApiSelected}
+                    onCheckedChange={(checked) => handleToggleAllOpenApi(Boolean(checked))}
+                  />
+                )}
+              </div>
+              {openApiDocs.length === 0 ? (
+                <Empty title={t("promptNoOpenApi")} />
+              ) : (
+                <div className="grid max-h-64 gap-1 overflow-y-auto p-2">
+                  {openApiDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-kumo-subtle/5"
+                    >
+                      <Checkbox
+                        label={doc.name}
+                        checked={form.injectedOpenApiDocIds.includes(doc.id)}
+                        onCheckedChange={(checked) => toggleOpenApi(doc.id, Boolean(checked))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </LayerCard.Primary>
+        </LayerCard>
+
+        <LayerCard>
+          <LayerCard.Secondary>{t("promptPreview")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-3">
+            <Text variant="secondary">{t("promptPreviewDescription")}</Text>
+            <div className="max-h-96 overflow-auto p-1">
+              <Code code={preview} />
+            </div>
+          </LayerCard.Primary>
+        </LayerCard>
+      </div>
+
+      <Dialog.Root open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <Dialog size="sm" className="px-6 py-6">
+          <Dialog.Title>{t("promptDeleteConfirmTitle")}</Dialog.Title>
+          <div className="grid gap-4 py-4">
+            <Text>{t("promptDeleteConfirmDescription")}</Text>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteConfirm(false)}>
+                {t("cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                loading={remove.isPending}
+                onClick={() => {
+                  if (promptId) {
+                    remove.mutate({ params: { path: { appId, promptId } } });
+                  }
+                }}
+              >
+                {t("delete")}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      </Dialog.Root>
     </>
   );
 }

@@ -12,6 +12,10 @@ import { appKeys } from "../../server/db/schema";
 import { resetConfigForTests } from "../../server/config/env";
 import { resetStorageForTests } from "../../server/storage";
 import { createOpenApiDocument } from "../../server/openapi/document";
+import {
+  DEFAULT_APP_SYSTEM_PROMPT,
+  DEFAULT_GLOBAL_SYSTEM_PROMPT,
+} from "../../server/validation/schemas";
 
 type PathContext = { params: Promise<{ path: string[] }> };
 
@@ -315,6 +319,7 @@ describe("Admin API HTTP flow", () => {
       { cookie: cookie ?? "", origin: "http://localhost" },
     );
     expect(rotationCsrfAccepted.status).toBe(200);
+    appA.appKey = (await rotationCsrfAccepted.json()).appKey;
     expect(csrfRejected.status).toBe(403);
     const csrfAccepted = await call(
       "PATCH",
@@ -376,6 +381,126 @@ describe("Admin API HTTP flow", () => {
     expect(listPreview.get.responses["200"].content?.["application/json"].schema).toMatchObject({
       type: "array",
     });
+  });
+});
+describe("App AI prompts", () => {
+  beforeAll(() => {
+    process.env.OPENSCENE_AUTH_MODE = "disabled";
+    resetConfigForTests();
+  });
+
+  test("manages multiple prompt profiles per App", async () => {
+    // 1. Lists auto-seeded default prompt profile
+    const listResponse = await call("GET", ["apps", appA.id, "prompts"]);
+    expect(listResponse.status).toBe(200);
+    const prompts = await listResponse.json();
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].key).toBe("default");
+    expect(prompts[0].isDefault).toBe(true);
+    expect(prompts[0].system).toBe(DEFAULT_APP_SYSTEM_PROMPT);
+
+    // 2. Creates payment-specific prompt profile
+    const createPayment = await call("POST", ["apps", appA.id, "prompts"], {
+      key: "payment",
+      name: "支付专用",
+      description: "支付结算模块专用提示词",
+      system: "You are the payment assistant.",
+      sections: ["Verify order amount before confirming."],
+      injectedComponents: ["button", "input"],
+      injectedOpenApiDocIds: [],
+      isDefault: false,
+      enabled: true,
+    });
+    expect(createPayment.status).toBe(201);
+    const payment = await createPayment.json();
+    expect(payment.key).toBe("payment");
+    expect(payment.name).toBe("支付专用");
+    expect(payment.isDefault).toBe(false);
+
+    // 3. Creates campaign-specific prompt profile as default
+    const createCampaign = await call("POST", ["apps", appA.id, "prompts"], {
+      key: "campaign",
+      name: "活动专用",
+      description: "限时促销活动模块提示词",
+      system: "You are the marketing campaign assistant.",
+      sections: ["Highlight discount codes."],
+      isDefault: true,
+      enabled: true,
+    });
+    expect(createCampaign.status).toBe(201);
+    const campaign = await createCampaign.json();
+    expect(campaign.isDefault).toBe(true);
+
+    // Verify payment is not default, campaign is default
+    const refetchedList = await (await call("GET", ["apps", appA.id, "prompts"])).json();
+    expect(refetchedList).toHaveLength(3);
+    const defaultItem = refetchedList.find((p: { isDefault: boolean }) => p.isDefault);
+    expect(defaultItem.key).toBe("campaign");
+
+    // 4. Update payment profile
+    const updatePayment = await call("PATCH", ["apps", appA.id, "prompts", payment.id], {
+      name: "收银结算专用",
+      system: "Updated payment system prompt.",
+    });
+    expect(updatePayment.status).toBe(200);
+    const updatedPayment = await updatePayment.json();
+    expect(updatedPayment.name).toBe("收银结算专用");
+    expect(updatedPayment.system).toBe("Updated payment system prompt.");
+
+    // 5. Delete payment profile
+    const deletePayment = await call("DELETE", ["apps", appA.id, "prompts", payment.id]);
+    expect(deletePayment.status).toBe(204);
+    const afterDelete = await call("GET", ["apps", appA.id, "prompts", payment.id]);
+    expect(afterDelete.status).toBe(404);
+  });
+
+  test("requires appId and accepts promptKey on AI chat endpoint", async () => {
+    const headers = { "x-openscene-app-key": appA.appKey };
+    const missing = await call(
+      "POST",
+      ["ai", "chat"],
+      { messages: [{ role: "user", content: "hello" }] },
+      headers,
+    );
+    expect(missing.status).toBe(422);
+
+    const withAppIdAndModule = await call(
+      "POST",
+      ["ai", "chat"],
+      {
+        messages: [{ role: "user", content: "hello" }],
+        appId: appA.id,
+        promptKey: "campaign",
+      },
+      headers,
+    );
+    // appId and promptKey are accepted; fails because AI provider is not configured.
+    expect(withAppIdAndModule.status).toBe(403);
+  });
+
+  test("returns the default global system prompt", async () => {
+    const response = await call("GET", ["ai", "system-prompt"]);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isDefault).toBe(true);
+    expect(body.prompt).toBe(DEFAULT_GLOBAL_SYSTEM_PROMPT);
+    expect(body.enabled).toBe(true);
+  });
+
+  test("persists and updates the global system prompt", async () => {
+    const update = await call("PATCH", ["ai", "system-prompt"], {
+      prompt: "Custom global instructions for safety and tone.",
+      enabled: true,
+    });
+    expect(update.status).toBe(200);
+    const body = await update.json();
+    expect(body.isDefault).toBe(false);
+    expect(body.prompt).toBe("Custom global instructions for safety and tone.");
+    expect(body.enabled).toBe(true);
+
+    const refetch = await call("GET", ["ai", "system-prompt"]);
+    expect(refetch.status).toBe(200);
+    expect(await refetch.json()).toEqual(body);
   });
 });
 

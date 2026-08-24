@@ -1,13 +1,21 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { generateText, streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { AppDatabase } from "../db/client";
-import { aiConfig } from "../db/schema";
+import {
+  aiConfig,
+  appOpenApiDocs,
+  appPrompts,
+  apps,
+  manifestRevisions,
+  systemPrompts,
+} from "../db/schema";
 import { nowIso } from "../db/ids";
 import { getConfig } from "../config/env";
 import { forbidden, validation } from "../errors";
 import { encryptSecret, decryptSecret } from "./encryption";
+import { AppManifestSchema } from "@openscene/protocol";
 import {
   AiChatRequestSchema,
   AiChatResponseSchema,
@@ -15,6 +23,10 @@ import {
   AiConfigStatusSchema,
   AiConfigUpdateSchema,
   AiTestSchema,
+  DEFAULT_APP_SYSTEM_PROMPT,
+  DEFAULT_GLOBAL_SYSTEM_PROMPT,
+  SystemPromptSchema,
+  SystemPromptUpdateSchema,
 } from "../validation/schemas";
 import type { z } from "zod";
 const GLOBAL_ID = "global";
@@ -85,6 +97,64 @@ export async function upsertAiConfig(db: AppDatabase, input: AiConfigInput) {
   return recordToPublic(saved!);
 }
 
+const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
+
+/** Read the global deployment system prompt. Returns default prompt when unconfigured. */
+export async function getSystemPrompt(db: AppDatabase) {
+  const row = await db.select().from(systemPrompts).where(eq(systemPrompts.id, GLOBAL_ID)).get();
+  if (!row) {
+    return SystemPromptSchema.parse({
+      prompt: DEFAULT_GLOBAL_SYSTEM_PROMPT,
+      enabled: true,
+      isDefault: true,
+      createdAt: EPOCH_ISO,
+      updatedAt: EPOCH_ISO,
+    });
+  }
+  return SystemPromptSchema.parse({
+    prompt: row.prompt,
+    enabled: row.enabled,
+    isDefault: false,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
+/** Create or update the global deployment system prompt. */
+export async function upsertSystemPrompt(
+  db: AppDatabase,
+  input: z.infer<typeof SystemPromptUpdateSchema>,
+) {
+  const timestamp = nowIso();
+  const existing = await db
+    .select()
+    .from(systemPrompts)
+    .where(eq(systemPrompts.id, GLOBAL_ID))
+    .get();
+  const prompt = input.prompt ?? existing?.prompt ?? DEFAULT_GLOBAL_SYSTEM_PROMPT;
+  const enabled = input.enabled ?? existing?.enabled ?? true;
+  const values = {
+    id: GLOBAL_ID,
+    prompt,
+    enabled,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+  await db
+    .insert(systemPrompts)
+    .values(values)
+    .onConflictDoUpdate({
+      target: systemPrompts.id,
+      set: {
+        prompt: values.prompt,
+        enabled: values.enabled,
+        updatedAt: values.updatedAt,
+      },
+    })
+    .run();
+  return getSystemPrompt(db);
+}
+
 /** Validate provider credentials by performing a minimal completion. */
 export async function testAiConfig(db: AppDatabase, input: Partial<AiConfigInput>) {
   const existing = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
@@ -143,6 +213,143 @@ async function resolveConfig(db: AppDatabase): Promise<ResolvedConfig> {
     apiKey,
   };
 }
+function parsePromptArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+async function resolveComponentsText(
+  db: AppDatabase,
+  appId: string,
+  keys: string[],
+): Promise<string> {
+  const app = await db
+    .select({ activeManifestRevisionId: apps.activeManifestRevisionId })
+    .from(apps)
+    .where(eq(apps.id, appId))
+    .get();
+  if (!app?.activeManifestRevisionId) return "";
+  const revision = await db
+    .select({ manifestJson: manifestRevisions.manifestJson })
+    .from(manifestRevisions)
+    .where(
+      and(
+        eq(manifestRevisions.appId, appId),
+        eq(manifestRevisions.id, app.activeManifestRevisionId),
+      ),
+    )
+    .get();
+  if (!revision) return "";
+  const manifest = AppManifestSchema.safeParse(JSON.parse(revision.manifestJson));
+  if (!manifest.success) return "";
+  const components = (manifest.data.components ?? {}) as Record<
+    string,
+    { title?: string; description?: string; props?: { properties?: Record<string, unknown> } }
+  >;
+  const lines = keys
+    .filter((key) => components[key])
+    .map((key) => {
+      const component = components[key];
+      const props = component.props?.properties ?? {};
+      const propText = Object.keys(props).length
+        ? ` (props: ${Object.keys(props).join(", ")})`
+        : "";
+      const description = component.description ? ` — ${component.description}` : "";
+      return `- \`${key}\`: ${component.title ?? key}${description}${propText}`;
+    });
+  if (lines.length === 0) return "";
+  return `## Available Components\nThe following components are published for this app:\n${lines.join("\n")}`;
+}
+
+async function resolveOpenApiText(db: AppDatabase, appId: string, ids: string[]): Promise<string> {
+  const rows = await db
+    .select({ id: appOpenApiDocs.id, name: appOpenApiDocs.name, json: appOpenApiDocs.json })
+    .from(appOpenApiDocs)
+    .where(and(eq(appOpenApiDocs.appId, appId), inArray(appOpenApiDocs.id, ids)))
+    .all();
+  if (rows.length === 0) return "";
+  const blocks = rows.map((row) => `### ${row.name}\n${row.json}`);
+  return `## OpenAPI Specifications\n${blocks.join("\n\n")}`;
+}
+
+/**
+ * Assemble the system prompt for an app by combining its stored base prompt, optional
+ * sections, and any injected component / OpenAPI content. The caller-supplied `system`
+ * (if any) is appended as an extra instruction. When injection is disabled only the
+ * caller-supplied system prompt is returned.
+ */
+export async function buildAppSystemPrompt(
+  db: AppDatabase,
+  appId: string,
+  options?: { promptKey?: string; promptId?: string; requestSystem?: string } | string,
+): Promise<string> {
+  const opts = typeof options === "string" ? { requestSystem: options } : (options ?? {});
+  const parts: string[] = [];
+
+  // 1. Global Deployment System Prompt
+  const globalPrompt = await getSystemPrompt(db);
+  if (globalPrompt.enabled && globalPrompt.prompt.trim()) {
+    parts.push(globalPrompt.prompt.trim());
+  }
+
+  // 2. Resolve App-specific prompt profile
+  let row: typeof appPrompts.$inferSelect | undefined;
+  if (opts.promptId) {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, opts.promptId)))
+      .get();
+  } else if (opts.promptKey) {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.key, opts.promptKey)))
+      .get();
+  } else {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.isDefault, true)))
+      .get();
+    if (!row) {
+      row = await db.select().from(appPrompts).where(eq(appPrompts.appId, appId)).limit(1).get();
+    }
+  }
+
+  const appPromptEnabled = row?.enabled ?? true;
+  if (appPromptEnabled) {
+    const system = (row?.system ?? DEFAULT_APP_SYSTEM_PROMPT).trim();
+    const sections = row ? parsePromptArray(row.sections) : [];
+    const injectedComponents = row ? parsePromptArray(row.injectedComponents) : [];
+    const injectedOpenApiDocIds = row ? parsePromptArray(row.injectedOpenApiDocIds) : [];
+
+    if (system) parts.push(system);
+    for (const section of sections) if (section.trim()) parts.push(section.trim());
+
+    if (injectedComponents.length > 0) {
+      const componentsText = await resolveComponentsText(db, appId, injectedComponents);
+      if (componentsText) parts.push(componentsText);
+    }
+    if (injectedOpenApiDocIds.length > 0) {
+      const openApiText = await resolveOpenApiText(db, appId, injectedOpenApiDocIds);
+      if (openApiText) parts.push(openApiText);
+    }
+  }
+
+  // 3. Caller-supplied request instruction
+  if (opts.requestSystem?.trim()) {
+    parts.push(opts.requestSystem.trim());
+  }
+
+  return parts.join("\n\n").trim();
+}
 
 /**
  * Run a chat completion for a verified client. Supports multiple response formats:
@@ -161,8 +368,13 @@ export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<R
     role: message.role,
     content: message.content,
   }));
+  const systemPrompt = await buildAppSystemPrompt(db, input.appId, {
+    promptKey: input.promptKey,
+    promptId: input.promptId,
+    requestSystem: input.system,
+  });
   const settings = {
-    system: input.system,
+    system: systemPrompt || undefined,
     temperature: input.temperature,
     maxOutputTokens: input.maxTokens,
   };

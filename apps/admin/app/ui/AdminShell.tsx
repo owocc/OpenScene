@@ -3,6 +3,7 @@
 import {
   BookOpen,
   ChartLine,
+  ChatText,
   Code,
   Copy,
   Cube,
@@ -11,6 +12,7 @@ import {
   Gear,
   Globe,
   Image,
+  ShieldWarning,
   SlidersHorizontal,
   Sparkle,
   SquaresFour,
@@ -25,10 +27,10 @@ import { useState, type ReactNode } from "react";
 import { api } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import { navigationGroups } from "./navigation";
-
 const icons = {
   book: BookOpen,
   chart: ChartLine,
+  chatText: ChatText,
   code: Code,
   cubes: Cube,
   copy: Copy,
@@ -37,6 +39,7 @@ const icons = {
   gear: Gear,
   globe: Globe,
   image: Image,
+  shieldWarning: ShieldWarning,
   sliders: SlidersHorizontal,
   sparkle: Sparkle,
   squares: SquaresFour,

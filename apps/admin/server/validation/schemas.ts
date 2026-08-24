@@ -396,6 +396,72 @@ export const AiTestSchema = z.object({
   model: z.string().optional(),
   error: z.string().optional(),
 });
+export const DEFAULT_GLOBAL_SYSTEM_PROMPT = [
+  "You are OpenScene AI, the foundational intelligence layer of the OpenScene system.",
+  "Follow strict safety guidelines, execute instructions accurately, and provide structured outputs.",
+].join("\n");
+
+export const SystemPromptUpdateSchema = z
+  .object({
+    prompt: z.string().min(1).max(32_000).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .openapi({ description: "Update the global deployment system prompt configuration" });
+
+export const SystemPromptSchema = z
+  .object({
+    prompt: z.string(),
+    enabled: z.boolean(),
+    isDefault: z.boolean(),
+    createdAt: IsoDateSchema,
+    updatedAt: IsoDateSchema,
+  })
+  .openapi({ description: "Global deployment system prompt configuration" });
+
+export const DEFAULT_APP_SYSTEM_PROMPT = [
+  "You are the AI assistant embedded in an OpenScene application.",
+  "Help users accomplish tasks using the components and APIs available to the app.",
+  "Be concise, accurate, and follow the application's conventions.",
+].join("\n");
+
+export const AppPromptCreateSchema = z
+  .object({
+    key: KeySchema,
+    name: z.string().min(1).max(200),
+    description: z.string().max(2_000).default(""),
+    system: z.string().max(16_000).default(DEFAULT_APP_SYSTEM_PROMPT),
+    sections: z.array(z.string().max(8_000)).max(20).default([]),
+    injectedComponents: z.array(z.string().min(1).max(256)).max(100).default([]),
+    injectedOpenApiDocIds: z.array(z.string().min(1).max(256)).max(100).default([]),
+    isDefault: z.boolean().default(false),
+    enabled: z.boolean().default(true),
+  })
+  .openapi({ description: "Create an app AI prompt profile" });
+
+export const AppPromptPatchSchema = AppPromptCreateSchema.partial().refine(
+  (value) => value.key === undefined,
+  { message: "Prompt key cannot be changed", path: ["key"] },
+);
+
+export const AppPromptSchema = z
+  .object({
+    id: IdSchema,
+    appId: IdSchema,
+    key: KeySchema,
+    name: z.string(),
+    description: z.string(),
+    system: z.string(),
+    sections: z.array(z.string()),
+    injectedComponents: z.array(z.string()),
+    injectedOpenApiDocIds: z.array(z.string()),
+    isDefault: z.boolean(),
+    enabled: z.boolean(),
+    createdAt: IsoDateSchema,
+    updatedAt: IsoDateSchema,
+  })
+  .openapi({ description: "An app AI prompt profile" });
+
+export const AppPromptUpdateSchema = AppPromptCreateSchema.partial();
 
 // Client consumption request. `format` selects the response representation.
 export const AiChatRequestSchema = z
@@ -404,8 +470,17 @@ export const AiChatRequestSchema = z
     model: z.string().min(1).max(200).optional(),
     system: z.string().max(8_000).optional(),
     temperature: z.number().min(0).max(2).optional(),
-    maxTokens: z.number().int().min(1).max(8_192).optional(),
     format: z.enum(["json", "text", "stream"]).default("json"),
+    maxTokens: z.number().int().min(1).max(8_192).optional(),
+    appId: z.string().min(1).max(256).openapi({
+      description: "App id whose prompt configuration is injected into the system prompt",
+    }),
+    promptKey: z.string().min(1).max(256).optional().openapi({
+      description: "Optional prompt module key to use. Defaults to the app's default prompt.",
+    }),
+    promptId: z.string().min(1).max(256).optional().openapi({
+      description: "Optional prompt module id to use.",
+    }),
   })
   .openapi({ description: "AI chat completion request" });
 

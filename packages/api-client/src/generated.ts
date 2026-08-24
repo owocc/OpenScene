@@ -50,6 +50,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/ai/system-prompt": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getSystemPrompt"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["patchSystemPrompt"];
+    trace?: never;
+  };
   "/api/v1/apps": {
     parameters: {
       query?: never;
@@ -482,6 +498,38 @@ export interface paths {
     patch: operations["updatePreviewProfile"];
     trace?: never;
   };
+  "/api/v1/apps/{appId}/prompts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listAppPrompts"];
+    put?: never;
+    post: operations["createAppPrompt"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/apps/{appId}/prompts/{promptId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["getAppPrompt"];
+    put?: never;
+    post?: never;
+    delete: operations["deleteAppPrompt"];
+    options?: never;
+    head?: never;
+    patch: operations["updateAppPrompt"];
+    trace?: never;
+  };
   "/api/v1/apps/{appId}/releases/{releaseId}": {
     parameters: {
       query?: never;
@@ -704,12 +752,18 @@ export interface components {
       model?: string;
       system?: string;
       temperature?: number;
-      maxTokens?: number;
       /**
        * @default json
        * @enum {string}
        */
       format: "json" | "text" | "stream";
+      maxTokens?: number;
+      /** @description App id whose prompt configuration is injected into the system prompt */
+      appId: string;
+      /** @description Optional prompt module key to use. Defaults to the app's default prompt. */
+      promptKey?: string;
+      /** @description Optional prompt module id to use. */
+      promptId?: string;
     };
     AiChatResponse: {
       model: string;
@@ -799,6 +853,69 @@ export interface components {
     };
     AppKeyRotation: {
       appKey: string;
+    };
+    /** @description An app AI prompt profile */
+    AppPrompt: {
+      id: string;
+      appId: string;
+      key: string;
+      name: string;
+      description: string;
+      system: string;
+      sections: string[];
+      injectedComponents: string[];
+      injectedOpenApiDocIds: string[];
+      isDefault: boolean;
+      enabled: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description Create an app AI prompt profile */
+    AppPromptCreate: {
+      key: string;
+      name: string;
+      /** @default  */
+      description: string;
+      /**
+       * @default You are the AI assistant embedded in an OpenScene application.
+       *     Help users accomplish tasks using the components and APIs available to the app.
+       *     Be concise, accurate, and follow the application's conventions.
+       */
+      system: string;
+      /** @default [] */
+      sections: string[];
+      /** @default [] */
+      injectedComponents: string[];
+      /** @default [] */
+      injectedOpenApiDocIds: string[];
+      /** @default false */
+      isDefault: boolean;
+      /** @default true */
+      enabled: boolean;
+    };
+    AppPromptPatch: {
+      key?: string;
+      name?: string;
+      /** @default  */
+      description: string;
+      /**
+       * @default You are the AI assistant embedded in an OpenScene application.
+       *     Help users accomplish tasks using the components and APIs available to the app.
+       *     Be concise, accurate, and follow the application's conventions.
+       */
+      system: string;
+      /** @default [] */
+      sections: string[];
+      /** @default [] */
+      injectedComponents: string[];
+      /** @default [] */
+      injectedOpenApiDocIds: string[];
+      /** @default false */
+      isDefault: boolean;
+      /** @default true */
+      enabled: boolean;
     };
     Bootstrap: {
       [key: string]: unknown;
@@ -982,6 +1099,21 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @description Global deployment system prompt configuration */
+    SystemPrompt: {
+      prompt: string;
+      enabled: boolean;
+      isDefault: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @description Update the global deployment system prompt configuration */
+    SystemPromptUpdate: {
+      prompt?: string;
+      enabled?: boolean;
+    };
     Version: {
       id: string;
       appId: string;
@@ -1079,12 +1211,18 @@ export interface operations {
           model?: string;
           system?: string;
           temperature?: number;
-          maxTokens?: number;
           /**
            * @default json
            * @enum {string}
            */
           format?: "json" | "text" | "stream";
+          maxTokens?: number;
+          /** @description App id whose prompt configuration is injected into the system prompt */
+          appId: string;
+          /** @description Optional prompt module key to use. Defaults to the app's default prompt. */
+          promptKey?: string;
+          /** @description Optional prompt module id to use. */
+          promptId?: string;
         };
       };
     };
@@ -1572,6 +1710,297 @@ export interface operations {
             ok: boolean;
             model?: string;
             error?: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  getSystemPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            prompt: string;
+            enabled: boolean;
+            isDefault: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  patchSystemPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          prompt?: string;
+          enabled?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            prompt: string;
+            enabled: boolean;
+            isDefault: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
           };
         };
       };
@@ -9285,6 +9714,801 @@ export interface operations {
             url: string;
             allowedOrigins: string[];
             isDefault: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  listAppPrompts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            key: string;
+            name: string;
+            description: string;
+            system: string;
+            sections: string[];
+            injectedComponents: string[];
+            injectedOpenApiDocIds: string[];
+            isDefault: boolean;
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          }[];
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  createAppPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          key: string;
+          name: string;
+          /** @default  */
+          description?: string;
+          /**
+           * @default You are the AI assistant embedded in an OpenScene application.
+           *     Help users accomplish tasks using the components and APIs available to the app.
+           *     Be concise, accurate, and follow the application's conventions.
+           */
+          system?: string;
+          /** @default [] */
+          sections?: string[];
+          /** @default [] */
+          injectedComponents?: string[];
+          /** @default [] */
+          injectedOpenApiDocIds?: string[];
+          /** @default false */
+          isDefault?: boolean;
+          /** @default true */
+          enabled?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            key: string;
+            name: string;
+            description: string;
+            system: string;
+            sections: string[];
+            injectedComponents: string[];
+            injectedOpenApiDocIds: string[];
+            isDefault: boolean;
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  getAppPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+        promptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            key: string;
+            name: string;
+            description: string;
+            system: string;
+            sections: string[];
+            injectedComponents: string[];
+            injectedOpenApiDocIds: string[];
+            isDefault: boolean;
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  deleteAppPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+        promptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  updateAppPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+        promptId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          key?: string;
+          name?: string;
+          /** @default  */
+          description?: string;
+          /**
+           * @default You are the AI assistant embedded in an OpenScene application.
+           *     Help users accomplish tasks using the components and APIs available to the app.
+           *     Be concise, accurate, and follow the application's conventions.
+           */
+          system?: string;
+          /** @default [] */
+          sections?: string[];
+          /** @default [] */
+          injectedComponents?: string[];
+          /** @default [] */
+          injectedOpenApiDocIds?: string[];
+          /** @default false */
+          isDefault?: boolean;
+          /** @default true */
+          enabled?: boolean;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            key: string;
+            name: string;
+            description: string;
+            system: string;
+            sections: string[];
+            injectedComponents: string[];
+            injectedOpenApiDocIds: string[];
+            isDefault: boolean;
+            enabled: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

@@ -27,7 +27,11 @@ export function buildHref(
 
 export function isAppScopedPath(pathname: string): boolean {
   return (
-    pathname !== "/apps" && pathname !== "/system" && pathname !== "/login" && pathname !== "/ai"
+    pathname !== "/apps" &&
+    pathname !== "/system" &&
+    pathname !== "/login" &&
+    pathname !== "/ai" &&
+    pathname !== "/system-prompt"
   );
 }
 
@@ -40,6 +44,7 @@ export const navigationGroups = [
       { href: "/reference", key: "apiReference", icon: "book" },
 
       { href: "/ai", key: "ai", icon: "sparkle" },
+      { href: "/system-prompt", key: "systemPrompt", icon: "shieldWarning" },
     ],
   },
   {
@@ -54,6 +59,7 @@ export const navigationGroups = [
       { href: "/categories", key: "categories", icon: "tag" },
       { href: "/locales", key: "locales", icon: "globe" },
       { href: "/openapi-docs", key: "openapiDocs", icon: "code" },
+      { href: "/prompts", key: "prompts", icon: "chatText" },
       { href: "/settings", key: "settings", icon: "sliders" },
     ],
   },
