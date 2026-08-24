@@ -16,9 +16,9 @@ import { LOCAL_TEST_SESSION_ID } from "@/core/local-test-session";
 import type { ComponentMeta, EditorMeta, PropMeta } from "@/core/meta";
 import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
+import { useStudioStore } from "@/stores/studio-store";
 import { DynamicModeDropdown, DynamicValueInput } from "./dynamic-value-input";
 import { StyleControl } from "./property-editor/style";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export * from "./dynamic-value-input";
@@ -1181,7 +1181,27 @@ export function PropertyEditor({
     () => Object.keys(state ?? {}).filter((k) => k !== "i18n" && k !== "__scene"),
     [state],
   );
-
+  const storeBootstrap = useStudioStore((s) => s.bootstrap);
+  const availableActionOptions = useMemo<
+    Array<{ key: string; title: string; description?: string }>
+  >(() => {
+    const list: Array<{ key: string; title: string; description?: string }> = [
+      { key: "setState", title: "修改状态 (setState)", description: "更新或切换状态变量" },
+    ];
+    const manifestActions = storeBootstrap?.manifest?.actions;
+    if (manifestActions && isRecord(manifestActions)) {
+      for (const [k, meta] of Object.entries(manifestActions)) {
+        if (k === "setState") continue;
+        const itemMeta = isRecord(meta) ? meta : {};
+        list.push({
+          key: k,
+          title: typeof itemMeta.title === "string" ? itemMeta.title : k,
+          description: typeof itemMeta.description === "string" ? itemMeta.description : undefined,
+        });
+      }
+    }
+    return list;
+  }, [storeBootstrap?.manifest?.actions]);
   // Available events on this component
   const eventsMap = useMemo(() => {
     const map: Record<string, { title: string; description?: string }> = {};
@@ -1199,7 +1219,6 @@ export function PropertyEditor({
     }
     return map;
   }, [meta.events, componentType]);
-
   return (
     <div className="grid gap-3">
       {/* 1. Component Props */}
@@ -1279,7 +1298,14 @@ export function PropertyEditor({
 
           {Object.entries(eventsMap).map(([name, event]) => {
             const rawAction = on?.[name];
-            const actionBinding = isRecord(rawAction) ? rawAction : undefined;
+            const actionBinding = isRecord(rawAction)
+              ? rawAction
+              : typeof rawAction === "string"
+                ? { action: rawAction }
+                : undefined;
+            const actionKey = actionBinding
+              ? (actionBinding.action as string) || (actionBinding.name as string) || "setState"
+              : undefined;
             const params = isRecord(actionBinding?.params)
               ? (actionBinding.params as Record<string, unknown>)
               : undefined;
@@ -1287,6 +1313,7 @@ export function PropertyEditor({
               ? Object.keys(params)[0] || stateKeys[0] || "isVisible"
               : stateKeys[0] || "isVisible";
             const targetVal = params ? params[targetVarKey] : "__toggle__";
+            const selectedActionOption = availableActionOptions.find((a) => a.key === actionKey);
 
             return (
               <div
@@ -1298,105 +1325,135 @@ export function PropertyEditor({
                   <span className="font-mono text-[9px] text-muted-foreground">on.{name}</span>
                 </div>
 
-                {actionBinding ? (
+                {actionKey ? (
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-normal"
-                      >
-                        {LL.properties.actionSetState()}
-                      </Badge>
+                      {/* Action Selector */}
+                      <div className="flex-1 min-w-0">
+                        <select
+                          className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                          value={actionKey}
+                          onChange={(e) => {
+                            const nextKey = e.target.value;
+                            if (nextKey === "setState") {
+                              const defaultVar = stateKeys[0] || "isVisible";
+                              onUpdateOn?.(name, {
+                                action: "setState",
+                                params: { [defaultVar]: "__toggle__" },
+                              });
+                            } else {
+                              onUpdateOn?.(name, { action: nextKey });
+                            }
+                          }}
+                        >
+                          {availableActionOptions.map((opt) => (
+                            <option key={opt.key} value={opt.key}>
+                              {opt.title} ({opt.key})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <Button
                         type="button"
                         variant="ghost"
                         size="xs"
-                        className="h-5 px-1 text-[10px] text-destructive hover:text-destructive cursor-pointer"
+                        className="h-7 px-1.5 text-[10px] text-destructive hover:text-destructive cursor-pointer shrink-0"
                         onClick={() => onUpdateOn?.(name, undefined)}
+                        title="删除动作绑定"
                       >
-                        <Trash2 className="size-2.5 mr-1" />
-                        <span>删除动作</span>
+                        <Trash2 className="size-3 mr-1" />
+                        <span>删除</span>
                       </Button>
                     </div>
 
-                    {/* Select variable to modify */}
-                    <div className="grid gap-1">
-                      <label className="text-[10px] text-muted-foreground">
-                        {LL.properties.selectVariable()}
-                      </label>
-                      <select
-                        className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                        value={targetVarKey}
-                        onChange={(e) => {
-                          const newKey = e.target.value;
-                          onUpdateOn?.(name, {
-                            action: "setState",
-                            params: { [newKey]: "__toggle__" },
-                          });
-                        }}
-                      >
-                        {stateKeys.map((key) => (
-                          <option key={key} value={key}>
-                            /{key}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {/* If action is setState: show state variable picker and value toggle */}
+                    {actionKey === "setState" ? (
+                      <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/60 p-2">
+                        <div className="grid gap-1">
+                          <label className="text-[10px] text-muted-foreground">
+                            {LL.properties.selectVariable()}
+                          </label>
+                          <select
+                            className="h-6.5 w-full font-mono text-xs bg-muted/40 rounded-md border border-border/60 px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                            value={targetVarKey}
+                            onChange={(e) => {
+                              const newKey = e.target.value;
+                              onUpdateOn?.(name, {
+                                action: "setState",
+                                params: { [newKey]: "__toggle__" },
+                              });
+                            }}
+                          >
+                            {stateKeys.map((key) => (
+                              <option key={key} value={key}>
+                                /{key}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                    {/* Target value selector */}
-                    <div className="grid gap-1">
-                      <label className="text-[10px] text-muted-foreground">
-                        {LL.properties.targetValue()}
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant={
-                            targetVal === "__toggle__" || targetVal === "!current"
-                              ? "default"
-                              : "outline"
-                          }
-                          size="xs"
-                          className="h-6 text-[10px] cursor-pointer"
-                          onClick={() =>
-                            onUpdateOn?.(name, {
-                              action: "setState",
-                              params: { [targetVarKey]: "__toggle__" },
-                            })
-                          }
-                        >
-                          {LL.properties.toggleBoolean()}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={targetVal === true ? "default" : "outline"}
-                          size="xs"
-                          className="h-6 text-[10px] cursor-pointer"
-                          onClick={() =>
-                            onUpdateOn?.(name, {
-                              action: "setState",
-                              params: { [targetVarKey]: true },
-                            })
-                          }
-                        >
-                          true
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={targetVal === false ? "default" : "outline"}
-                          size="xs"
-                          className="h-6 text-[10px] cursor-pointer"
-                          onClick={() =>
-                            onUpdateOn?.(name, {
-                              action: "setState",
-                              params: { [targetVarKey]: false },
-                            })
-                          }
-                        >
-                          false
-                        </Button>
+                        <div className="grid gap-1">
+                          <label className="text-[10px] text-muted-foreground">
+                            {LL.properties.targetValue()}
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant={
+                                targetVal === "__toggle__" || targetVal === "!current"
+                                  ? "default"
+                                  : "outline"
+                              }
+                              size="xs"
+                              className="h-6 text-[10px] cursor-pointer"
+                              onClick={() =>
+                                onUpdateOn?.(name, {
+                                  action: "setState",
+                                  params: { [targetVarKey]: "__toggle__" },
+                                })
+                              }
+                            >
+                              {LL.properties.toggleBoolean()}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={targetVal === true ? "default" : "outline"}
+                              size="xs"
+                              className="h-6 text-[10px] cursor-pointer"
+                              onClick={() =>
+                                onUpdateOn?.(name, {
+                                  action: "setState",
+                                  params: { [targetVarKey]: true },
+                                })
+                              }
+                            >
+                              true
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={targetVal === false ? "default" : "outline"}
+                              size="xs"
+                              className="h-6 text-[10px] cursor-pointer"
+                              onClick={() =>
+                                onUpdateOn?.(name, {
+                                  action: "setState",
+                                  params: { [targetVarKey]: false },
+                                })
+                              }
+                            >
+                              false
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      selectedActionOption?.description && (
+                        <p className="text-[10px] leading-relaxed text-muted-foreground px-1">
+                          {selectedActionOption.description}
+                        </p>
+                      )
+                    )}
                   </div>
                 ) : (
                   <Button
@@ -1405,15 +1462,20 @@ export function PropertyEditor({
                     size="xs"
                     className="h-7 w-full gap-1 text-xs border-dashed text-muted-foreground hover:text-foreground cursor-pointer"
                     onClick={() => {
-                      const defaultVar = stateKeys[0] || "isVisible";
-                      onUpdateOn?.(name, {
-                        action: "setState",
-                        params: { [defaultVar]: "__toggle__" },
-                      });
+                      const firstAction = availableActionOptions[0]?.key || "setState";
+                      if (firstAction === "setState") {
+                        const defaultVar = stateKeys[0] || "isVisible";
+                        onUpdateOn?.(name, {
+                          action: "setState",
+                          params: { [defaultVar]: "__toggle__" },
+                        });
+                      } else {
+                        onUpdateOn?.(name, { action: firstAction });
+                      }
                     }}
                   >
                     <Plus className="size-3" />
-                    <span>{LL.properties.bindAction()} (setState)</span>
+                    <span>{LL.properties.bindAction()}</span>
                   </Button>
                 )}
               </div>
