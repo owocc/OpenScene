@@ -814,9 +814,49 @@ type RootTranslation = {
      */
     layerName: string;
     /**
-     * A​p​p​ ​独​立​运​行​时
+     * 条​件​显​示​ ​(​V​i​s​i​b​i​l​i​t​y​)
      */
-    runtimeTitle: string;
+    visibilityTitle: string;
+    /**
+     * 绑​定​状​态​变​量​或​布​尔​表​达​式​，​值​为​真​时​渲​染​展​示​该​组​件​。
+     */
+    visibilityDesc: string;
+    /**
+     * 配​置​条​件​显​示
+     */
+    configureVisibility: string;
+    /**
+     * 重​置​ ​(​始​终​显​示​)
+     */
+    resetVisibility: string;
+    /**
+     * 事​件​与​动​作​ ​(​E​v​e​n​t​s​)
+     */
+    eventsTitle: string;
+    /**
+     * 绑​定​动​作
+     */
+    bindAction: string;
+    /**
+     * 未​配​置​动​作
+     */
+    noAction: string;
+    /**
+     * 修​改​状​态​ ​(​s​e​t​S​t​a​t​e​)
+     */
+    actionSetState: string;
+    /**
+     * 选​择​要​修​改​的​状​态​变​量
+     */
+    selectVariable: string;
+    /**
+     * 目​标​值
+     */
+    targetValue: string;
+    /**
+     * 取​反​切​换​ ​(​!​t​o​g​g​l​e​)
+     */
+    toggleBoolean: string;
     /**
      * 画​布​通​过​目​标​ ​A​p​p​ ​i​f​r​a​m​e​ ​进​行​沙​箱​渲​染​。​S​t​u​d​i​o​ ​仅​通​过​ ​P​r​e​v​i​e​w​ ​B​r​i​d​g​e​ ​传​递​文​档​快​照​。
      */
@@ -1743,9 +1783,49 @@ export type TranslationFunctions = {
      */
     layerName: () => LocalizedString;
     /**
-     * App 独立运行时
+     * 条件显示 (Visibility)
      */
-    runtimeTitle: () => LocalizedString;
+    visibilityTitle: () => LocalizedString;
+    /**
+     * 绑定状态变量或布尔表达式，值为真时渲染展示该组件。
+     */
+    visibilityDesc: () => LocalizedString;
+    /**
+     * 配置条件显示
+     */
+    configureVisibility: () => LocalizedString;
+    /**
+     * 重置 (始终显示)
+     */
+    resetVisibility: () => LocalizedString;
+    /**
+     * 事件与动作 (Events)
+     */
+    eventsTitle: () => LocalizedString;
+    /**
+     * 绑定动作
+     */
+    bindAction: () => LocalizedString;
+    /**
+     * 未配置动作
+     */
+    noAction: () => LocalizedString;
+    /**
+     * 修改状态 (setState)
+     */
+    actionSetState: () => LocalizedString;
+    /**
+     * 选择要修改的状态变量
+     */
+    selectVariable: () => LocalizedString;
+    /**
+     * 目标值
+     */
+    targetValue: () => LocalizedString;
+    /**
+     * 取反切换 (!toggle)
+     */
+    toggleBoolean: () => LocalizedString;
     /**
      * 画布通过目标 App iframe 进行沙箱渲染。Studio 仅通过 Preview Bridge 传递文档快照。
      */

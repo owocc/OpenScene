@@ -217,7 +217,17 @@ const en_US: Translation = {
     title: "Properties",
     empty: "Select a node to edit meta properties provided by target App.",
     layerName: "Layer name",
-    runtimeTitle: "App-owned runtime",
+    visibilityTitle: "Visibility",
+    visibilityDesc: "Bind to a state variable or boolean condition to control component rendering.",
+    configureVisibility: "Configure Visibility",
+    resetVisibility: "Reset (Always Visible)",
+    eventsTitle: "Events & Actions",
+    bindAction: "Bind Action",
+    noAction: "No action configured",
+    actionSetState: "Set State (setState)",
+    selectVariable: "Select state variable...",
+    targetValue: "Target Value",
+    toggleBoolean: "Toggle (!toggle)",
     runtimeDesc:
       "Preview is rendered by the target App iframe. Studio only sends document snapshots through Preview Bridge.",
     openapi: {

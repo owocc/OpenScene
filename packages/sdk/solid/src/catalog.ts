@@ -35,6 +35,22 @@ function mergeComponentDefinitions(
   return { ...baseSolidComponents, ...custom };
 }
 
+function mergeActionDefinitions(
+  custom:
+    | OpenSceneSolidActionDefinition[]
+    | Record<string, OpenSceneSolidActionDefinition>
+    | undefined,
+): Record<string, OpenSceneSolidActionDefinition> {
+  if (!custom) return { ...baseSolidActions };
+  if (Array.isArray(custom)) {
+    return {
+      ...baseSolidActions,
+      ...Object.fromEntries(custom.map((definition) => [definition.key, definition])),
+    };
+  }
+  return { ...baseSolidActions, ...custom };
+}
+
 export type SolidRenderer<P = Record<string, unknown>> = (
   props: ComponentRenderProps<P>,
 ) => JSX.Element;
@@ -223,7 +239,7 @@ export function defineOpenSceneSolidApp(
   const appKey = options.app?.key ?? options.appKey ?? "openscene-solid";
   const appType = options.app?.type ?? options.appType ?? APP_TYPE_WEB;
   const components = normalizeComponents(mergeComponentDefinitions(options.components));
-  const actions = normalizeActions(options.actions);
+  const actions = normalizeActions(mergeActionDefinitions(options.actions));
   const catalogData = {
     components: Object.fromEntries(
       Object.entries(components).map(([type, definition]) => [
@@ -334,5 +350,28 @@ export const baseSolidComponents: Record<string, OpenSceneSolidComponentDefiniti
     children: true,
     events: { press: { title: "Press" } },
     render: Button as unknown as SolidRenderer,
+  },
+};
+
+export const baseSolidActions: Record<string, OpenSceneSolidActionDefinition> = {
+  setState: {
+    key: "setState",
+    title: "Set State",
+    description: "Update state values",
+    params: z.record(z.string(), z.unknown()),
+    handler: (params, setState) => {
+      if (!params) return;
+      setState((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(params)) {
+          if (v === "__toggle__" || v === "!current") {
+            next[k] = !prev[k];
+          } else {
+            next[k] = v;
+          }
+        }
+        return next;
+      });
+    },
   },
 };

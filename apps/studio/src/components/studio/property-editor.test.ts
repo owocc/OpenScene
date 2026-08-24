@@ -243,4 +243,10 @@ describe("Dynamic mode and path handling", () => {
       "Hello, Card!",
     );
   });
+
+  it("supports visibility and dynamic state evaluation", () => {
+    const state = { isVisible: true, isHidden: false };
+    expect(resolveDynamicValue({ $state: "/isVisible" }, state, "en-US")).toBe(true);
+    expect(resolveDynamicValue({ $state: "/isHidden" }, state, "en-US")).toBe(false);
+  });
 });

@@ -145,12 +145,19 @@ function createIdentityRegistry(
           };
         },
       } as unknown as ComponentRenderProps;
+      const isVisible = createMemo(() => {
+        if (cleanElement.visible === undefined || cleanElement.visible === null) return true;
+        const evaluated = evaluateDynamicValue(cleanElement.visible, getState());
+        return Boolean(evaluated);
+      });
       return (
-        <OpenSceneNodeProvider nodeId={nodeId ?? ""}>
-          <span data-node-id={nodeId ?? undefined} style={{ display: "contents" }}>
-            {renderer(cleanProps)}
-          </span>
-        </OpenSceneNodeProvider>
+        <Show when={isVisible()}>
+          <OpenSceneNodeProvider nodeId={nodeId ?? ""}>
+            <span data-node-id={nodeId ?? undefined} style={{ display: "contents" }}>
+              {renderer(cleanProps)}
+            </span>
+          </OpenSceneNodeProvider>
+        </Show>
       );
     };
   }

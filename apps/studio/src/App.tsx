@@ -634,7 +634,36 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                           elementId={selectedId}
                           props={(selectedElement.props ?? {}) as Record<string, JsonValue>}
                           state={document.spec.state as Record<string, JsonValue> | undefined}
+                          visible={selectedElement.visible}
+                          on={selectedElement.on as Record<string, unknown> | undefined}
                           onChange={updateProp}
+                          onUpdateVisible={(val) => {
+                            updateElement(selectedId, (el) => {
+                              const next = { ...el };
+                              if (val === undefined) {
+                                delete next.visible;
+                              } else {
+                                next.visible = val as never;
+                              }
+                              return next;
+                            });
+                          }}
+                          onUpdateOn={(eventName, actionVal) => {
+                            updateElement(selectedId, (el) => {
+                              const on = {
+                                ...((el.on as Record<string, unknown> | undefined) ?? {}),
+                              };
+                              if (actionVal === undefined) {
+                                delete on[eventName];
+                              } else {
+                                on[eventName] = actionVal as never;
+                              }
+                              return {
+                                ...el,
+                                on: Object.keys(on).length > 0 ? (on as never) : undefined,
+                              };
+                            });
+                          }}
                         />
                       </div>
                     ) : selectedElement ? (

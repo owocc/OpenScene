@@ -214,7 +214,17 @@ const zh_CN: BaseTranslation = {
     title: "属性",
     empty: "选择节点后编辑目标 App 提供的属性 Meta。",
     layerName: "图层名称",
-    runtimeTitle: "App 独立运行时",
+    visibilityTitle: "条件显示 (Visibility)",
+    visibilityDesc: "绑定状态变量或布尔表达式，值为真时渲染展示该组件。",
+    configureVisibility: "配置条件显示",
+    resetVisibility: "重置 (始终显示)",
+    eventsTitle: "事件与动作 (Events)",
+    bindAction: "绑定动作",
+    noAction: "未配置动作",
+    actionSetState: "修改状态 (setState)",
+    selectVariable: "选择要修改的状态变量",
+    targetValue: "目标值",
+    toggleBoolean: "取反切换 (!toggle)",
     runtimeDesc:
       "画布通过目标 App iframe 进行沙箱渲染。Studio 仅通过 Preview Bridge 传递文档快照。",
     openapi: {

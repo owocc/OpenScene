@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Eye, Plus, Trash2, Zap } from "lucide-react";
 import {
   dynamicMode,
   dynamicValue,
@@ -18,6 +18,8 @@ import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
 import { DynamicModeDropdown, DynamicValueInput } from "./dynamic-value-input";
 import { StyleControl } from "./property-editor/style";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export * from "./dynamic-value-input";
 import { createOpenSceneClient } from "@openscene/api-client";
@@ -1154,7 +1156,11 @@ export interface PropertyEditorProps {
   elementId: string;
   props: Record<string, JsonValue>;
   state: Record<string, JsonValue> | undefined;
+  visible?: unknown;
+  on?: Record<string, unknown>;
   onChange: (name: string, value: JsonValue) => void;
+  onUpdateVisible?: (value: unknown) => void;
+  onUpdateOn?: (eventName: string, action: unknown) => void;
 }
 
 export function PropertyEditor({
@@ -1163,11 +1169,40 @@ export function PropertyEditor({
   elementId,
   props,
   state,
+  visible,
+  on,
   onChange,
+  onUpdateVisible,
+  onUpdateOn,
 }: PropertyEditorProps) {
+  const { LL } = useI18n();
   const statePaths = useMemo(() => getEditableStatePaths(state), [state]);
+  const stateKeys = useMemo(
+    () => Object.keys(state ?? {}).filter((k) => k !== "i18n" && k !== "__scene"),
+    [state],
+  );
+
+  // Available events on this component
+  const eventsMap = useMemo(() => {
+    const map: Record<string, { title: string; description?: string }> = {};
+    if (meta.events) {
+      for (const [k, v] of Object.entries(meta.events)) {
+        map[k] = { title: v.title, description: v.description };
+      }
+    }
+    // Default to press if interactive or no explicit events
+    if (
+      Object.keys(map).length === 0 &&
+      (componentType === "Button" || componentType === "View" || componentType === "Image")
+    ) {
+      map.press = { title: "Press (按下/点击)", description: "组件被点击时触发" };
+    }
+    return map;
+  }, [meta.events, componentType]);
+
   return (
     <div className="grid gap-3">
+      {/* 1. Component Props */}
       {Object.entries(meta.props).map(([name, prop]) => (
         <PropertyField
           key={`${elementId}:${name}`}
@@ -1179,25 +1214,213 @@ export function PropertyEditor({
           statePaths={statePaths}
         />
       ))}
-      {meta.events &&
-        Object.entries(meta.events).map(([name, event]) => (
-          <fieldset key={name} className="grid gap-1.5 border-t border-border pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-[11px] font-medium">{event.title}</label>
-              <span className="font-mono text-[9px] text-muted-foreground">on.{name}</span>
-            </div>
-            <ActionControl
-              meta={{ control: "action", placeholder: event.description }}
-              value={undefined}
-              onChange={() => undefined}
+
+      {/* 2. Universal Visibility (条件显示) */}
+      <fieldset className="grid gap-2 border-t border-border/80 pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Eye className="size-3.5 text-primary" />
+            <span className="text-[11px] font-medium text-foreground select-none">
+              {LL.properties.visibilityTitle()}
+            </span>
+          </div>
+          {visible !== undefined ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="h-5 px-1.5 text-[10px] text-destructive hover:text-destructive cursor-pointer"
+              onClick={() => onUpdateVisible?.(undefined)}
+            >
+              <Trash2 className="size-2.5 mr-1" />
+              <span>{LL.properties.resetVisibility()}</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="h-5 px-1.5 text-[10px] text-primary hover:bg-primary/10 cursor-pointer"
+              onClick={() => {
+                const defaultTarget = statePaths[0] ? { $state: statePaths[0] } : true;
+                onUpdateVisible?.(defaultTarget);
+              }}
+            >
+              <Plus className="size-2.5 mr-1" />
+              <span>{LL.properties.configureVisibility()}</span>
+            </Button>
+          )}
+        </div>
+
+        {visible !== undefined && (
+          <div className="grid gap-1">
+            <DynamicValueInput
+              value={visible as JsonValue}
+              onChange={(val) => onUpdateVisible?.(val)}
+              statePaths={statePaths}
+              placeholder="/isVisible"
             />
-            {event.allowedActions && (
-              <p className="text-[10px] text-muted-foreground">
-                可用动作：{event.allowedActions.join(" · ")}
-              </p>
-            )}
-          </fieldset>
-        ))}
+            <p className="text-[10px] leading-4 text-muted-foreground">
+              {LL.properties.visibilityDesc()}
+            </p>
+          </div>
+        )}
+      </fieldset>
+
+      {/* 3. Events & Actions (事件与动作) */}
+      {Object.keys(eventsMap).length > 0 && (
+        <div className="grid gap-2.5 border-t border-border/80 pt-3">
+          <div className="flex items-center gap-1.5 px-0.5">
+            <Zap className="size-3.5 text-amber-500" />
+            <span className="text-[11px] font-semibold text-foreground select-none">
+              {LL.properties.eventsTitle()}
+            </span>
+          </div>
+
+          {Object.entries(eventsMap).map(([name, event]) => {
+            const rawAction = on?.[name];
+            const actionBinding = isRecord(rawAction) ? rawAction : undefined;
+            const params = isRecord(actionBinding?.params)
+              ? (actionBinding.params as Record<string, unknown>)
+              : undefined;
+            const targetVarKey = params
+              ? Object.keys(params)[0] || stateKeys[0] || "isVisible"
+              : stateKeys[0] || "isVisible";
+            const targetVal = params ? params[targetVarKey] : "__toggle__";
+
+            return (
+              <div
+                key={name}
+                className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium text-foreground">{event.title}</span>
+                  <span className="font-mono text-[9px] text-muted-foreground">on.{name}</span>
+                </div>
+
+                {actionBinding ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-normal"
+                      >
+                        {LL.properties.actionSetState()}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        className="h-5 px-1 text-[10px] text-destructive hover:text-destructive cursor-pointer"
+                        onClick={() => onUpdateOn?.(name, undefined)}
+                      >
+                        <Trash2 className="size-2.5 mr-1" />
+                        <span>删除动作</span>
+                      </Button>
+                    </div>
+
+                    {/* Select variable to modify */}
+                    <div className="grid gap-1">
+                      <label className="text-[10px] text-muted-foreground">
+                        {LL.properties.selectVariable()}
+                      </label>
+                      <select
+                        className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                        value={targetVarKey}
+                        onChange={(e) => {
+                          const newKey = e.target.value;
+                          onUpdateOn?.(name, {
+                            action: "setState",
+                            params: { [newKey]: "__toggle__" },
+                          });
+                        }}
+                      >
+                        {stateKeys.map((key) => (
+                          <option key={key} value={key}>
+                            /{key}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Target value selector */}
+                    <div className="grid gap-1">
+                      <label className="text-[10px] text-muted-foreground">
+                        {LL.properties.targetValue()}
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant={
+                            targetVal === "__toggle__" || targetVal === "!current"
+                              ? "default"
+                              : "outline"
+                          }
+                          size="xs"
+                          className="h-6 text-[10px] cursor-pointer"
+                          onClick={() =>
+                            onUpdateOn?.(name, {
+                              action: "setState",
+                              params: { [targetVarKey]: "__toggle__" },
+                            })
+                          }
+                        >
+                          {LL.properties.toggleBoolean()}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={targetVal === true ? "default" : "outline"}
+                          size="xs"
+                          className="h-6 text-[10px] cursor-pointer"
+                          onClick={() =>
+                            onUpdateOn?.(name, {
+                              action: "setState",
+                              params: { [targetVarKey]: true },
+                            })
+                          }
+                        >
+                          true
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={targetVal === false ? "default" : "outline"}
+                          size="xs"
+                          className="h-6 text-[10px] cursor-pointer"
+                          onClick={() =>
+                            onUpdateOn?.(name, {
+                              action: "setState",
+                              params: { [targetVarKey]: false },
+                            })
+                          }
+                        >
+                          false
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="h-7 w-full gap-1 text-xs border-dashed text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={() => {
+                      const defaultVar = stateKeys[0] || "isVisible";
+                      onUpdateOn?.(name, {
+                        action: "setState",
+                        params: { [defaultVar]: "__toggle__" },
+                      });
+                    }}
+                  >
+                    <Plus className="size-3" />
+                    <span>{LL.properties.bindAction()} (setState)</span>
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
