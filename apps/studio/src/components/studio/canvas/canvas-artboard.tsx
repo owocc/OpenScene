@@ -24,9 +24,7 @@ export function CanvasArtboard({ viewport, children }: CanvasArtboardProps) {
         transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
       }}
     >
-      <div className="h-full w-full overflow-hidden border border-border/80 bg-background">
-        {children}
-      </div>
+      <div className="h-full w-full  border border-border bg-background">{children}</div>
     </div>
   );
 }

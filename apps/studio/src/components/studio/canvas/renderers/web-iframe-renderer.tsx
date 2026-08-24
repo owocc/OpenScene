@@ -213,29 +213,31 @@ export function WebIframeRenderer({
   }, [connected, selectedNodeIds]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <iframe
-        ref={frameRef}
-        title="Target App preview"
-        src={editorUrl}
-        className="h-full w-full border-0 bg-background"
-        referrerPolicy="no-referrer"
-        onLoad={() => {
-          if (!hasLoadedRef.current) {
-            hasLoadedRef.current = true;
-            return;
-          }
-          if (resettingRef.current) {
-            resettingRef.current = false;
-            return;
-          }
-          portRef.current?.close();
-          portRef.current = null;
-          setConnected(false);
-          resettingRef.current = true;
-          setSessionId(crypto.randomUUID());
-        }}
-      />
+    <div className="relative h-full w-full">
+      <div className="relative  h-full w-full overflow-hidden">
+        <iframe
+          ref={frameRef}
+          title="Target App preview"
+          src={editorUrl}
+          className="h-full w-full border-0 bg-background"
+          referrerPolicy="no-referrer"
+          onLoad={() => {
+            if (!hasLoadedRef.current) {
+              hasLoadedRef.current = true;
+              return;
+            }
+            if (resettingRef.current) {
+              resettingRef.current = false;
+              return;
+            }
+            portRef.current?.close();
+            portRef.current = null;
+            setConnected(false);
+            resettingRef.current = true;
+            setSessionId(crypto.randomUUID());
+          }}
+        />
+      </div>
       {/* Studio-owned overlay: draws hover/selection outlines from geometry
         reported by the iframe, keeping the preview DOM untouched. */}
       <div
