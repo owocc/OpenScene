@@ -121,9 +121,16 @@ function createIdentityRegistry(
       const privateId = elementProps.__opensceneNodeId;
       const nodeId = typeof privateId === "string" ? privateId : null;
       const cleanElement = removePrivateNodeId(renderProps.element);
-      const evaluatedProps = createMemo(
-        () => evaluateDynamicValue(cleanElement.props, getState()) as Record<string, unknown>,
-      );
+      const evaluatedProps = createMemo(() => {
+        const state = getState();
+        const resolved = evaluateDynamicValue(cleanElement.props, state) as Record<string, unknown>;
+        console.log(`[OpenScene Solid] Component "${type}" (#${nodeId}) evaluated props:`, {
+          raw: cleanElement.props,
+          evaluated: resolved,
+          state,
+        });
+        return resolved;
+      });
       const cleanProps = {
         ...renderProps,
         get props() {

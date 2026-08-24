@@ -69,7 +69,14 @@ export function View(props: PrimitiveProps): JSX.Element {
 
 export function Text(props: PrimitiveProps): JSX.Element {
   const node = useOpenSceneNode();
-  const resolved = () => useResolvedProps(props.props);
+  const resolved = () => {
+    const res = useResolvedProps(props.props);
+    console.log(`[OpenScene Solid Node] Text (#${node.nodeId}) props evaluated:`, {
+      raw: props.props,
+      resolved: res,
+    });
+    return res;
+  };
   const text = () => {
     const val = resolved().text ?? resolved().label;
     return typeof val === "string" || typeof val === "number" || typeof val === "boolean"

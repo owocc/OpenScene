@@ -47,7 +47,7 @@ export function resolveTranslation(
 }
 
 export function resolveTemplate(template: string, state: Record<string, unknown>): string {
-  return template.replaceAll(
+  const result = template.replaceAll(
     /(?:\$\{|\{\{|\{)\s*([^}]+?)\s*(?:\}\}|\})/g,
     (_, rawPointer: string) => {
       const pointer = rawPointer.trim();
@@ -58,6 +58,8 @@ export function resolveTemplate(template: string, state: Record<string, unknown>
         : "";
     },
   );
+  console.log(`[OpenScene Dynamic] resolveTemplate("${template}") => "${result}"`, { state });
+  return result;
 }
 
 export function isBinding(value: unknown): value is Record<string, string> {

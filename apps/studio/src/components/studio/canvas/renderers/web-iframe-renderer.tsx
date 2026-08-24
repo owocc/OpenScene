@@ -89,7 +89,13 @@ export function WebIframeRenderer({
       revision,
     });
     const parsed = StudioPortMessageSchema.safeParse(message);
-    if (parsed.success) portRef.current.postMessage(parsed.data);
+    if (parsed.success) {
+      console.log(`[OpenScene Studio] Sending updated DOCUMENT_SET (rev: ${revision})`, {
+        state: document.spec.state,
+        root: document.spec.root,
+      });
+      portRef.current.postMessage(parsed.data);
+    }
   }
 
   useEffect(() => {
@@ -156,6 +162,7 @@ export function WebIframeRenderer({
       channel.port1.start();
       portRef.current?.close();
       portRef.current = channel.port1;
+      console.log(`[OpenScene Studio] Connecting to iframe renderer (session: ${sessionId})`);
       frame.contentWindow?.postMessage(
         createBridgeEnvelope(sessionId, "STUDIO_CONNECT", undefined),
         { targetOrigin: allowedOrigin, transfer: [channel.port2] },
@@ -166,6 +173,10 @@ export function WebIframeRenderer({
       });
       const parsedDoc = StudioPortMessageSchema.safeParse(initMessage);
       if (parsedDoc.success) {
+        console.log(
+          `[OpenScene Studio] Sending initial DOCUMENT_SET on connect (rev: ${revisionRef.current})`,
+          { state: documentRef.current.spec.state, root: documentRef.current.spec.root },
+        );
         channel.port1.postMessage(parsedDoc.data);
         sentRevisionRef.current = revisionRef.current;
       }

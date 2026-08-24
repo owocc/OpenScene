@@ -363,6 +363,10 @@ export class OpenSceneController implements OpenSceneClient {
       ...document.spec.state,
       __scene: { pageInfo: document.pageInfo, globalConfig: document.globalConfig },
     };
+    console.log(`[OpenScene Client] Received DOCUMENT_SET (rev: ${revision})`, {
+      state: document.spec.state,
+      root: document.spec.root,
+    });
     const store = this.state.runtimeStore ?? createStateStore(runtimeState);
     const currentSnapshot = store.getSnapshot();
     const updates: Record<string, unknown> = {};
