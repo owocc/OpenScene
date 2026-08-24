@@ -120,6 +120,10 @@ export function Button(props: PrimitiveProps): JSX.Element {
       : "button";
   const handleClick = (event: MouseEvent) => {
     const press = props.on("press");
+    console.log(`[OpenScene Event] Button (#${node.nodeId}) clicked! Emitting "press" event:`, {
+      bound: press.bound,
+      shouldPreventDefault: press.shouldPreventDefault,
+    });
     if (press.shouldPreventDefault) event.preventDefault();
     press.emit();
   };

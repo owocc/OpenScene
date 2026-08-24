@@ -148,7 +148,14 @@ function createIdentityRegistry(
       const isVisible = createMemo(() => {
         if (cleanElement.visible === undefined || cleanElement.visible === null) return true;
         const evaluated = evaluateDynamicValue(cleanElement.visible, getState());
-        return Boolean(evaluated);
+        const visible = Boolean(evaluated);
+        console.log(`[OpenScene Visibility] Component "${type}" (#${nodeId}) visibility changed:`, {
+          rawCondition: cleanElement.visible,
+          evaluated,
+          isVisible: visible,
+          state: getState(),
+        });
+        return visible;
       });
       return (
         <Show when={isVisible()}>

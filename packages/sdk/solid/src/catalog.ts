@@ -360,6 +360,7 @@ export const baseSolidActions: Record<string, OpenSceneSolidActionDefinition> = 
     description: "Update state values",
     params: z.record(z.string(), z.unknown()),
     handler: (params, setState) => {
+      console.log(`[OpenScene Action] Triggered "setState" action with params:`, params);
       if (!params) return;
       setState((prev) => {
         const next = { ...prev };
@@ -370,6 +371,7 @@ export const baseSolidActions: Record<string, OpenSceneSolidActionDefinition> = 
             next[k] = v;
           }
         }
+        console.log(`[OpenScene Action] "setState" completed:`, { before: prev, after: next });
         return next;
       });
     },
