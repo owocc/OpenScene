@@ -92,7 +92,21 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
 
   createEffect(() => {
     const snapshot = context.snapshot();
-    setSelection([...snapshot.selectedElementIds]);
+    const ids = [...snapshot.selectedElementIds];
+    setSelection(ids);
+    if (ids.length > 0 && canvas) {
+      const targetId = ids[0];
+      const nodes = [
+        ...canvas.querySelectorAll<HTMLElement>(`[data-node-id="${CSS.escape(targetId)}"]`),
+      ];
+      const targetNode =
+        nodes.find(
+          (n) => n.getBoundingClientRect().width > 0 && n.getBoundingClientRect().height > 0,
+        ) ?? nodes[0];
+      if (targetNode && typeof targetNode.scrollIntoView === "function") {
+        targetNode.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      }
+    }
   });
   const [geometryRevision, setGeometryRevision] = createSignal(0);
   createEffect(() => {
@@ -138,6 +152,18 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
   createEffect(() => {
     // Serve geometry requests from Studio (tree selection → overlay outline).
     context.client.onGeometryRequest = (elementId) => {
+      if (canvas) {
+        const nodes = [
+          ...canvas.querySelectorAll<HTMLElement>(`[data-node-id="${CSS.escape(elementId)}"]`),
+        ];
+        const targetNode =
+          nodes.find(
+            (n) => n.getBoundingClientRect().width > 0 && n.getBoundingClientRect().height > 0,
+          ) ?? nodes[0];
+        if (targetNode && typeof targetNode.scrollIntoView === "function") {
+          targetNode.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        }
+      }
       const rect = rectForNode(canvas, elementId, geometryRevision);
       return rect ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height } : null;
     };
