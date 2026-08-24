@@ -1,4 +1,11 @@
-import { createContext, createSignal, useContext, type Accessor, type JSX } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createSignal,
+  useContext,
+  type Accessor,
+  type JSX,
+} from "solid-js";
 import { setValueByPointer } from "./evaluate.js";
 import type { ActionHandler, ComponentRegistry, StateUpdater } from "./types.js";
 
@@ -22,6 +29,13 @@ export function RuntimeProvider(props: RuntimeProviderProps): JSX.Element {
   const [state, setRawState] = createSignal<Record<string, unknown>>(
     props.initialState ? structuredClone(props.initialState) : {},
   );
+
+  createEffect(() => {
+    if (props.initialState) {
+      setRawState(structuredClone(props.initialState));
+    }
+  });
+
   const setState: RuntimeContextValue["setState"] = (updater) =>
     setRawState((previous) => (typeof updater === "function" ? updater(previous) : updater));
   const setStateByPath = (pointer: string, value: unknown) => {
