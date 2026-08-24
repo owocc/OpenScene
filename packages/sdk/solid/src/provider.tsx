@@ -1,13 +1,10 @@
 import {
-  createContext,
   createEffect,
   createMemo,
   createSignal,
   ErrorBoundary,
   onCleanup,
   Show,
-  useContext,
-  type Accessor,
   type JSX,
   type Component,
 } from "solid-js";
@@ -25,24 +22,14 @@ import {
 } from "@openscene/javascript";
 import type { SceneDocument } from "@openscene/protocol";
 import type { OpenSceneSolidApp } from "./catalog.js";
+import { OpenSceneContext, useOpenScene } from "./context.js";
 import { OpenSceneNodeProvider } from "./node.js";
 import { SelectionCanvas } from "./selection.js";
-
 export interface OpenSceneProviderProps {
   client?: OpenSceneClient;
   app: OpenSceneSolidApp;
   children?: JSX.Element;
 }
-
-interface OpenSceneContextValue {
-  client: OpenSceneClient;
-  app: OpenSceneSolidApp;
-  snapshot: Accessor<OpenSceneClientState>;
-  /** Live document revision pushed by the Studio over the bridge. */
-  revision: Accessor<number | null>;
-}
-
-const OpenSceneContext = createContext<OpenSceneContextValue>();
 
 function getDefaultClient(): OpenSceneClient {
   if (typeof window !== "undefined" && window.OpenScene) return window.OpenScene;
@@ -114,12 +101,7 @@ export function OpenSceneProvider(props: OpenSceneProviderProps): JSX.Element {
   );
 }
 
-export function useOpenScene(): OpenSceneContextValue {
-  const value = useContext(OpenSceneContext);
-  if (value) return value;
-  throw new Error("useOpenScene must be called inside OpenSceneProvider");
-}
-
+export { useOpenScene, type OpenSceneContextValue } from "./context.js";
 function removePrivateNodeId(element: UIElement): UIElement {
   const props = { ...(element.props as Record<string, unknown>) };
   delete props.__opensceneNodeId;

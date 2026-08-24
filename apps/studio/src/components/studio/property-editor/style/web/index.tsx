@@ -1,7 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isRecord, type JsonValue } from "@/core/document";
+import { isDynamicValue, isRecord, type JsonValue } from "@/core/document";
+import { DynamicValueInput } from "../../../dynamic-value-input";
 import type { StyleControlProps, StyleEntry } from "../types";
 import {
   camelToKebab,
@@ -14,18 +15,14 @@ import {
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
 
-function stringValue(value: JsonValue | undefined): string {
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
 function objectToStyleEntries(obj: unknown): StyleEntry[] {
-  if (!isRecord(obj)) return [];
+  if (!isRecord(obj) || isDynamicValue(obj)) return [];
   return Object.entries(obj).map(([key, val]) => {
     const normalizedKey = camelToKebab(key.trim());
     return {
       id: `${normalizedKey}-${Math.random().toString(36).slice(2, 7)}`,
       key: normalizedKey,
-      value: typeof val === "string" || typeof val === "number" ? String(val) : JSON.stringify(val),
+      value: val as JsonValue,
     };
   });
 }
@@ -56,20 +53,23 @@ export function WebStyleControl({ meta, value, onChange }: StyleControlProps) {
   }, []);
 
   useEffect(() => {
+    if (isDynamicValue(value)) return;
     const currentRecord = styleEntriesToRecord(entries);
     const incomingRecord = isRecord(value) ? value : {};
     const currentKeys = Object.keys(currentRecord);
     const incomingKeys = Object.keys(incomingRecord);
     const isDifferent =
       currentKeys.length !== incomingKeys.length ||
-      incomingKeys.some((k) => stringValue(incomingRecord[k]) !== stringValue(currentRecord[k]));
+      incomingKeys.some(
+        (k) => JSON.stringify(incomingRecord[k]) !== JSON.stringify(currentRecord[k]),
+      );
     if (isDifferent) {
       setEntries(objectToStyleEntries(value));
     }
   }, [value]);
-
-  const updateEntry = (id: string, field: "key" | "value", newValue: string) => {
-    const formattedValue = field === "key" ? camelToKebab(newValue) : newValue;
+  const updateEntry = (id: string, field: "key" | "value", newValue: JsonValue) => {
+    const formattedValue =
+      field === "key" && typeof newValue === "string" ? camelToKebab(newValue) : newValue;
     const next = entries.map((entry) =>
       entry.id === id ? { ...entry, [field]: formattedValue } : entry,
     );
@@ -141,47 +141,32 @@ export function WebStyleControl({ meta, value, onChange }: StyleControlProps) {
                 />
 
                 {/* Value Input with suggestions and optional color picker */}
-                <div className="relative flex items-center">
-                  {valueSuggestions.length > 0 && (
-                    <datalist id={valListId}>
-                      {valueSuggestions.map((val) => (
-                        <option key={val} value={val} />
-                      ))}
-                    </datalist>
-                  )}
-
-                  {isColor && (
-                    <div className="absolute left-1.5 flex items-center justify-center">
+                {/* Value Input with dynamic mode support, suggestions, and optional color picker */}
+                <DynamicValueInput
+                  className="h-8"
+                  inputClassName="font-mono text-[11px]"
+                  placeholder={valueSuggestions.length > 0 ? "value (select / type)" : "value"}
+                  value={entry.value}
+                  suggestions={valueSuggestions}
+                  datalistId={valListId}
+                  prefix={
+                    isColor ? (
                       <input
                         type="color"
                         aria-label="Pick color"
-                        className="size-5 cursor-pointer appearance-none rounded border border-border bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-xs [&::-webkit-color-swatch]:border-none"
+                        className="size-4 cursor-pointer appearance-none rounded border border-border bg-transparent p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-xs [&::-webkit-color-swatch]:border-none"
                         value={
+                          typeof entry.value === "string" &&
                           /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(entry.value.trim())
                             ? entry.value.trim()
                             : "#000000"
                         }
                         onChange={(e) => updateEntry(entry.id, "value", e.target.value)}
                       />
-                    </div>
-                  )}
-
-                  <input
-                    className={cn(
-                      inputClassName,
-                      "font-mono text-[11px] placeholder:font-sans",
-                      isColor && "pl-8",
-                    )}
-                    placeholder={valueSuggestions.length > 0 ? "value (select / type)" : "value"}
-                    list={valueSuggestions.length > 0 ? valListId : undefined}
-                    value={entry.value}
-                    onChange={(e) => updateEntry(entry.id, "value", e.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-
-                {/* Delete button */}
+                    ) : undefined
+                  }
+                  onChange={(val) => updateEntry(entry.id, "value", val)}
+                />
                 <button
                   type="button"
                   className="flex size-7 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-muted hover:text-destructive focus-visible:outline-none"

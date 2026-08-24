@@ -1,13 +1,17 @@
 import type { SceneDocument, UIElement } from "@openscene/protocol";
 
 import {
+  deleteVariableInDocument,
+  renameVariableInDocument,
+  setVariableInDocument,
+} from "./document";
+import {
   deleteElementRecursive,
   getElementLocation,
   insertElement,
   isSlotNodeId,
   moveElement,
 } from "./slot-tree";
-
 export type EditorElement = UIElement & { name?: string };
 export type Surface = "visual" | "text" | "developer" | "preview";
 export type ActiveToolMode = "select" | "interact" | "hand";
@@ -52,8 +56,11 @@ export type EditorAction =
   | { type: "tool.set"; mode: ActiveToolMode }
   | { type: "viewport.patch"; patch: Partial<ViewportState> }
   | { type: "history.undo" }
-  | { type: "history.redo" };
-
+  | { type: "history.redo" }
+  | { type: "state.setVariable"; key: string; value: unknown }
+  | { type: "state.deleteVariable"; key: string }
+  | { type: "state.renameVariable"; oldKey: string; newKey: string }
+  | { type: "state.update"; state: Record<string, unknown> };
 function selectedForDocument(
   document: SceneDocument,
   nodeIds: readonly string[],
@@ -227,6 +234,27 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         future: state.future.slice(1),
         revision: state.revision + 1,
       };
+    }
+    case "state.setVariable": {
+      const nextDoc = setVariableInDocument(state.document, action.key, action.value);
+      return commit(state, nextDoc);
+    }
+    case "state.deleteVariable": {
+      const nextDoc = deleteVariableInDocument(state.document, action.key);
+      return commit(state, nextDoc);
+    }
+    case "state.renameVariable": {
+      const nextDoc = renameVariableInDocument(state.document, action.oldKey, action.newKey);
+      return commit(state, nextDoc);
+    }
+    case "state.update": {
+      return commit(state, {
+        ...state.document,
+        spec: {
+          ...state.document.spec,
+          state: action.state,
+        },
+      });
     }
   }
 }

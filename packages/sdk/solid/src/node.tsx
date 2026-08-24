@@ -1,5 +1,7 @@
 import { createContext, useContext } from "solid-js";
 import type { JSX } from "solid-js";
+import { evaluateDynamicValue } from "@openscene/javascript";
+import { useOpenScene } from "./context.js";
 
 export interface OpenSceneNodeContextValue {
   nodeId: string | null;
@@ -35,17 +37,31 @@ export interface PrimitiveProps {
   on: (event: string) => { emit: () => void; shouldPreventDefault: boolean; bound: boolean };
 }
 
+function useResolvedProps(rawProps: Record<string, unknown>): Record<string, unknown> {
+  try {
+    const context = useOpenScene();
+    const state =
+      context.snapshot().runtimeStore?.getSnapshot() ??
+      (context.snapshot().document?.spec.state as Record<string, unknown> | undefined) ??
+      {};
+    return evaluateDynamicValue(rawProps, state) as Record<string, unknown>;
+  } catch {
+    return rawProps;
+  }
+}
+
 export function View(props: PrimitiveProps): JSX.Element {
   const node = useOpenSceneNode();
-  const className =
-    typeof props.props.className === "string"
-      ? props.props.className
-      : typeof props.props.class === "string"
-        ? props.props.class
+  const resolved = () => useResolvedProps(props.props);
+  const className = () =>
+    typeof resolved().className === "string"
+      ? (resolved().className as string)
+      : typeof resolved().class === "string"
+        ? (resolved().class as string)
         : undefined;
-  const style = props.props.style;
+  const style = () => resolved().style;
   return (
-    <div {...node.nodeAttrs} class={className} style={style as JSX.CSSProperties}>
+    <div {...node.nodeAttrs} class={className()} style={style() as JSX.CSSProperties}>
       {props.children}
     </div>
   );
@@ -53,44 +69,48 @@ export function View(props: PrimitiveProps): JSX.Element {
 
 export function Text(props: PrimitiveProps): JSX.Element {
   const node = useOpenSceneNode();
-  const text =
-    typeof props.props.text === "string"
-      ? props.props.text
-      : typeof props.props.label === "string"
-        ? props.props.label
+  const resolved = () => useResolvedProps(props.props);
+  const text = () => {
+    const val = resolved().text ?? resolved().label;
+    return typeof val === "string" || typeof val === "number" || typeof val === "boolean"
+      ? String(val)
+      : undefined;
+  };
+  const className = () =>
+    typeof resolved().className === "string"
+      ? (resolved().className as string)
+      : typeof resolved().class === "string"
+        ? (resolved().class as string)
         : undefined;
-  const className =
-    typeof props.props.className === "string"
-      ? props.props.className
-      : typeof props.props.class === "string"
-        ? props.props.class
-        : undefined;
-  const style = props.props.style;
+  const style = () => resolved().style;
   return (
-    <span {...node.nodeAttrs} class={className} style={style as JSX.CSSProperties}>
-      {text ?? props.children}
+    <span {...node.nodeAttrs} class={className()} style={style() as JSX.CSSProperties}>
+      {text() ?? props.children}
     </span>
   );
 }
 
 export function Button(props: PrimitiveProps): JSX.Element {
   const node = useOpenSceneNode();
-  const label =
-    typeof props.props.label === "string"
-      ? props.props.label
-      : typeof props.props.text === "string"
-        ? props.props.text
+  const resolved = () => useResolvedProps(props.props);
+  const label = () => {
+    const val = resolved().label ?? resolved().text;
+    return typeof val === "string" || typeof val === "number" || typeof val === "boolean"
+      ? String(val)
+      : undefined;
+  };
+  const className = () =>
+    typeof resolved().className === "string"
+      ? (resolved().className as string)
+      : typeof resolved().class === "string"
+        ? (resolved().class as string)
         : undefined;
-  const className =
-    typeof props.props.className === "string"
-      ? props.props.className
-      : typeof props.props.class === "string"
-        ? props.props.class
-        : undefined;
-  const style = props.props.style;
-  const disabled = props.props.disabled === true;
-  const type =
-    props.props.type === "submit" || props.props.type === "reset" ? props.props.type : "button";
+  const style = () => resolved().style;
+  const disabled = () => resolved().disabled === true;
+  const type = () =>
+    resolved().type === "submit" || resolved().type === "reset"
+      ? (resolved().type as "submit" | "reset")
+      : "button";
   const handleClick = (event: MouseEvent) => {
     const press = props.on("press");
     if (press.shouldPreventDefault) event.preventDefault();
@@ -99,13 +119,13 @@ export function Button(props: PrimitiveProps): JSX.Element {
   return (
     <button
       {...node.nodeAttrs}
-      type={type}
-      disabled={disabled}
-      class={className}
-      style={style as JSX.CSSProperties}
+      type={type()}
+      disabled={disabled()}
+      class={className()}
+      style={style() as JSX.CSSProperties}
       onClick={handleClick}
     >
-      {label ?? props.children}
+      {label() ?? props.children}
     </button>
   );
 }

@@ -550,6 +550,11 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             onCopyJson={() => void copyJson()}
             onSave={saveDocument}
             onApplyAgentActions={handleApplyAgentActions}
+            onSetVariable={(key, value) => dispatch({ type: "state.setVariable", key, value })}
+            onDeleteVariable={(key) => dispatch({ type: "state.deleteVariable", key })}
+            onRenameVariable={(oldKey, newKey) =>
+              dispatch({ type: "state.renameVariable", oldKey, newKey })
+            }
           />
         )}
         {/* 4. Right Properties Panel (hidden when nothing is selected; resizable, max 60vw) */}

@@ -129,6 +129,9 @@ export interface StudioSidebarProps {
   onCopyJson: () => void;
   onSave: () => void;
   onApplyAgentActions?: (actions: AgentUiAction[]) => void;
+  onSetVariable?: (key: string, value: unknown) => void;
+  onDeleteVariable?: (key: string) => void;
+  onRenameVariable?: (oldKey: string, newKey: string) => void;
 }
 
 export const navTabs: Array<{

@@ -1,9 +1,9 @@
 import { isObjectRecord } from "./guards.js";
 
 export function getValueByPointer(object: unknown, pointer: string): unknown {
-  if (!pointer || pointer === "/") return object;
-  if (!pointer.startsWith("/")) return undefined;
-  return pointer
+  if (!pointer || pointer === "/") return undefined;
+  const normalized = pointer.startsWith("/") ? pointer : `/${pointer}`;
+  return normalized
     .slice(1)
     .split("/")
     .reduce<unknown>((current, segment) => {
@@ -47,12 +47,17 @@ export function resolveTranslation(
 }
 
 export function resolveTemplate(template: string, state: Record<string, unknown>): string {
-  return template.replaceAll(/\$\{([^}]+)\}/g, (_, pointer: string) => {
-    const value = getValueByPointer(state, pointer);
-    return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
-      ? String(value)
-      : "";
-  });
+  return template.replaceAll(
+    /(?:\$\{|\{\{|\{)\s*([^}]+?)\s*(?:\}\}|\})/g,
+    (_, rawPointer: string) => {
+      const pointer = rawPointer.trim();
+      const normalized = pointer.startsWith("/") ? pointer : `/${pointer}`;
+      const value = getValueByPointer(state, normalized);
+      return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+        ? String(value)
+        : "";
+    },
+  );
 }
 
 export function isBinding(value: unknown): value is Record<string, string> {

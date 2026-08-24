@@ -390,6 +390,175 @@ type RootTranslation = {
        * 预​览​语​言​ ​(​i​1​8​n​)
        */
       locales: string;
+      /**
+       * 状​态​变​量
+       */
+      title: string;
+      /**
+       * 搜​索​变​量​名​或​值​.​.​.
+       */
+      searchPlaceholder: string;
+      /**
+       * 新​建​变​量
+       */
+      addVariable: string;
+      /**
+       * 编​辑​变​量
+       */
+      editVariable: string;
+      /**
+       * 重​命​名​变​量
+       */
+      renameVariable: string;
+      /**
+       * 删​除​变​量
+       */
+      deleteVariable: string;
+      /**
+       * 变​量​名
+       */
+      variableName: string;
+      /**
+       * 类​型
+       */
+      variableType: string;
+      /**
+       * 变​量​值
+       */
+      variableValue: string;
+      /**
+       * 例​如​ ​c​o​u​n​t​e​r​,​ ​u​s​e​r​N​a​m​e
+       */
+      variableKeyPlaceholder: string;
+      /**
+       * 变​量​名​必​须​是​合​法​标​识​符​（​字​母​、​数​字​、​_​、​$​）
+       */
+      invalidKey: string;
+      /**
+       * 变​量​名​不​能​使​用​保​留​关​键​字​ ​(​i​1​8​n​,​ ​l​a​n​g​,​ ​_​_​s​c​e​n​e​)
+       */
+      reservedKey: string;
+      /**
+       * 该​变​量​名​已​存​在
+       */
+      duplicateKey: string;
+      /**
+       * 暂​无​状​态​变​量
+       */
+      emptyStateTitle: string;
+      /**
+       * 创​建​状​态​变​量​，​在​组​件​属​性​中​进​行​数​据​绑​定​、​条​件​判​断​与​模​板​计​算​。
+       */
+      emptyStateDesc: string;
+      /**
+       * {​c​o​u​n​t​}​ ​处​组​件​引​用
+       * @param {unknown} count
+       */
+      referencesCount: RequiredParams<"count">;
+      /**
+       * 未​被​组​件​引​用
+       */
+      noReferences: string;
+      /**
+       * 引​用​该​变​量​的​组​件
+       */
+      referencesTitle: string;
+      /**
+       * 确​认​删​除​变​量
+       */
+      confirmDeleteTitle: string;
+      /**
+       * 确​定​要​删​除​变​量​“​{​n​a​m​e​}​”​吗​？
+       * @param {unknown} name
+       */
+      confirmDelete: RequiredParams<"name">;
+      /**
+       * 变​量​“​{​n​a​m​e​}​”​当​前​正​被​ ​{​c​o​u​n​t​}​ ​处​组​件​引​用​。​删​除​可​能​导​致​动​态​绑​定​失​效​。​确​定​继​续​吗​？
+       * @param {unknown} count
+       * @param {unknown} name
+       */
+      confirmDeleteWithRefs: RequiredParams<"count" | "name">;
+      /**
+       * 文​本​ ​(​s​t​r​i​n​g​)
+       */
+      typeString: string;
+      /**
+       * 数​值​ ​(​n​u​m​b​e​r​)
+       */
+      typeNumber: string;
+      /**
+       * 布​尔​ ​(​b​o​o​l​e​a​n​)
+       */
+      typeBoolean: string;
+      /**
+       * 对​象​ ​(​o​b​j​e​c​t​)
+       */
+      typeObject: string;
+      /**
+       * 数​组​ ​(​a​r​r​a​y​)
+       */
+      typeArray: string;
+      /**
+       * 空​值​ ​(​n​u​l​l​)
+       */
+      typeNull: string;
+      /**
+       * J​S​O​N​ ​格​式​错​误​，​请​检​查​语​法
+       */
+      jsonInvalid: string;
+      /**
+       * 复​制​状​态​路​径
+       */
+      copyPath: string;
+      /**
+       * 已​复​制​状​态​路​径
+       */
+      pathCopied: string;
+      /**
+       * 复​制​变​量
+       */
+      duplicate: string;
+      /**
+       * 保​存
+       */
+      save: string;
+      /**
+       * 取​消
+       */
+      cancel: string;
+      /**
+       * 删​除
+       */
+      delete: string;
+      /**
+       * 创​建
+       */
+      create: string;
+      /**
+       * {​c​o​u​n​t​}​ ​个​变​量
+       * @param {unknown} count
+       */
+      variableCount: RequiredParams<"count">;
+      /**
+       * 多​语​言
+       */
+      localesTab: string;
+      /**
+       * 变​量​列​表
+       */
+      variablesTab: string;
+      /**
+       * 格​式​化​ ​J​S​O​N
+       */
+      formatJson: string;
+      /**
+       * 展​开​查​看
+       */
+      expandJson: string;
+      /**
+       * 收​起
+       */
+      collapseJson: string;
     };
   };
   toolbar: {
@@ -1120,6 +1289,170 @@ export type TranslationFunctions = {
        * 预览语言 (i18n)
        */
       locales: () => LocalizedString;
+      /**
+       * 状态变量
+       */
+      title: () => LocalizedString;
+      /**
+       * 搜索变量名或值...
+       */
+      searchPlaceholder: () => LocalizedString;
+      /**
+       * 新建变量
+       */
+      addVariable: () => LocalizedString;
+      /**
+       * 编辑变量
+       */
+      editVariable: () => LocalizedString;
+      /**
+       * 重命名变量
+       */
+      renameVariable: () => LocalizedString;
+      /**
+       * 删除变量
+       */
+      deleteVariable: () => LocalizedString;
+      /**
+       * 变量名
+       */
+      variableName: () => LocalizedString;
+      /**
+       * 类型
+       */
+      variableType: () => LocalizedString;
+      /**
+       * 变量值
+       */
+      variableValue: () => LocalizedString;
+      /**
+       * 例如 counter, userName
+       */
+      variableKeyPlaceholder: () => LocalizedString;
+      /**
+       * 变量名必须是合法标识符（字母、数字、_、$）
+       */
+      invalidKey: () => LocalizedString;
+      /**
+       * 变量名不能使用保留关键字 (i18n, lang, __scene)
+       */
+      reservedKey: () => LocalizedString;
+      /**
+       * 该变量名已存在
+       */
+      duplicateKey: () => LocalizedString;
+      /**
+       * 暂无状态变量
+       */
+      emptyStateTitle: () => LocalizedString;
+      /**
+       * 创建状态变量，在组件属性中进行数据绑定、条件判断与模板计算。
+       */
+      emptyStateDesc: () => LocalizedString;
+      /**
+       * {count} 处组件引用
+       */
+      referencesCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 未被组件引用
+       */
+      noReferences: () => LocalizedString;
+      /**
+       * 引用该变量的组件
+       */
+      referencesTitle: () => LocalizedString;
+      /**
+       * 确认删除变量
+       */
+      confirmDeleteTitle: () => LocalizedString;
+      /**
+       * 确定要删除变量“{name}”吗？
+       */
+      confirmDelete: (arg: { name: unknown }) => LocalizedString;
+      /**
+       * 变量“{name}”当前正被 {count} 处组件引用。删除可能导致动态绑定失效。确定继续吗？
+       */
+      confirmDeleteWithRefs: (arg: { count: unknown; name: unknown }) => LocalizedString;
+      /**
+       * 文本 (string)
+       */
+      typeString: () => LocalizedString;
+      /**
+       * 数值 (number)
+       */
+      typeNumber: () => LocalizedString;
+      /**
+       * 布尔 (boolean)
+       */
+      typeBoolean: () => LocalizedString;
+      /**
+       * 对象 (object)
+       */
+      typeObject: () => LocalizedString;
+      /**
+       * 数组 (array)
+       */
+      typeArray: () => LocalizedString;
+      /**
+       * 空值 (null)
+       */
+      typeNull: () => LocalizedString;
+      /**
+       * JSON 格式错误，请检查语法
+       */
+      jsonInvalid: () => LocalizedString;
+      /**
+       * 复制状态路径
+       */
+      copyPath: () => LocalizedString;
+      /**
+       * 已复制状态路径
+       */
+      pathCopied: () => LocalizedString;
+      /**
+       * 复制变量
+       */
+      duplicate: () => LocalizedString;
+      /**
+       * 保存
+       */
+      save: () => LocalizedString;
+      /**
+       * 取消
+       */
+      cancel: () => LocalizedString;
+      /**
+       * 删除
+       */
+      delete: () => LocalizedString;
+      /**
+       * 创建
+       */
+      create: () => LocalizedString;
+      /**
+       * {count} 个变量
+       */
+      variableCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 多语言
+       */
+      localesTab: () => LocalizedString;
+      /**
+       * 变量列表
+       */
+      variablesTab: () => LocalizedString;
+      /**
+       * 格式化 JSON
+       */
+      formatJson: () => LocalizedString;
+      /**
+       * 展开查看
+       */
+      expandJson: () => LocalizedString;
+      /**
+       * 收起
+       */
+      collapseJson: () => LocalizedString;
     };
   };
   toolbar: {

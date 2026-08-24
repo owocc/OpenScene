@@ -12,5 +12,5 @@ export interface StyleControlProps {
 export interface StyleEntry {
   id: string;
   key: string;
-  value: string;
+  value: JsonValue;
 }

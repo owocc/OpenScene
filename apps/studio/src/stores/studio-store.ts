@@ -31,6 +31,10 @@ export interface StudioStoreState extends EditorState {
   setToolMode: (mode: ActiveToolMode) => void;
   patchViewport: (patch: Partial<ViewportState>) => void;
   switchLocale: (locale: string) => void;
+  setVariable: (key: string, value: unknown) => void;
+  deleteVariable: (key: string) => void;
+  renameVariable: (oldKey: string, newKey: string) => void;
+  updateState: (state: Record<string, unknown>) => void;
   undo: () => void;
   redo: () => void;
 }
@@ -88,6 +92,11 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => ({
   setToolMode: (mode) => get().dispatch({ type: "tool.set", mode }),
   patchViewport: (patch) => get().dispatch({ type: "viewport.patch", patch }),
   switchLocale: (locale) => get().dispatch({ type: "locale.switch", locale }),
+  setVariable: (key, value) => get().dispatch({ type: "state.setVariable", key, value }),
+  deleteVariable: (key) => get().dispatch({ type: "state.deleteVariable", key }),
+  renameVariable: (oldKey, newKey) =>
+    get().dispatch({ type: "state.renameVariable", oldKey, newKey }),
+  updateState: (state) => get().dispatch({ type: "state.update", state }),
   undo: () => get().dispatch({ type: "history.undo" }),
   redo: () => get().dispatch({ type: "history.redo" }),
 }));

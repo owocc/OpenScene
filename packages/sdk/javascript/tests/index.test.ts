@@ -6,6 +6,7 @@ import {
 } from "@openscene/protocol";
 import { MessageChannel } from "node:worker_threads";
 import { OpenSceneController, defineAppManifest, openSceneDirectives } from "../src/index.ts";
+import { evaluateDynamicValue, resolveTemplate } from "../src/solid/evaluate.ts";
 import { openSceneManifestPlugin } from "../src/vite.ts";
 
 const manifest: AppManifest = defineAppManifest({
@@ -155,5 +156,33 @@ describe("Vite manifest plugin", () => {
 describe("OpenScene directives", () => {
   test("exports the two framework-neutral custom directives", () => {
     expect(openSceneDirectives.map((directive) => directive.name)).toEqual(["$page", "$t"]);
+  });
+});
+
+describe("Solid SDK Dynamic Evaluation", () => {
+  test("evaluates template expressions with {{/path}} and ${/path}", () => {
+    const state = { hei: 100, aa: "active" };
+    expect(resolveTemplate("{{/hei}}px", state)).toBe("100px");
+    expect(resolveTemplate("{{hei}}px", state)).toBe("100px");
+    expect(resolveTemplate("${/hei}px", state)).toBe("100px");
+    expect(resolveTemplate("${hei}px", state)).toBe("100px");
+    expect(resolveTemplate("btn-{{aa}}", state)).toBe("btn-active");
+  });
+
+  test("evaluates nested dynamic style properties for components like Image", () => {
+    const state = { hei: 100 };
+    const rawProps = {
+      src: "https://example.com/photo.jpg",
+      style: {
+        width: { $template: "{{/hei}}px" },
+        height: "100px",
+      },
+    };
+
+    const evaluated = evaluateDynamicValue(rawProps, state) as typeof rawProps;
+    expect(evaluated.style).toEqual({
+      width: "100px",
+      height: "100px",
+    });
   });
 });

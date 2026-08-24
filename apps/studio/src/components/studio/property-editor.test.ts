@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { resolveControlRenderer, controlRegistry } from "./property-editor";
+import {
+  resolveControlRenderer,
+  controlRegistry,
+  DynamicValueInput,
+  MODE_CONFIGS,
+} from "./property-editor";
+import {
+  dynamicMode,
+  dynamicValue,
+  normalizeStatePath,
+  readStatePath,
+  resolveDynamicValue,
+} from "@/core/document";
 import {
   searchCssProperties,
   getCssValueSuggestions,
@@ -170,5 +182,65 @@ describe("resolveControlRenderer string parsing", () => {
     expect(resolveControlRenderer("unknown_custom_control")).toBe(controlRegistry.text);
     expect(resolveControlRenderer("")).toBe(controlRegistry.text);
     expect(resolveControlRenderer(undefined)).toBe(controlRegistry.text);
+  });
+});
+
+describe("Dynamic mode and path handling", () => {
+  it("normalizes state paths safely without root '/' returning full object", () => {
+    // Empty string normalization should NOT produce "/"
+    expect(normalizeStatePath("")).toBe("");
+    expect(normalizeStatePath("/")).toBe("");
+    expect(normalizeStatePath("counter")).toBe("/counter");
+    expect(normalizeStatePath("/user/name")).toBe("/user/name");
+
+    // readStatePath with empty path returns undefined, NOT the entire state object
+    const mockState = { counter: 42, user: { name: "Alice" } };
+    expect(readStatePath(mockState, "")).toBeUndefined();
+    expect(readStatePath(mockState, "/")).toBeUndefined();
+    expect(readStatePath(mockState, "/counter")).toBe(42);
+    expect(readStatePath(mockState, "/user/name")).toBe("Alice");
+
+    // dynamicValue generation
+    expect(dynamicValue("state", "counter")).toEqual({ $state: "/counter" });
+    expect(dynamicValue("state", "")).toEqual({ $state: "" });
+    expect(dynamicValue("bindState", "userInput")).toEqual({ $bindState: "/userInput" });
+    expect(dynamicValue("template", "Hello {{name}}")).toEqual({ $template: "Hello {{name}}" });
+    expect(dynamicValue("i18n", "title")).toEqual({ $t: "/i18n/$lang/title" });
+
+    // dynamicMode identification
+    expect(dynamicMode({ $state: "/counter" })).toBe("state");
+    expect(dynamicMode({ $bindState: "/userInput" })).toBe("bindState");
+    expect(dynamicMode({ $template: "Hi" })).toBe("template");
+    expect(dynamicMode({ $t: "key" })).toBe("i18n");
+    expect(dynamicMode("raw string")).toBeUndefined();
+    expect(dynamicMode(123)).toBeUndefined();
+  });
+
+  it("handles style control when value is a dynamic value ($state)", () => {
+    const StyleComp = resolveControlRenderer("style");
+    expect(StyleComp).toBeDefined();
+
+    // Dynamic value should be identified as dynamicMode "state"
+    const dynamicVal = { $state: "/theme/cardStyle" };
+    expect(dynamicMode(dynamicVal)).toBe("state");
+  });
+
+  it("provides DynamicValueInput and MODE_CONFIGS for headless inline dynamic values", () => {
+    expect(DynamicValueInput).toBeDefined();
+    expect(MODE_CONFIGS.literal.shortLabel).toBe("Value");
+    expect(MODE_CONFIGS.state.shortLabel).toBe("State");
+    expect(MODE_CONFIGS.bindState.shortLabel).toBe("Bind");
+    expect(MODE_CONFIGS.template.shortLabel).toBe("Tpl");
+    expect(MODE_CONFIGS.i18n.shortLabel).toBe("i18n");
+  });
+
+  it("resolves template dynamic values correctly with {{}} and ${} and paths with/without slash", () => {
+    const state = { hei: 100, name: "Card" };
+    expect(resolveDynamicValue({ $template: "{{/hei}}px" }, state, "en-US")).toBe("100px");
+    expect(resolveDynamicValue({ $template: "{{hei}}px" }, state, "en-US")).toBe("100px");
+    expect(resolveDynamicValue({ $template: "${/hei}px" }, state, "en-US")).toBe("100px");
+    expect(resolveDynamicValue({ $template: "Hello, {{ name }}!" }, state, "en-US")).toBe(
+      "Hello, Card!",
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   dynamicMode,
@@ -16,6 +16,10 @@ import { LOCAL_TEST_SESSION_ID } from "@/core/local-test-session";
 import type { ComponentMeta, EditorMeta, PropMeta } from "@/core/meta";
 import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
+import { DynamicModeDropdown, DynamicValueInput } from "./dynamic-value-input";
+import { StyleControl } from "./property-editor/style";
+
+export * from "./dynamic-value-input";
 import { createOpenSceneClient } from "@openscene/api-client";
 import {
   openApiMethods,
@@ -24,7 +28,6 @@ import {
   type OpenApiValue,
 } from "@openscene/schema";
 import { cn } from "@/lib/utils";
-import { StyleControl } from "./property-editor/style";
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
 const textareaClassName =
@@ -36,8 +39,7 @@ interface ControlProps {
   onChange: (value: JsonValue) => void;
 }
 
-type ControlRenderer = (props: ControlProps) => ReactNode;
-
+export type ControlRenderer = React.ComponentType<ControlProps>;
 function stringValue(value: JsonValue | undefined) {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
@@ -1012,7 +1014,117 @@ export function resolveControlRenderer(controlName?: string): ControlRenderer {
   }
 }
 
-function DynamicValueControl({
+function PropertyField({
+  name,
+  prop,
+  componentType,
+  value,
+  onChange,
+  statePaths,
+}: {
+  name: string;
+  prop: PropMeta;
+  componentType: string;
+  value: JsonValue | undefined;
+  onChange: (value: JsonValue) => void;
+  statePaths: string[];
+}) {
+  const meta = prop.editor;
+  const supportedModes = prop.dynamic ?? [getBindingType(componentType, prop.title), "template"];
+  const dynamicModes = prop.translatable ? [...supportedModes, "i18n" as const] : supportedModes;
+  const availableModes: Array<DynamicMode | "literal"> = ["literal", ...dynamicModes];
+
+  const mode = dynamicMode(value);
+  const activeMode = mode && dynamicModes.includes(mode) ? mode : "literal";
+  const [literalValue, setLiteralValue] = useState<JsonValue | undefined>(
+    activeMode === "literal" ? value : prop.default,
+  );
+
+  useEffect(() => {
+    if (activeMode === "literal" && !isDynamicValue(value)) {
+      setLiteralValue(value);
+    }
+  }, [activeMode, value]);
+
+  const updateLiteral = (next: JsonValue) => {
+    setLiteralValue(next);
+    onChange(next);
+  };
+
+  const handleSwitchMode = (nextMode: DynamicMode | "literal") => {
+    if (nextMode === activeMode) return;
+    if (nextMode === "literal") {
+      onChange(literalValue ?? prop.default ?? "");
+      return;
+    }
+    if (nextMode === "state" || nextMode === "bindState") {
+      const currentText = isDynamicValue(value) ? dynamicValueText(value) : "";
+      const chosen = currentText.trim()
+        ? currentText.trim()
+        : statePaths.length > 0
+          ? statePaths[0]
+          : "";
+      onChange(dynamicValue(nextMode, chosen));
+      return;
+    }
+    if (nextMode === "template") {
+      const currentText = isDynamicValue(value)
+        ? dynamicValueText(value)
+        : typeof literalValue === "string"
+          ? literalValue
+          : "";
+      onChange({ $template: currentText });
+      return;
+    }
+    if (nextMode === "i18n") {
+      const currentText = isDynamicValue(value) ? dynamicValueText(value) : "";
+      onChange(dynamicValue("i18n", currentText));
+      return;
+    }
+  };
+
+  const isLiteral = activeMode === "literal";
+
+  return (
+    <fieldset className="grid gap-1.5">
+      {/* Header: title on left as span, div on right for name + mode dropdown */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-foreground select-none">{prop.title}</span>
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <span className="font-mono text-[9px] text-muted-foreground select-none">{name}</span>
+          <DynamicModeDropdown
+            activeMode={activeMode}
+            availableModes={availableModes}
+            onSelectMode={handleSwitchMode}
+          />
+        </div>
+      </div>
+
+      {/* Control Body */}
+      {!isLiteral ? (
+        <DynamicValueInput
+          value={value}
+          onChange={onChange}
+          statePaths={statePaths}
+          supportedModes={availableModes}
+          translatable={prop.translatable}
+          hideModeDropdown={true}
+        />
+      ) : (
+        (() => {
+          const ControlComponent = resolveControlRenderer(meta.control);
+          return <ControlComponent meta={meta} value={literalValue} onChange={updateLiteral} />;
+        })()
+      )}
+
+      {prop.description && (
+        <p className="text-[10px] leading-4 text-muted-foreground">{prop.description}</p>
+      )}
+    </fieldset>
+  );
+}
+
+export function DynamicValueControl({
   propMeta,
   componentType,
   value,
@@ -1025,79 +1137,17 @@ function DynamicValueControl({
   onChange: (value: JsonValue) => void;
   statePaths: string[];
 }) {
-  const meta = propMeta.editor;
-  const supportedModes = propMeta.dynamic ?? [
-    getBindingType(componentType, propMeta.title),
-    "template",
-  ];
-  const dynamicModes = propMeta.translatable
-    ? [...supportedModes, "i18n" as const]
-    : supportedModes;
-  const mode = dynamicMode(value);
-  const activeMode = mode && dynamicModes.includes(mode) ? mode : "literal";
-  const [literalValue, setLiteralValue] = useState<JsonValue | undefined>(
-    activeMode === "literal" ? value : propMeta.default,
-  );
-
-  useEffect(() => {
-    if (activeMode === "literal" && !isDynamicValue(value)) setLiteralValue(value);
-  }, [activeMode, value]);
-
-  const control = resolveControlRenderer(meta.control);
-  const updateLiteral = (next: JsonValue) => {
-    setLiteralValue(next);
-    onChange(next);
-  };
-
   return (
-    <div className="grid gap-1.5">
-      {activeMode === "literal" ? (
-        control({ meta, value: literalValue, onChange: updateLiteral })
-      ) : activeMode === "state" || activeMode === "bindState" ? (
-        <div className="grid gap-1">
-          <input
-            className={inputClassName}
-            list={`state-paths-${propMeta.title.replace(/\W/g, "-")}`}
-            value={isDynamicValue(value) ? dynamicValueText(value) : ""}
-            placeholder="/user/name"
-            onChange={(event) => onChange(dynamicValue(activeMode, event.target.value))}
-          />
-          <datalist id={`state-paths-${propMeta.title.replace(/\W/g, "-")}`}>
-            {statePaths.map((path) => (
-              <option key={path} value={path} />
-            ))}
-          </datalist>
-        </div>
-      ) : (
-        <input
-          className={inputClassName}
-          value={isDynamicValue(value) ? dynamicValueText(value) : ""}
-          placeholder={activeMode === "i18n" ? "heroTitle" : "{{/user/name}}"}
-          onChange={(event) => onChange(dynamicValue(activeMode, event.target.value))}
-        />
-      )}
-      <select
-        className="h-7 rounded-lg border border-input bg-background px-2 text-[10px] text-muted-foreground"
-        value={activeMode}
-        onChange={(event) => {
-          const nextMode = event.target.value as DynamicMode | "literal";
-          if (nextMode === "literal") {
-            onChange(literalValue ?? "");
-            return;
-          }
-          onChange(dynamicValue(nextMode, isDynamicValue(value) ? dynamicValueText(value) : ""));
-        }}
-      >
-        <option value="literal">Literal</option>
-        {dynamicModes.includes("state") && <option value="state">State read</option>}
-        {dynamicModes.includes("bindState") && <option value="bindState">Two-way bind</option>}
-        {dynamicModes.includes("template") && <option value="template">Template</option>}
-        {dynamicModes.includes("i18n") && <option value="i18n">i18n key</option>}
-      </select>
-    </div>
+    <PropertyField
+      name={propMeta.title}
+      prop={propMeta}
+      componentType={componentType}
+      value={value}
+      onChange={onChange}
+      statePaths={statePaths}
+    />
   );
 }
-
 export interface PropertyEditorProps {
   meta: ComponentMeta;
   componentType: string;
@@ -1119,23 +1169,15 @@ export function PropertyEditor({
   return (
     <div className="grid gap-3">
       {Object.entries(meta.props).map(([name, prop]) => (
-        <fieldset key={name} className="grid gap-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <label className="text-[11px] font-medium text-foreground">{prop.title}</label>
-            <span className="font-mono text-[9px] text-muted-foreground">{name}</span>
-          </div>
-          <DynamicValueControl
-            key={`${elementId}:${name}`}
-            propMeta={prop}
-            componentType={componentType}
-            value={props[name] ?? prop.default}
-            onChange={(value) => onChange(name, value)}
-            statePaths={statePaths}
-          />
-          {prop.description && (
-            <p className="text-[10px] leading-4 text-muted-foreground">{prop.description}</p>
-          )}
-        </fieldset>
+        <PropertyField
+          key={`${elementId}:${name}`}
+          name={name}
+          prop={prop}
+          componentType={componentType}
+          value={props[name] ?? prop.default}
+          onChange={(value) => onChange(name, value)}
+          statePaths={statePaths}
+        />
       ))}
       {meta.events &&
         Object.entries(meta.events).map(([name, event]) => (

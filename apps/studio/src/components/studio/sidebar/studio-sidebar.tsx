@@ -47,6 +47,9 @@ export function StudioSidebar({
   onCopyJson,
   onSave,
   onApplyAgentActions,
+  onSetVariable,
+  onDeleteVariable,
+  onRenameVariable,
 }: StudioSidebarProps) {
   const { LL } = useI18n();
   const queryPanel = useQueryStore((s) => s.panel);
@@ -294,6 +297,11 @@ export function StudioSidebar({
                         locale={locale}
                         locales={locales}
                         onLocaleChange={onLocaleChange}
+                        document={document}
+                        onSetVariable={onSetVariable}
+                        onDeleteVariable={onDeleteVariable}
+                        onRenameVariable={onRenameVariable}
+                        onSelectNode={onSelectNode}
                       />
                     )}
                   </div>
