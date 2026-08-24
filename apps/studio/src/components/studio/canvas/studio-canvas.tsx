@@ -11,7 +11,8 @@ import { WebIframeRenderer } from "./renderers/web-iframe-renderer";
 import { useAgentChatStore } from "@/stores/agent-chat-store";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { CheckCheck, Sparkles, X } from "lucide-react";
+import { ShineBorder } from "@/components/ui/shine-border";
+import { Astroid, CheckCheck, X } from "lucide-react";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
 export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
@@ -199,41 +200,41 @@ export function StudioCanvas({
                   : viewport.currentDeviceHeight,
               }}
             >
-              <div className="absolute -top-6 left-0 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground select-none">
+              <div className="absolute -top-7 left-0 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground select-none">
                 <span>主画布</span>
                 <span className="text-[10px] text-muted-foreground/60">rev {revision}</span>
               </div>
-              <div className="h-full w-full border border-border bg-background shadow-md overflow-hidden">
-                {previewElement}
+              <div className="relative h-full w-full border border-border bg-background shadow-md">
+                <div className="h-full w-full overflow-hidden">{previewElement}</div>
               </div>
             </div>
 
             {/* 2. Live AI Replica Canvas Artboard */}
             {aiPreviewDocument && (
               <div
-                className="relative flex flex-col transition-all duration-150 ring-4 ring-primary/25 rounded-2xl shadow-2xl overflow-hidden border border-primary/50 bg-background"
+                className="relative transition-all duration-150"
                 style={{
                   width: viewport.isRotated
                     ? viewport.currentDeviceHeight
                     : viewport.currentDeviceWidth,
-                  height:
-                    (viewport.isRotated
-                      ? viewport.currentDeviceWidth
-                      : viewport.currentDeviceHeight) + 36,
+                  height: viewport.isRotated
+                    ? viewport.currentDeviceWidth
+                    : viewport.currentDeviceHeight,
                 }}
               >
-                {/* Top AI Banner */}
-                <div className="h-9 shrink-0 flex items-center justify-between bg-primary/95 px-3 py-1 text-primary-foreground backdrop-blur select-none">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold">
-                    <Sparkles className="size-3.5 text-amber-300 animate-pulse" />
-                    <span>AI 实时副本画布</span>
-                    {isStreaming && <Spinner className="size-3 text-primary-foreground" />}
+                {/* Header above artboard matching main canvas */}
+                <div className="absolute -top-7 inset-x-0 flex items-center justify-between text-[11px] font-medium text-muted-foreground select-none">
+                  <div className="flex items-center gap-1.5">
+                    <Astroid className="size-3.5 text-foreground" />
+                    <span className="font-semibold text-foreground">AI 实时副本画布</span>
+                    {isStreaming && <Spinner className="size-3 text-foreground" />}
                   </div>
+                  {/* Action buttons floating on the right */}
                   <div className="flex items-center gap-1.5">
                     <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-6 gap-1 px-2.5 text-[11px] font-semibold bg-background text-foreground hover:bg-background/90 shadow-sm"
+                      size="xs"
+                      variant="default"
+                      className="h-6 gap-1 px-2.5 text-[11px] font-medium shadow-xs"
                       onClick={() => {
                         if (aiPreviewDocument) {
                           onApplyDocument?.(aiPreviewDocument);
@@ -241,13 +242,13 @@ export function StudioCanvas({
                         }
                       }}
                     >
-                      <CheckCheck className="size-3.5 text-emerald-600" />
-                      替换为主页面
+                      <CheckCheck className="size-3 text-emerald-300" />
+                      <span>替换为主页面</span>
                     </Button>
                     <Button
-                      size="icon"
+                      size="icon-xs"
                       variant="ghost"
-                      className="size-6 text-primary-foreground hover:bg-white/20"
+                      className="size-6 text-muted-foreground hover:text-foreground"
                       title="关闭实时副本"
                       onClick={discardAiPreview}
                     >
@@ -256,8 +257,16 @@ export function StudioCanvas({
                   </div>
                 </div>
 
-                {/* Live AI Iframe Renderer */}
-                <div className="flex-1 w-full overflow-hidden">{aiPreviewElement}</div>
+                {/* Artboard Container with ShineBorder matching main canvas */}
+                <div className="relative h-full w-full border border-border bg-background shadow-md">
+                  <div className="h-full w-full overflow-hidden">{aiPreviewElement}</div>
+                  <ShineBorder
+                    borderWidth={2}
+                    duration={8}
+                    shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
+                    className="z-20 pointer-events-none"
+                  />
+                </div>
               </div>
             )}
           </div>

@@ -2,26 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowUp,
-  Bot,
+  Astroid,
   Check,
   ChevronDown,
   Code2,
   Copy,
   Edit2,
-  File,
   FileText,
   Image as ImageIcon,
-  LayoutTemplate,
   List,
   MessageSquare,
   MoreVertical,
   MousePointerClick,
-  Paperclip,
   Plus,
   RotateCcw,
-  Sparkles,
-  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -33,10 +27,47 @@ import {
 } from "@openscene/protocol";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "./markdown-content";
+import { ShineBorder } from "@/components/ui/shine-border";
 import { useStudioStore } from "@/stores/studio-store";
-import { useAgentChatStore, type ChatAttachment } from "@/stores/agent-chat-store";
+import { useAgentChatStore } from "@/stores/agent-chat-store";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Attachment as PromptAttachment,
+  AttachmentName,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments as PromptAttachments,
+} from "@/components/ai-elements/attachments";
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from "@/components/ai-elements/model-selector";
+import {
+  PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionAddScreenshot,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
+  PromptInputBody,
+  PromptInputButton,
+  PromptInputFooter,
+  PromptInputProvider,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+  usePromptInputAttachments,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,25 +77,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Attachment,
-  AttachmentAction,
   AttachmentContent,
   AttachmentDescription,
   AttachmentGroup,
   AttachmentMedia,
   AttachmentTitle,
 } from "@/components/ui/attachment";
-import {
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageFooter,
-  MessageGroup,
-  MessageHeader,
-} from "@/components/ui/message";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 interface AgentsPanelProps {
   appKey: string;
   manifestVersion: string;
@@ -74,9 +95,178 @@ interface AgentsPanelProps {
   diagnostics: Array<{ message: string }>;
   document?: SceneDocument;
   selectedId?: string | null;
+  onSelectNode?: (nodeId: string | null) => void;
   onApplyAgentActions?: (actions: AgentUiAction[]) => void;
 }
 
+function PromptInputAttachmentsDisplay({
+  selectedElement,
+  selectedId,
+  attachSelectedElement,
+  onDetachElement,
+  onSelectElement,
+}: {
+  selectedElement: { type: string } | null;
+  selectedId: string | null;
+  attachSelectedElement: boolean;
+  onDetachElement: () => void;
+  onSelectElement?: (nodeId: string | null) => void;
+}) {
+  const attachments = usePromptInputAttachments();
+  const handleRemove = (id: string) => attachments.remove(id);
+
+  const hasElement = attachSelectedElement && selectedElement && selectedId;
+  if (attachments.files.length === 0 && !hasElement) {
+    return null;
+  }
+
+  return (
+    <PromptAttachments variant="inline">
+      {hasElement && (
+        <PromptAttachment
+          data={{
+            id: `elem_${selectedId}`,
+            type: "element",
+            filename: `#${selectedId}`,
+          }}
+          onRemove={onDetachElement}
+          className="cursor-pointer hover:bg-muted/80 transition-all"
+          onClick={() => onSelectElement?.(selectedId)}
+        >
+          <AttachmentPreview />
+          <AttachmentName />
+          <AttachmentRemove />
+        </PromptAttachment>
+      )}
+      {attachments.files.map((attachment) => (
+        <PromptAttachment
+          data={attachment}
+          key={attachment.id}
+          onRemove={() => handleRemove(attachment.id)}
+        >
+          <AttachmentPreview />
+          <AttachmentName />
+          <AttachmentRemove />
+        </PromptAttachment>
+      ))}
+    </PromptAttachments>
+  );
+}
+function summarizeAndDeduplicateActions(actions: AgentUiAction[]) {
+  const map = new Map<
+    string,
+    {
+      id: string;
+      action: AgentUiAction["action"];
+      componentType?: string;
+      targetParentId?: string;
+      mergedProps: Record<string, unknown>;
+      elementSpec?: Record<string, unknown>;
+    }
+  >();
+  let replaceAction: AgentUiAction | null = null;
+
+  for (const act of actions) {
+    if (act.action === "replace_document") {
+      replaceAction = act;
+      continue;
+    }
+
+    const elementId =
+      act.action === "insert_element" ? act.elementId || act.element.id || "new" : act.elementId;
+
+    if (!elementId) continue;
+
+    const existing = map.get(elementId);
+    if (!existing) {
+      const initialProps =
+        act.action === "update_element" && act.patch?.props
+          ? { ...(act.patch.props as Record<string, unknown>) }
+          : {};
+      map.set(elementId, {
+        id: elementId,
+        action: act.action,
+        componentType: act.action === "insert_element" ? act.element.type : undefined,
+        targetParentId: act.action === "insert_element" ? act.target?.parentId : undefined,
+        mergedProps: initialProps,
+        elementSpec:
+          act.action === "insert_element" ? (act.element as Record<string, unknown>) : undefined,
+      });
+    } else {
+      if (act.action === "update_element" && act.patch?.props) {
+        Object.assign(existing.mergedProps, act.patch.props as Record<string, unknown>);
+      }
+      if (act.action === "delete_element") {
+        existing.action = "delete_element";
+      }
+    }
+  }
+
+  const list: Array<{
+    id: string;
+    action: AgentUiAction["action"];
+    label: string;
+    details: string;
+    badgeColor: string;
+    badgeText: string;
+  }> = [];
+
+  if (replaceAction && replaceAction.action === "replace_document") {
+    list.push({
+      id: "document",
+      action: "replace_document",
+      label: "Canvas Document",
+      details: `Replaced full document (${Object.keys(replaceAction.document.spec.elements).length} elements)`,
+      badgeColor: "text-blue-500",
+      badgeText: "Replace",
+    });
+  }
+
+  for (const item of map.values()) {
+    if (item.action === "insert_element") {
+      list.push({
+        id: item.id,
+        action: item.action,
+        label: `#${item.id}`,
+        details: item.elementSpec
+          ? JSON.stringify(item.elementSpec, null, 2)
+          : `Inserted into #${item.targetParentId || "root"}`,
+        badgeColor: "text-emerald-500",
+        badgeText: "+ Insert",
+      });
+    } else if (item.action === "update_element") {
+      const hasProps = Object.keys(item.mergedProps).length > 0;
+      list.push({
+        id: item.id,
+        action: item.action,
+        label: `#${item.id}`,
+        details: hasProps
+          ? JSON.stringify(item.mergedProps, null, 2)
+          : "Element properties updated",
+        badgeColor: "text-amber-500",
+        badgeText: "~ Edit",
+      });
+    } else if (item.action === "delete_element") {
+      list.push({
+        id: item.id,
+        action: item.action,
+        label: `#${item.id}`,
+        details: `Deleted element #${item.id} from canvas`,
+        badgeColor: "text-destructive",
+        badgeText: "- Delete",
+      });
+    }
+  }
+
+  return {
+    items: list,
+    replaceAction,
+    uniqueCount: list.length,
+    insertCount: list.filter((x) => x.action === "insert_element").length,
+    updateCount: list.filter((x) => x.action === "update_element").length,
+    deleteCount: list.filter((x) => x.action === "delete_element").length,
+  };
+}
 export function AgentsPanel({
   appKey,
   manifestVersion,
@@ -86,6 +276,7 @@ export function AgentsPanel({
   diagnostics,
   document,
   selectedId,
+  onSelectNode,
   onApplyAgentActions,
 }: AgentsPanelProps) {
   const { LL } = useI18n();
@@ -107,23 +298,32 @@ export function AgentsPanel({
 
   const [viewMode, setViewMode] = useState<"chat" | "sessions">("chat");
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [renameTitle, setRenameTitle] = useState("");
-  const [input, setInput] = useState("");
-  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showContractInfo, setShowContractInfo] = useState(false);
   const [attachSelectedElement, setAttachSelectedElement] = useState(true);
-
+  const handleSelectElement = (nodeId: string | null) => {
+    if (onSelectNode) {
+      onSelectNode(nodeId);
+    } else {
+      useStudioStore.getState().selectNode(nodeId);
+    }
+  };
   const selectedElement = useMemo(() => {
     if (!selectedId || !document?.spec.elements) return null;
     return document.spec.elements[selectedId] ?? null;
   }, [selectedId, document]);
 
+  useEffect(() => {
+    if (selectedId) {
+      setAttachSelectedElement(true);
+    }
+  }, [selectedId]);
+
   const [expandedJsonMap, setExpandedJsonMap] = useState<Record<string, boolean>>({});
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   function handleApplyActions(actions: AgentUiAction[]) {
     if (onApplyAgentActions) {
       onApplyAgentActions(actions);
@@ -133,6 +333,12 @@ export function AgentsPanel({
       useStudioStore.getState().dispatch({ type: "document.replace", document: nextDoc });
       useStudioStore.getState().showNotice(`✨ ${LL.panels.agents.appliedToCanvasSuccess()}`);
     }
+  }
+
+  function handlePreviewActions(actions: AgentUiAction[]) {
+    const currentDoc = useStudioStore.getState().document;
+    const previewDoc = applyAgentUiActionsToDocument(currentDoc, actions);
+    useAgentChatStore.getState().setAiPreview(previewDoc, actions);
   }
   // Available prompt profiles for this App
   // Initialize sessions from bootstrap if available
@@ -184,33 +390,8 @@ export function AgentsPanel({
     window.setTimeout(() => setCopiedId(null), 2000);
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const newAttachments: ChatAttachment[] = Array.from(files).map((file) => {
-      const isImg = file.type.startsWith("image/");
-      return {
-        id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        dataUrl: isImg ? URL.createObjectURL(file) : undefined,
-      };
-    });
-
-    setPendingAttachments((prev) => [...prev, ...newAttachments]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-  function handleRemoveAttachment(id: string) {
-    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
-  }
-
   function handleCreateSession() {
     createSession(defaultPromptId, undefined, `Chat ${sessions.length + 1}`);
-    setInput("");
-    setPendingAttachments([]);
     setViewMode("chat");
   }
 
@@ -221,10 +402,16 @@ export function AgentsPanel({
     setRenamingSessionId(null);
     setRenameTitle("");
   }
-  async function handleSend() {
-    if (!activeSession || (!input.trim() && pendingAttachments.length === 0)) return;
-    const content = input.trim();
-    const attachments = [...pendingAttachments];
+  const handleSubmit = (message: PromptInputMessage) => {
+    if (!activeSession) return;
+    const content = message.text;
+    const attachments = message.files?.map((f) => ({
+      id: f.id,
+      name: f.filename || "file",
+      size: f.size,
+      type: f.mediaType,
+      url: f.url,
+    }));
     const elementPayload =
       attachSelectedElement && selectedElement && selectedId
         ? {
@@ -236,18 +423,8 @@ export function AgentsPanel({
           }
         : undefined;
 
-    setInput("");
-    setPendingAttachments([]);
-    await sendMessage(activeSession.id, content, attachments, elementPayload);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void handleSend();
-    }
-  }
-
+    void sendMessage(activeSession.id, content, attachments, elementPayload);
+  };
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background text-xs">
       {/* Top Header Toolbar */}
@@ -383,60 +560,6 @@ export function AgentsPanel({
                 </DropdownMenu>
               </div>
             </div>
-
-            {/* Prompt Profile Selector */}
-            {promptProfiles.length > 0 && activeSession && (
-              <div className="flex items-center justify-between gap-1 rounded-lg border border-border/40 bg-background/60 px-2 py-1">
-                <span className="text-[11px] text-muted-foreground">
-                  {LL.panels.agents.promptProfile()}:
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
-                    render={
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 gap-1 px-1.5 text-[11px] font-medium"
-                      >
-                        <Sparkles className="size-3 text-amber-500" />
-                        <span className="max-w-[130px] truncate">
-                          {selectedPrompt?.name || LL.panels.agents.defaultProfile()}
-                        </span>
-                        <ChevronDown className="size-2.5 opacity-60" />
-                      </Button>
-                    }
-                  />
-                  <DropdownMenuContent align="end" className="w-60">
-                    <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                      {LL.panels.agents.promptProfile()}
-                    </div>
-                    <DropdownMenuSeparator />
-                    {promptProfiles.map((p) => (
-                      <DropdownMenuItem
-                        key={p.id}
-                        onClick={() => setSessionPrompt(activeSession.id, p.id, p.key)}
-                        className={cn(
-                          "flex flex-col items-start gap-0.5 text-xs",
-                          (p.id === activeSession.promptId ||
-                            (!activeSession.promptId && p.isDefault)) &&
-                            "bg-accent font-medium",
-                        )}
-                      >
-                        <div className="flex w-full items-center justify-between">
-                          <span>{p.name}</span>
-                          {p.isDefault && (
-                            <Badge variant="outline" className="h-4 px-1 text-[9px]">
-                              {LL.panels.agents.defaultProfile()}
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="font-mono text-[10px] text-muted-foreground">{p.key}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -592,9 +715,7 @@ export function AgentsPanel({
           <div className="flex-1 overflow-y-auto p-3">
             {!activeSession || activeSession.messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">
-                <div className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <Bot className="size-5" />
-                </div>
+                <Astroid className="size-8 text-foreground/80" />
                 <div>
                   <div className="text-xs font-semibold text-foreground">
                     {LL.panels.agents.title()}
@@ -617,240 +738,291 @@ export function AgentsPanel({
                       size="sm"
                       className="h-auto justify-start px-2.5 py-1.5 text-left text-[11px] text-muted-foreground hover:text-foreground"
                       onClick={() => {
-                        setInput(suggestion);
-                        textareaRef.current?.focus();
+                        handleSubmit({ text: suggestion });
                       }}
                     >
-                      <Sparkles className="mr-1.5 size-3 shrink-0 text-amber-500" />
+                      <Astroid className="mr-1.5 size-3 shrink-0 text-foreground/70" />
                       <span className="truncate">{suggestion}</span>
                     </Button>
                   ))}
                 </div>
               </div>
             ) : (
-              <MessageGroup className="gap-4">
+              <div className="flex flex-col gap-4">
                 {activeSession.messages.map((m) => {
                   const isUser = m.role === "user";
                   return (
-                    <Message key={m.id} align={isUser ? "end" : "start"} className="gap-2">
-                      {!isUser && (
-                        <MessageAvatar className="size-7 bg-primary/10 text-primary">
-                          <Sparkles className="size-3.5" />
-                        </MessageAvatar>
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "flex flex-col w-full min-w-0",
+                        isUser ? "items-end" : "items-start",
                       )}
-
-                      <MessageContent className="max-w-[85%]">
-                        <MessageHeader className="justify-between text-[10px]">
-                          <span>{isUser ? "You" : selectedPrompt?.name || "AI Agent"}</span>
-                          <span>
-                            {new Date(m.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </MessageHeader>
-                        {/* Selected Element Context Tag (User Message) */}
-                        {isUser && m.selectedElement && (
-                          <div className="mb-1 flex items-center gap-1.5 self-end rounded-lg border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] text-muted-foreground select-none">
-                            <MousePointerClick className="size-3 text-primary" />
-                            <span className="font-semibold text-foreground">
-                              {m.selectedElement.type}
-                            </span>
-                            <span className="font-mono text-muted-foreground/80">
-                              ({m.selectedElement.nodeId})
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Attachments if any (rendered above message bubble) */}
-                        {m.attachments && m.attachments.length > 0 && (
-                          <AttachmentGroup className="gap-1.5">
-                            {m.attachments.map((att) => (
-                              <Attachment key={att.id} size="sm" className="max-w-full">
-                                <AttachmentMedia variant="icon">
-                                  {att.type?.startsWith("image/") ? (
-                                    <ImageIcon className="size-3.5 text-blue-500" />
-                                  ) : (
-                                    <FileText className="size-3.5 text-muted-foreground" />
-                                  )}
-                                </AttachmentMedia>
-                                <AttachmentContent>
-                                  <AttachmentTitle className="truncate text-[11px]">
-                                    {att.name}
-                                  </AttachmentTitle>
-                                  {att.size ? (
-                                    <AttachmentDescription className="text-[9px]">
-                                      {(att.size / 1024).toFixed(1)} KB
-                                    </AttachmentDescription>
-                                  ) : null}
-                                </AttachmentContent>
-                              </Attachment>
-                            ))}
-                          </AttachmentGroup>
-                        )}
-
-                        {/* Message Bubble Content */}
-                        {(() => {
-                          const parsed =
-                            !isUser && m.content ? splitContentAndUiActions(m.content) : null;
-                          const displayText = isUser ? m.content : parsed?.displayText;
-                          const actions = parsed?.actions;
-                          const rawJson = parsed?.rawJson;
-                          const isJsonExpanded = Boolean(expandedJsonMap[m.id]);
-
-                          const replaceAction = actions?.find(
-                            (a) => a.action === "replace_document",
-                          );
-                          const insertCount =
-                            actions?.filter((a) => a.action === "insert_element").length ?? 0;
-                          const updateCount =
-                            actions?.filter((a) => a.action === "update_element").length ?? 0;
-                          const deleteCount =
-                            actions?.filter((a) => a.action === "delete_element").length ?? 0;
-
-                          return (
-                            <>
-                              <div
-                                className={cn(
-                                  "rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap",
-                                  isUser
-                                    ? "bg-primary text-primary-foreground"
-                                    : "border border-border/50 bg-muted/40 text-foreground",
+                    >
+                      {/* Attachments (including attached canvas element) */}
+                      {((m.attachments && m.attachments.length > 0) ||
+                        (isUser && m.selectedElement)) && (
+                        <AttachmentGroup className="mb-1 gap-1.5 max-w-[60%]">
+                          {isUser && m.selectedElement && (
+                            <Attachment
+                              key="selected-elem"
+                              size="sm"
+                              className="max-w-full cursor-pointer hover:bg-muted/80 hover:border-primary/50 transition-all select-none"
+                              onClick={() =>
+                                m.selectedElement && handleSelectElement(m.selectedElement.nodeId)
+                              }
+                              title={`Select ${m.selectedElement.type} (#${m.selectedElement.nodeId})`}
+                            >
+                              <AttachmentMedia variant="icon">
+                                <MousePointerClick className="size-3.5 text-primary" />
+                              </AttachmentMedia>
+                              <AttachmentContent>
+                                <AttachmentTitle className="truncate text-[11px]">
+                                  #{m.selectedElement.nodeId}
+                                </AttachmentTitle>
+                              </AttachmentContent>
+                            </Attachment>
+                          )}
+                          {m.attachments?.map((att) => (
+                            <Attachment key={att.id} size="sm" className="max-w-full">
+                              <AttachmentMedia variant="icon">
+                                {att.type?.startsWith("image/") ? (
+                                  <ImageIcon className="size-3.5 text-blue-500" />
+                                ) : (
+                                  <FileText className="size-3.5 text-muted-foreground" />
                                 )}
-                              >
-                                {displayText ||
-                                  (actions && actions.length > 0 ? (
-                                    <div className="flex items-center gap-1.5 font-medium text-foreground">
-                                      <Sparkles className="size-3.5 text-amber-500" />
-                                      <span>{LL.panels.agents.uiDocumentDetected()}</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-1.5 py-0.5 text-muted-foreground">
-                                      <Spinner className="size-3" />
-                                      <span className="text-[11px]">Thinking…</span>
-                                    </div>
-                                  ))}
+                              </AttachmentMedia>
+                              <AttachmentContent>
+                                <AttachmentTitle className="truncate text-[11px]">
+                                  {att.name}
+                                </AttachmentTitle>
+                                {att.size ? (
+                                  <AttachmentDescription className="text-[9px]">
+                                    {(att.size / 1024).toFixed(1)} KB
+                                  </AttachmentDescription>
+                                ) : null}
+                              </AttachmentContent>
+                            </Attachment>
+                          ))}
+                        </AttachmentGroup>
+                      )}
+                      {/* Message Content */}
+                      {(() => {
+                        const parsed =
+                          !isUser && m.content ? splitContentAndUiActions(m.content) : null;
+                        const displayText = isUser ? m.content : parsed?.displayText;
+                        const actions = parsed?.actions;
+                        const rawJson = parsed?.rawJson;
+                        const isJsonExpanded = Boolean(expandedJsonMap[m.id]);
+                        const summary =
+                          actions && actions.length > 0
+                            ? summarizeAndDeduplicateActions(actions)
+                            : null;
+
+                        if (isUser) {
+                          return (
+                            <div className="flex flex-col items-end max-w-[60%] space-y-0.5">
+                              <div className="w-full rounded-2xl bg-primary px-3 py-2 text-xs leading-relaxed text-primary-foreground whitespace-pre-wrap break-words shadow-sm">
+                                {displayText}
                               </div>
-
-                              {/* Generated UI Action Plan Card */}
-                              {!isUser && actions && actions.length > 0 && (
-                                <div className="mt-1.5 flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-2.5">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5 font-medium text-foreground">
-                                      <Sparkles className="size-3.5 text-amber-500" />
-                                      <span>{LL.panels.agents.uiDocumentDetected()}</span>
-                                    </div>
-                                    <Button
-                                      variant="default"
-                                      size="sm"
-                                      className="h-6 gap-1 px-2 text-[11px]"
-                                      onClick={() => handleApplyActions(actions)}
-                                    >
-                                      <LayoutTemplate className="size-3" />
-                                      {LL.panels.agents.applyToCanvas()}
-                                    </Button>
-                                  </div>
-                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
-                                    <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                      {replaceAction &&
-                                      replaceAction.action === "replace_document" ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="h-4 border-blue-500/40 bg-blue-500/10 px-1 text-[9px] font-normal text-blue-500"
-                                        >
-                                          全量重绘画布 (
-                                          {Object.keys(replaceAction.document.spec.elements).length}{" "}
-                                          elements)
-                                        </Badge>
-                                      ) : (
-                                        <>
-                                          {insertCount > 0 && (
-                                            <Badge
-                                              variant="outline"
-                                              className="h-4 border-emerald-500/40 bg-emerald-500/10 px-1 text-[9px] font-normal text-emerald-500"
-                                            >
-                                              +{insertCount} 插入
-                                            </Badge>
-                                          )}
-                                          {updateCount > 0 && (
-                                            <Badge
-                                              variant="outline"
-                                              className="h-4 border-amber-500/40 bg-amber-500/10 px-1 text-[9px] font-normal text-amber-500"
-                                            >
-                                              ~{updateCount} 编辑
-                                            </Badge>
-                                          )}
-                                          {deleteCount > 0 && (
-                                            <Badge
-                                              variant="outline"
-                                              className="h-4 border-destructive/40 bg-destructive/10 px-1 text-[9px] font-normal text-destructive"
-                                            >
-                                              -{deleteCount} 删除
-                                            </Badge>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-
-                                    {rawJson && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-4 gap-1 p-0 text-[10px] text-muted-foreground hover:text-foreground"
-                                        onClick={() =>
-                                          setExpandedJsonMap((prev) => ({
-                                            ...prev,
-                                            [m.id]: !prev[m.id],
-                                          }))
-                                        }
-                                      >
-                                        <Code2 className="size-3" />
-                                        <span>
-                                          {isJsonExpanded
-                                            ? LL.panels.agents.hideJson()
-                                            : LL.panels.agents.viewJson()}
-                                        </span>
-                                      </Button>
+                              {m.content && (
+                                <div className="flex items-center gap-1 pr-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    className="opacity-50 hover:opacity-100"
+                                    title={
+                                      copiedId === m.id
+                                        ? LL.panels.agents.copied()
+                                        : LL.panels.agents.copyMessage()
+                                    }
+                                    onClick={() => handleCopyMessage(m.id, m.content)}
+                                  >
+                                    {copiedId === m.id ? (
+                                      <Check className="text-emerald-500" />
+                                    ) : (
+                                      <Copy />
                                     )}
-                                  </div>
-
-                                  {isJsonExpanded && rawJson && (
-                                    <pre className="max-h-60 overflow-auto rounded-lg bg-muted/60 p-2 font-mono text-[10px] leading-tight text-foreground select-text whitespace-pre-wrap">
-                                      <code>{rawJson}</code>
-                                    </pre>
-                                  )}
+                                  </Button>
                                 </div>
                               )}
-                            </>
+                            </div>
                           );
-                        })()}
-                        {!isUser && m.content && (
-                          <MessageFooter className="gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-5 opacity-70 hover:opacity-100"
-                              title={
-                                copiedId === m.id
-                                  ? LL.panels.agents.copied()
-                                  : LL.panels.agents.copyMessage()
-                              }
-                              onClick={() => handleCopyMessage(m.id, m.content)}
-                            >
-                              {copiedId === m.id ? (
-                                <Check className="size-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="size-3" />
-                              )}
-                            </Button>
-                          </MessageFooter>
-                        )}
-                      </MessageContent>
-                    </Message>
+                        }
+
+                        // Agent message: 100% width, no bubble background, markdown rendered
+                        return (
+                          <div className="w-full space-y-2 pt-0.5">
+                            {displayText ? (
+                              <MarkdownContent content={displayText} />
+                            ) : actions && actions.length > 0 ? (
+                              <div className="flex items-center text-xs font-medium text-foreground">
+                                <span>{LL.panels.agents.uiDocumentDetected()}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+                                <Spinner className="size-3" />
+                                <span className="text-[11px]">Thinking…</span>
+                              </div>
+                            )}
+
+                            {/* Generated UI Action Plan Card */}
+                            {summary && summary.items.length > 0 && (
+                              <div
+                                className="relative w-full overflow-hidden rounded-2xl border border-border/80 bg-card/60 shadow-sm backdrop-blur flex flex-col cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                                onClick={() => handlePreviewActions(actions!)}
+                                title="Click to preview on AI replica canvas"
+                              >
+                                <ShineBorder
+                                  borderWidth={1.5}
+                                  duration={8}
+                                  shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
+                                />
+                                {/* Header Row */}
+                                <div className="flex items-center justify-between p-2.5 pb-2">
+                                  <div className="flex flex-col min-w-0 pr-2">
+                                    <span className="font-semibold text-xs text-foreground truncate">
+                                      {summary.replaceAction
+                                        ? "Full Canvas Replacement"
+                                        : `Changed ${summary.uniqueCount} ${summary.uniqueCount === 1 ? "element" : "elements"}`}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                                      {summary.insertCount > 0 && (
+                                        <span className="text-emerald-500 font-medium">
+                                          +{summary.insertCount}
+                                        </span>
+                                      )}
+                                      {summary.updateCount > 0 && (
+                                        <span className="text-amber-500 font-medium">
+                                          ~{summary.updateCount}
+                                        </span>
+                                      )}
+                                      {summary.deleteCount > 0 && (
+                                        <span className="text-destructive font-medium">
+                                          -{summary.deleteCount}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="default"
+                                    size="xs"
+                                    className="font-medium shadow-xs shrink-0 px-2.5"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleApplyActions(actions!);
+                                    }}
+                                  >
+                                    Apply
+                                  </Button>
+                                </div>
+
+                                {/* Line by Line Updates */}
+                                <div className="flex flex-col divide-y divide-border/40 border-t border-border/60 bg-muted/20">
+                                  {summary.items.map((item, itemIdx) => (
+                                    <div
+                                      key={itemIdx}
+                                      className="flex items-center justify-between px-3 py-1.5 text-xs hover:bg-muted/40 transition-colors"
+                                    >
+                                      <div className="flex items-center min-w-0 pr-2">
+                                        <Tooltip>
+                                          <TooltipTrigger
+                                            render={
+                                              <span
+                                                className="font-mono text-[11px] font-medium text-foreground cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 hover:text-primary transition-colors truncate"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSelectElement(item.id);
+                                                }}
+                                              >
+                                                {item.label}
+                                              </span>
+                                            }
+                                          />
+                                          <TooltipContent
+                                            side="right"
+                                            sideOffset={6}
+                                            className="max-w-xs whitespace-pre-wrap font-mono text-[10px] leading-tight p-2.5 bg-zinc-950 text-zinc-100 border border-zinc-800 shadow-xl rounded-xl"
+                                          >
+                                            {item.details}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                      <span
+                                        className={cn(
+                                          "shrink-0 font-mono text-[10px] font-medium",
+                                          item.badgeColor,
+                                        )}
+                                      >
+                                        {item.badgeText}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {/* Message Footer with Copy and View JSON buttons */}
+                            {m.content && (
+                              <div className="flex flex-col gap-1.5 pt-0.5">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    className="opacity-60 hover:opacity-100"
+                                    title={
+                                      copiedId === m.id
+                                        ? LL.panels.agents.copied()
+                                        : LL.panels.agents.copyMessage()
+                                    }
+                                    onClick={() => handleCopyMessage(m.id, m.content)}
+                                  >
+                                    {copiedId === m.id ? (
+                                      <Check className="text-emerald-500" />
+                                    ) : (
+                                      <Copy />
+                                    )}
+                                  </Button>
+
+                                  {rawJson && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      className={cn(
+                                        "opacity-60 hover:opacity-100",
+                                        isJsonExpanded && "opacity-100 bg-muted text-foreground",
+                                      )}
+                                      title={
+                                        isJsonExpanded
+                                          ? LL.panels.agents.hideJson()
+                                          : LL.panels.agents.viewJson()
+                                      }
+                                      onClick={() =>
+                                        setExpandedJsonMap((prev) => ({
+                                          ...prev,
+                                          [m.id]: !prev[m.id],
+                                        }))
+                                      }
+                                    >
+                                      <Code2 />
+                                    </Button>
+                                  )}
+                                </div>
+
+                                {isJsonExpanded && rawJson && (
+                                  <pre className="max-h-60 w-full overflow-auto rounded-xl border border-border/70 bg-zinc-950 p-2.5 font-mono text-[10px] leading-relaxed text-zinc-200 select-text whitespace-pre-wrap">
+                                    <code>{rawJson}</code>
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   );
                 })}
                 <div ref={messagesEndRef} />
-              </MessageGroup>
+              </div>
             )}
           </div>
 
@@ -862,124 +1034,80 @@ export function AgentsPanel({
             </div>
           )}
 
-          {/* 5. Input Area with Attachment Trigger */}
+          {/* 5. Modern AI Elements PromptInput Area */}
           <div className="shrink-0 border-t border-border/60 bg-background p-2.5">
-            {/* Selected Element Context pill */}
-            {selectedElement && selectedId && (
-              <div
-                className={cn(
-                  "mb-2 flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-xs transition-all",
-                  attachSelectedElement
-                    ? "border-primary/40 bg-primary/5 text-foreground"
-                    : "border-border/60 bg-muted/20 text-muted-foreground opacity-60",
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-1.5 truncate">
-                  <MousePointerClick className="size-3.5 shrink-0 text-primary" />
-                  <span className="font-semibold text-[11px] text-foreground">
-                    {selectedElement.type}
-                  </span>
-                  <span className="font-mono text-[10px] text-muted-foreground truncate">
-                    ({selectedId})
-                  </span>
-                </div>
-                <label className="flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
-                  <Checkbox
-                    checked={attachSelectedElement}
-                    onCheckedChange={(checked) => setAttachSelectedElement(Boolean(checked))}
-                  />
-                  <span className="text-[10px] font-medium text-foreground">
-                    {LL.panels.agents.attachElementContext()}
-                  </span>
-                </label>
-              </div>
-            )}
+            <PromptInputProvider
+              status={isStreaming ? "streaming" : "ready"}
+              onStop={stopStreaming}
+            >
+              <PromptInput globalDrop multiple onSubmit={handleSubmit}>
+                <PromptInputAttachmentsDisplay
+                  selectedElement={selectedElement}
+                  selectedId={selectedId ?? null}
+                  attachSelectedElement={attachSelectedElement}
+                  onDetachElement={() => setAttachSelectedElement(false)}
+                  onSelectElement={handleSelectElement}
+                />
+                <PromptInputBody>
+                  <PromptInputTextarea placeholder={LL.panels.agents.inputPlaceholder()} />
+                </PromptInputBody>
+                <PromptInputFooter>
+                  <PromptInputTools>
+                    <PromptInputActionMenu>
+                      <PromptInputActionMenuTrigger />
+                      <PromptInputActionMenuContent>
+                        <PromptInputActionAddAttachments />
+                        <PromptInputActionAddScreenshot />
+                      </PromptInputActionMenuContent>
+                    </PromptInputActionMenu>
 
-            {/* Pending attachments preview strip */}
-            {pendingAttachments.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {pendingAttachments.map((att) => (
-                  <Attachment key={att.id} size="sm" className="max-w-full">
-                    <AttachmentMedia variant="icon">
-                      {att.type?.startsWith("image/") ? (
-                        <ImageIcon className="size-3.5 text-blue-500" />
-                      ) : (
-                        <File className="size-3.5 text-muted-foreground" />
-                      )}
-                    </AttachmentMedia>
-                    <AttachmentContent>
-                      <AttachmentTitle className="max-w-[100px] truncate text-[11px]">
-                        {att.name}
-                      </AttachmentTitle>
-                    </AttachmentContent>
-                    <AttachmentAction
-                      title={LL.panels.agents.removeAttachment()}
-                      onClick={() => handleRemoveAttachment(att.id)}
-                    >
-                      <X className="size-3" />
-                    </AttachmentAction>
-                  </Attachment>
-                ))}
-              </div>
-            )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              accept="image/*,.json,.txt,.md,.pdf,.csv"
-              onChange={handleFileSelect}
-            />
-
-            <div className="relative flex items-end gap-1.5 rounded-xl border border-border/80 bg-muted/20 p-1.5 focus-within:border-ring/60 focus-within:ring-1 focus-within:ring-ring/30">
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-                title={LL.panels.agents.addAttachment()}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Paperclip className="size-3.5" />
-              </Button>
-
-              <Textarea
-                ref={textareaRef}
-                rows={1}
-                value={input}
-                placeholder={LL.panels.agents.inputPlaceholder()}
-                className="max-h-28 min-h-[28px] resize-none border-0 bg-transparent p-1 text-xs shadow-none focus-visible:ring-0"
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-
-              {isStreaming ? (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  type="button"
-                  className="size-7 shrink-0 rounded-lg"
-                  title={LL.panels.agents.stop()}
-                  onClick={stopStreaming}
-                >
-                  <Square className="size-3 fill-current" />
-                </Button>
-              ) : (
-                <Button
-                  variant="default"
-                  size="icon"
-                  type="button"
-                  disabled={!input.trim() && pendingAttachments.length === 0}
-                  className="size-7 shrink-0 rounded-lg"
-                  title={LL.panels.agents.send()}
-                  onClick={() => void handleSend()}
-                >
-                  <ArrowUp className="size-3.5" />
-                </Button>
-              )}
-            </div>
-
+                    {/* Model / Prompt Profile Selector */}
+                    {promptProfiles.length > 0 && activeSession && (
+                      <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
+                        <ModelSelectorTrigger asChild>
+                          <PromptInputButton>
+                            <ModelSelectorLogo provider={selectedPrompt?.key || "claude"} />
+                            <ModelSelectorName>
+                              {selectedPrompt?.name || "Default Prompt"}
+                            </ModelSelectorName>
+                          </PromptInputButton>
+                        </ModelSelectorTrigger>
+                        <ModelSelectorContent>
+                          <ModelSelectorInput placeholder="Search prompt profiles…" />
+                          <ModelSelectorList>
+                            <ModelSelectorEmpty>No prompt profile found.</ModelSelectorEmpty>
+                            <ModelSelectorGroup heading="Prompt Profiles">
+                              {promptProfiles.map((p) => (
+                                <ModelSelectorItem
+                                  key={p.id}
+                                  value={p.name}
+                                  onSelect={() => {
+                                    setSessionPrompt(activeSession.id, p.id, p.key);
+                                    setModelSelectorOpen(false);
+                                  }}
+                                >
+                                  <ModelSelectorLogo provider={p.key} />
+                                  <div className="flex flex-col flex-1 min-w-0">
+                                    <span className="font-medium truncate">{p.name}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono truncate">
+                                      {p.key}
+                                    </span>
+                                  </div>
+                                  {p.id === activeSession.promptId && (
+                                    <Check className="ml-auto size-3.5 text-primary shrink-0" />
+                                  )}
+                                </ModelSelectorItem>
+                              ))}
+                            </ModelSelectorGroup>
+                          </ModelSelectorList>
+                        </ModelSelectorContent>
+                      </ModelSelector>
+                    )}
+                  </PromptInputTools>
+                  <PromptInputSubmit />
+                </PromptInputFooter>
+              </PromptInput>
+            </PromptInputProvider>
             {/* Footer info & toggle for diagnostics */}
             <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-muted-foreground">
               <span className="truncate">

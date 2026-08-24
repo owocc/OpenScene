@@ -284,6 +284,7 @@ export function StudioSidebar({
                         diagnostics={diagnostics}
                         document={document}
                         selectedId={selectedId}
+                        onSelectNode={onSelectNode}
                         onApplyAgentActions={onApplyAgentActions}
                       />
                     )}

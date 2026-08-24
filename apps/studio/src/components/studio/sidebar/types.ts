@@ -1,9 +1,9 @@
 import {
+  Astroid,
   Code2,
   Eye,
   FileText,
   Hexagon,
-  Sparkles,
   SquareMousePointer,
   type LucideIcon,
 } from "lucide-react";
@@ -137,7 +137,7 @@ export const navTabs: Array<{
   icon: LucideIcon;
 }> = [
   { id: "pages", label: "Pages", icon: FileText },
-  { id: "agents", label: "Agents", icon: Sparkles },
+  { id: "agents", label: "Agents", icon: Astroid },
   { id: "variables", label: "Variables", icon: Hexagon },
 ];
 
