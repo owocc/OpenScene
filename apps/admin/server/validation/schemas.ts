@@ -210,6 +210,7 @@ export const BootstrapSchema = z.object({
   }),
   returnUrl: z.string().url(),
   prompts: z.array(z.record(z.string(), z.unknown())).optional(),
+  locales: z.array(z.record(z.string(), z.unknown())).optional(),
   chatSessions: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 export const RuntimeDeliverySchema = RuntimePageDeliverySchema;

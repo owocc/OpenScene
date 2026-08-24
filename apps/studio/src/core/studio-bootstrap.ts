@@ -19,6 +19,13 @@ export interface AppPromptInfo {
   enabled: boolean;
 }
 
+export interface AppLocaleInfo {
+  id: string;
+  code: string;
+  name: string;
+  isDefault: boolean;
+}
+
 export interface StudioBootstrap {
   session: { id: string; expiresAt: string };
   app: { id: string; key: string; name: string; type: AppType };
@@ -40,6 +47,7 @@ export interface StudioBootstrap {
   };
   returnUrl: string;
   prompts?: AppPromptInfo[];
+  locales?: AppLocaleInfo[];
   chatSessions?: unknown[];
 }
 export type StudioBootstrapState =

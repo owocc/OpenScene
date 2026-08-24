@@ -1730,6 +1730,7 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
     capabilities: { saveDraft: true, createVersion: true, publish: true, uploadAsset: true },
     returnUrl: session.returnUrl,
     prompts: await listAppPrompts(db, session.appId),
+    locales: await listLocales(db, session.appId),
     chatSessions: await getResourceChatSessions(
       db,
       session.appId,

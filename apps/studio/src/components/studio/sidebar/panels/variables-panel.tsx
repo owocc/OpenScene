@@ -237,8 +237,9 @@ export function VariablesPanel({
   }, [fetchServerLocales]);
 
   const effectiveLocales = useMemo<ServerLocaleOption[]>(() => {
-    if (serverLocales.length > 0) {
-      return serverLocales.map((l) => ({
+    const rawLocales = serverLocales.length > 0 ? serverLocales : (bootstrap?.locales ?? []);
+    if (rawLocales && rawLocales.length > 0) {
+      return rawLocales.map((l) => ({
         id: l.id,
         code: l.code,
         name: l.name || KNOWN_LOCALE_NAMES[l.code] || l.code,
@@ -251,7 +252,7 @@ export function VariablesPanel({
       name: KNOWN_LOCALE_NAMES[code] || code,
       isDefault: code === "en" || code === "en-US",
     }));
-  }, [serverLocales, locales]);
+  }, [bootstrap?.locales, serverLocales, locales]);
 
   const filteredLocales = useMemo(() => {
     if (!localeSearchQuery.trim()) return effectiveLocales;

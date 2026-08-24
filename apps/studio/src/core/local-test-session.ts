@@ -32,5 +32,9 @@ export function createLocalTestBootstrap(origin = "http://localhost:5174"): Stud
         enabled: true,
       },
     ],
+    locales: [
+      { id: "locale-en", code: "en-US", name: "English (US)", isDefault: true },
+      { id: "locale-zh", code: "zh-CN", name: "简体中文", isDefault: false },
+    ],
   };
 }
