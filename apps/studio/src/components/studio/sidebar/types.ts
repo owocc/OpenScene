@@ -119,7 +119,7 @@ export interface StudioSidebarProps {
   viewport?: ViewportState;
   onPatchViewport?: (patch: Partial<ViewportState>) => void;
   onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
-  onSelectNode: (nodeId: string | null) => void;
+  onSelectNode: (nodeId: string | null, options?: { centerInView?: boolean }) => void;
   hoverNodeId?: string | null;
   onReorder: (elementId: string, parentId: string, index?: number) => void;
   onSurfaceChange: (surface: Surface) => void;

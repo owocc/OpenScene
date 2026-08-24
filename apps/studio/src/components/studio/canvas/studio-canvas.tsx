@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { Astroid, CheckCheck, X } from "lucide-react";
+import type { ElementRect } from "@openscene/protocol";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
 export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
@@ -51,6 +52,9 @@ export function StudioCanvas({
   onToolChange,
   onSelectionChange,
   onHoverElement,
+  onGeometryChange: externalOnGeometryChange,
+  centerTargetNodeId,
+  onClearCenterTarget,
   onFrameDrop,
   onUndo,
   onRedo,
@@ -70,6 +74,37 @@ export function StudioCanvas({
     }),
     [bootstrap.app.key, bootstrap.resource.id, bootstrap.resource.kind],
   );
+  const handleGeometryChange = (
+    elementId: string,
+    rect: ElementRect,
+    scrollLeft: number,
+    scrollTop: number,
+  ) => {
+    externalOnGeometryChange?.(elementId, rect, scrollLeft, scrollTop);
+    if (centerTargetNodeId === elementId && rect && (rect.width > 0 || rect.height > 0)) {
+      onClearCenterTarget?.();
+      const artboardW = viewport.isRotated
+        ? viewport.currentDeviceHeight
+        : viewport.currentDeviceWidth;
+      const artboardH = viewport.isRotated
+        ? viewport.currentDeviceWidth
+        : viewport.currentDeviceHeight;
+
+      const elemCenterX = rect.left + rect.width / 2;
+      const elemCenterY = rect.top + rect.height / 2;
+
+      const dx = elemCenterX - artboardW / 2;
+      const dy = elemCenterY - artboardH / 2;
+
+      const targetPanX = Math.round(-dx * viewport.zoom);
+      const targetPanY = Math.round(-dy * viewport.zoom);
+
+      onPatchViewport({
+        panX: targetPanX,
+        panY: targetPanY,
+      });
+    }
+  };
   const rendererProps: CanvasRendererProps = {
     url: bootstrap.preview.url,
     allowedOrigin: bootstrap.preview.allowedOrigin,
@@ -86,6 +121,7 @@ export function StudioCanvas({
     },
     onSelectionChange,
     onHoverElement,
+    onGeometryChange: handleGeometryChange,
     onFrameDrop,
   };
   const adapter = canvasRendererRegistry[bootstrap.app.type];
@@ -183,7 +219,7 @@ export function StudioCanvas({
           onPatch={onPatchViewport}
         >
           <div
-            className="flex items-center justify-center gap-12 origin-center transition-transform duration-75"
+            className="flex items-center justify-center gap-12 origin-center transition-transform duration-300 ease-out"
             style={{
               transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
             }}

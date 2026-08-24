@@ -23,8 +23,7 @@ interface PagesPanelProps {
   registry: AdapterRegistry;
   selectedId: string;
   hoverNodeId?: string | null;
-  onSelectNode: (nodeId: string | null) => void;
-  /** Move `elementId` under `parentId` (children) at `index` (append when omitted). */
+  onSelectNode: (nodeId: string | null, options?: { centerInView?: boolean }) => void;
   onReorder: (elementId: string, parentId: string, index?: number) => void;
   /** Insert a new component; optional drop target from tree drag-and-drop. */
   onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
@@ -76,7 +75,7 @@ function DocumentTree({
   registry: AdapterRegistry;
   selectedId: string;
   hoverNodeId?: string | null;
-  onSelectNode: (nodeId: string | null) => void;
+  onSelectNode: (nodeId: string | null, options?: { centerInView?: boolean }) => void;
   onReorder: (elementId: string, parentId: string, index?: number) => void;
   onAddComponent: (type: string, target?: { parentId: string; index?: number }) => void;
 }) {
@@ -157,7 +156,7 @@ function DocumentTree({
                 hovered && !selected && "bg-accent/40",
                 isSlot && "text-muted-foreground",
               )}
-              onClick={() => onSelectNode(data.id)}
+              onClick={() => onSelectNode(data.id, { centerInView: true })}
             >
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 {isSlot ? (
@@ -204,7 +203,6 @@ export function PagesPanel({
 }: PagesPanelProps) {
   const { LL } = useI18n();
   const nodeCount = Object.keys(document.spec.elements).length;
-
   const hasRoot = document.spec.root != null && document.spec.root in document.spec.elements;
 
   return (

@@ -28,6 +28,7 @@ export function WebIframeRenderer({
   viewportSize,
   onSelectionChange,
   onHoverElement,
+  onGeometryChange,
   onFrameDrop,
   onError,
 }: CanvasRendererProps) {
@@ -50,12 +51,24 @@ export function WebIframeRenderer({
   const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
-  const callbacksRef = useRef({ onSelectionChange, onHoverElement, onFrameDrop, onError });
+  const callbacksRef = useRef({
+    onSelectionChange,
+    onHoverElement,
+    onGeometryChange,
+    onFrameDrop,
+    onError,
+  });
   // Keep the ref pointing at the latest props: the initial capture would
   // otherwise freeze stale closures (e.g. addComponent over an old document).
   useEffect(() => {
-    callbacksRef.current = { onSelectionChange, onHoverElement, onFrameDrop, onError };
-  }, [onSelectionChange, onHoverElement, onFrameDrop, onError]);
+    callbacksRef.current = {
+      onSelectionChange,
+      onHoverElement,
+      onGeometryChange,
+      onFrameDrop,
+      onError,
+    };
+  }, [onSelectionChange, onHoverElement, onGeometryChange, onFrameDrop, onError]);
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
   // Tracks the last revision pushed to the renderer so every document change
@@ -127,6 +140,7 @@ export function WebIframeRenderer({
             height: rect.height,
           };
           setSelectionRects((prev) => ({ ...prev, [elementId]: content }));
+          callbacksRef.current.onGeometryChange?.(elementId, rect, scrollLeft, scrollTop);
         } else if (message.data.type === "FRAME_SCROLL") {
           setFrameScroll({
             left: message.data.payload.scrollLeft,

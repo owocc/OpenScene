@@ -1,5 +1,5 @@
 import type { AppType } from "@openscene/constants";
-import type { SceneDocument } from "@openscene/protocol";
+import type { ElementRect, SceneDocument } from "@openscene/protocol";
 import type { ReactNode } from "react";
 
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
@@ -28,6 +28,12 @@ export interface CanvasRendererProps {
   viewportSize?: { width: number; height: number };
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onHoverElement?: (nodeId: string | null) => void;
+  onGeometryChange?: (
+    elementId: string,
+    rect: ElementRect,
+    scrollLeft: number,
+    scrollTop: number,
+  ) => void;
   /** A component card was dropped anywhere over the preview frame. */
   onFrameDrop?: () => void;
   onError?: (message: string) => void;
@@ -56,6 +62,14 @@ export interface StudioCanvasProps {
   onToolChange: (mode: ActiveToolMode) => void;
   onSelectionChange: (nodeIds: string[], primaryNodeId: string | null) => void;
   onHoverElement?: (nodeId: string | null) => void;
+  onGeometryChange?: (
+    elementId: string,
+    rect: ElementRect,
+    scrollLeft: number,
+    scrollTop: number,
+  ) => void;
+  centerTargetNodeId?: string | null;
+  onClearCenterTarget?: () => void;
   onFrameDrop?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;

@@ -143,10 +143,10 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     activeToolMode,
     viewport,
   } = editor;
-  const { LL } = useI18n();
+  const [centerTargetNodeId, setCenterTargetNodeId] = useState<string | null>(null);
   const selectedId = selectedNodeId ?? "";
   const sidebarCollapsed = useQueryStore((s) => s.sidebarCollapsed);
-  // Right panel is hidden while nothing is selected; width is read once per
+  const { LL } = useI18n();
   // shown mount (first show and every hidden→shown transition) rather than
   // subscribed to: re-rendering mid-drag races react-resizable-panels'
   // pointer capture and freezes the drag after the first move.
@@ -481,9 +481,12 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
           onSurfaceChange={(nextSurface) => dispatch({ type: "surface.set", surface: nextSurface })}
           onToolChange={(mode) => dispatch({ type: "tool.set", mode })}
-          onSelectionChange={(nodeIds, primaryNodeId) =>
-            dispatch({ type: "nodes.select", nodeIds, primaryNodeId })
-          }
+          centerTargetNodeId={centerTargetNodeId}
+          onClearCenterTarget={() => setCenterTargetNodeId(null)}
+          onSelectionChange={(nodeIds, primaryNodeId) => {
+            setCenterTargetNodeId(null);
+            dispatch({ type: "nodes.select", nodeIds, primaryNodeId });
+          }}
           onHoverElement={setHoverNodeId}
           onFrameDrop={() => {
             const pending = (window as unknown as Record<string, string | null>)
@@ -523,13 +526,18 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             viewport={viewport}
             onPatchViewport={(patch) => dispatch({ type: "viewport.patch", patch })}
             onAddComponent={addComponent}
-            onSelectNode={(nodeId) =>
+            onSelectNode={(nodeId, options) => {
+              if (options?.centerInView ?? true) {
+                setCenterTargetNodeId(nodeId);
+              } else {
+                setCenterTargetNodeId(null);
+              }
               dispatch({
                 type: "nodes.select",
                 nodeIds: nodeId ? [nodeId] : [],
                 primaryNodeId: nodeId,
-              })
-            }
+              });
+            }}
             onReorder={(elementId, parentId, index) =>
               dispatch({ type: "node.reorder", elementId, parentId, index })
             }
