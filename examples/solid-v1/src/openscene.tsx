@@ -1,7 +1,8 @@
-import { createComponent } from "solid-js";
+import { createComponent, createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { APP_TYPE_WEB } from "@openscene/constants";
 import { defineAppManifest } from "@openscene/javascript";
+import { openApiMethods, type OpenApiValue } from "@openscene/schema";
 import {
   baseSolidComponents,
   defineOpenSceneSolidAction,
@@ -68,6 +69,25 @@ const statusCardProps = z
     status: z.enum(["idle", "active", "complete"]).optional(),
   })
   .passthrough();
+const openApiProviderProps = z
+  .object({
+    openapi: z
+      .object({
+        json: z.record(z.string(), z.unknown()),
+        path: z.string(),
+        method: z.enum([...openApiMethods]),
+        params: z
+          .object({
+            path: z.record(z.string(), z.string()).optional(),
+            query: z.record(z.string(), z.unknown()).optional(),
+            body: z.unknown().optional(),
+          })
+          .optional(),
+      })
+      .meta({ "x-editor": { control: "openapi" } })
+      .optional(),
+  })
+  .passthrough();
 
 /** A composition example: use the shared View primitive as the component root. */
 const Callout = defineOpenSceneSolidComponent({
@@ -79,16 +99,19 @@ const Callout = defineOpenSceneSolidComponent({
   tags: ["example", "composition"],
   editor: { fields: ["tone"] },
   children: true,
-  render: (renderProps) =>
-    createComponent(View, {
+  render: (renderProps) => {
+    const elementProps =
+      (renderProps as unknown as { props?: Record<string, unknown> }).props ?? {};
+    return createComponent(View, {
       props: {
-        ...renderProps.element.props,
-        className: `solid-v1-callout solid-v1-callout-${String(renderProps.element.props.tone ?? "info")}`,
+        ...elementProps,
+        className: `solid-v1-callout solid-v1-callout-${String(elementProps.tone ?? "info")}`,
       },
       children: renderProps.children,
       emit: renderProps.emit,
       on: renderProps.on,
-    }),
+    });
+  },
 });
 
 /** A hook example: attach the editor identity to a semantic custom root. */
@@ -103,9 +126,10 @@ const StatusCard = defineOpenSceneSolidComponent({
   children: true,
   render: (renderProps) => {
     const node = useOpenSceneNode();
-    const props = renderProps.element.props as Record<string, unknown>;
-    const status = typeof props.status === "string" ? props.status : "idle";
-    const label = typeof props.label === "string" ? props.label : "Status";
+    const elementProps =
+      (renderProps as unknown as { props?: Record<string, unknown> }).props ?? {};
+    const status = typeof elementProps.status === "string" ? elementProps.status : "idle";
+    const label = typeof elementProps.label === "string" ? elementProps.label : "Status";
     return createComponent(Dynamic, {
       component: "article",
       ...node.nodeAttrs,
@@ -119,6 +143,59 @@ const StatusCard = defineOpenSceneSolidComponent({
   },
 });
 
+type OpenApiRequest = {
+  url: string;
+  method: string;
+  body?: string;
+  headers: Record<string, string>;
+};
+
+function buildOpenApiRequest(value: OpenApiValue | undefined): OpenApiRequest | null {
+  if (!value || !value.json || typeof value.json !== "object" || !value.path || !value.method) {
+    return null;
+  }
+  const rawServers = value.json.servers;
+  const serverList = Array.isArray(rawServers)
+    ? (rawServers as unknown as Array<{ url?: unknown }>)
+    : [];
+  const base =
+    typeof serverList[0]?.url === "string" && serverList[0].url
+      ? serverList[0].url.replace(/\/$/, "")
+      : "";
+  let path = value.path;
+  const pathParams = value.params?.path ?? {};
+  path = path.replace(/\{([^}]+)\}/g, (_, name: string) =>
+    encodeURIComponent(pathParams[name] ?? ""),
+  );
+  const searchParams = new URLSearchParams();
+  const query = value.params?.query ?? {};
+  for (const [key, item] of Object.entries(query)) {
+    searchParams.set(key, typeof item === "string" ? item : JSON.stringify(item));
+  }
+  const queryString = searchParams.toString();
+  const url = `${base}${path}${queryString ? `?${queryString}` : ""}`;
+  const headers: Record<string, string> = { accept: "application/json" };
+  const method = value.method.toUpperCase();
+  let body: string | undefined;
+  if (method !== "GET" && method !== "HEAD" && value.params?.body !== undefined) {
+    body = JSON.stringify(value.params.body);
+    headers["content-type"] = "application/json";
+  }
+  return { url, method, headers, body };
+}
+
+async function executeOpenApiRequest(request: OpenApiRequest): Promise<unknown> {
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+  });
+  if (!response.ok) {
+    throw new Error(`${request.method} ${request.url} -> ${response.status}`);
+  }
+  return response.json();
+}
+
 const setNotice = defineOpenSceneSolidAction({
   key: "solidV1SetNotice",
   title: "Set notice",
@@ -130,11 +207,75 @@ const setNotice = defineOpenSceneSolidAction({
     setState((previous) => ({ ...previous, solidV1Notice: message }));
   },
 });
+/** Requests an OpenAPI operation (from a self-contained document snapshot) and renders the response. */
+const OpenApiProvider = defineOpenSceneSolidComponent({
+  type: "SolidV1OpenApiProvider",
+  schema: openApiProviderProps,
+  title: "OpenAPI Provider",
+  description: "根据 OpenAPI 文档请求接口并渲染响应。",
+  category: "data",
+  tags: ["openapi", "data"],
+  children: true,
+  render: (renderProps) => {
+    // Snapshot the element props once: `props` is a reactive getter in
+    // json-render, so reading it inside the memo below would re-run the memo
+    // and refetch in a loop. The response is written imperatively to the
+    // output element instead of through reactive children: json-render
+    // re-resolves elements whose rendered output changes, so signal-driven
+    // updates would remount the provider and restart the request endlessly.
+    const value = untrack(
+      () =>
+        (renderProps as unknown as { props?: Record<string, unknown> }).props?.openapi as
+          | OpenApiValue
+          | undefined,
+    );
+    const request = createMemo(() => buildOpenApiRequest(value));
+    let outputEl: { textContent: string | null } | undefined;
+    createEffect(() => {
+      const next = request();
+      if (!next || !outputEl) return;
+      let cancelled = false;
+      outputEl.textContent = "Loading…";
+      void executeOpenApiRequest(next)
+        .then((result) => {
+          if (cancelled || !outputEl) return;
+          outputEl.textContent = JSON.stringify(result, null, 2);
+        })
+        .catch((err) => {
+          if (cancelled || !outputEl) return;
+          outputEl.textContent = String(err);
+        });
+      onCleanup(() => {
+        cancelled = true;
+      });
+    });
+    return Show({
+      get when() {
+        return request();
+      },
+      fallback: createComponent(Dynamic, {
+        component: "span",
+        class: "solid-v1-openapi-missing",
+        children: "OpenAPI not configured",
+      }),
+      children: [
+        createComponent(Dynamic, {
+          component: "pre",
+          class: "solid-v1-openapi-data",
+          ref: (el: { textContent: string | null } | undefined) => {
+            outputEl = el;
+          },
+        }),
+        renderProps.children,
+      ],
+    });
+  },
+});
 
 export function createSolidApp(appKey: string): OpenSceneSolidApp {
   return defineOpenSceneSolidApp({
     app: { key: appKey, type: APP_TYPE_WEB },
-    components: [...baseComponents, Callout, StatusCard],
+    components: [...baseComponents, Callout, StatusCard, OpenApiProvider],
     actions: [setNotice],
   });
 }

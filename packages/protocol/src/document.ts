@@ -24,7 +24,7 @@ export interface SceneDocument {
   schemaVersion: typeof SCENE_DOCUMENT_SCHEMA_VERSION;
   pageInfo: ScenePageInfo;
   globalConfig: SceneGlobalConfig;
-  spec: Spec;
+  spec: Omit<Spec, "root"> & { root: string | null };
   [key: string]: unknown;
 }
 
@@ -50,7 +50,9 @@ const UIElementSchema = z
 
 const SpecSchema = z
   .object({
-    root: nonEmptyString,
+    // A new document has no root until the author adds the first node; the
+    // runtime renders nothing until a root element is manually assigned.
+    root: nonEmptyString.nullable(),
     elements: z.record(nonEmptyString, UIElementSchema),
     state: unknownRecord.optional(),
   })
@@ -102,7 +104,7 @@ export const SceneDocumentSchema: z.ZodType<SceneDocument> = z
   .catchall(z.unknown())
   .superRefine((document, context) => {
     const { root, elements, state } = document.spec;
-    if (!(root in elements)) {
+    if (root !== null && !(root in elements)) {
       context.addIssue({
         code: "custom",
         path: ["spec", "root"],
@@ -161,10 +163,10 @@ export function createEmptySceneDocument(): SceneDocument {
     },
     globalConfig: {},
     spec: {
-      root: "root",
-      elements: {
-        root: { type: "View", props: {}, children: [] },
-      },
+      // No root node: the author adds the first element manually and it
+      // becomes the root. The runtime renders nothing until then.
+      root: null,
+      elements: {},
       state: {},
     },
   };

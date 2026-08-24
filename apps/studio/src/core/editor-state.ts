@@ -79,7 +79,11 @@ function documentWidth(document: SceneDocument) {
 export function createEditorState(document: SceneDocument, revision: number): EditorState {
   return {
     document,
-    ...selectedForDocument(document, [document.spec.root], document.spec.root),
+    ...selectedForDocument(
+      document,
+      document.spec.root !== null ? [document.spec.root] : [],
+      document.spec.root,
+    ),
     past: [],
     future: [],
     revision,

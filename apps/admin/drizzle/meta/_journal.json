@@ -43,6 +43,13 @@
       "when": 1787422502391,
       "tag": "0005_tiresome_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787482786446,
+      "tag": "0006_black_guardsmen",
+      "breakpoints": true
     }
   ]
 }

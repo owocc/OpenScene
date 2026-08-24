@@ -272,6 +272,34 @@ export const LocalePatchSchema = LocaleCreateSchema.partial().refine(
   (value) => value.code === undefined,
   { message: "Locale code cannot be changed", path: ["code"] },
 );
+const OpenApiDocumentJsonSchema = z.record(z.string(), z.unknown()).refine((v) => {
+  const p = (v as { paths?: unknown }).paths;
+  return typeof p === "object" && p !== null && !Array.isArray(p);
+}, "OpenAPI document must contain paths");
+
+export const OpenApiDocSchema = z.object({
+  id: IdSchema,
+  appId: IdSchema,
+  name: z.string().min(1),
+  json: OpenApiDocumentJsonSchema,
+  isDefault: z.boolean(),
+  createdAt: IsoDateSchema,
+  updatedAt: IsoDateSchema,
+});
+
+export const OpenApiDocSummarySchema = OpenApiDocSchema.omit({ json: true });
+
+export const OpenApiDocCreateSchema = z.object({
+  name: z.string().min(1),
+  json: OpenApiDocumentJsonSchema,
+  isDefault: z.boolean().optional(),
+});
+
+export const OpenApiDocPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  json: OpenApiDocumentJsonSchema.optional(),
+  isDefault: z.boolean().optional(),
+});
 export const ResourceCreateSchema = z.object({
   key: KeySchema,
   title: z.string().min(1),

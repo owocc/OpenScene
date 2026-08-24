@@ -140,6 +140,7 @@ export function AdminConsole() {
   if (pathname === "/categories") return <CategoriesView />;
   if (pathname === "/locales") return <LocalesView />;
   if (pathname === "/assets") return <AssetsView />;
+  if (pathname === "/openapi-docs") return <OpenApiDocsView />;
   if (pathname === "/manifest") return <ManifestView />;
   if (pathname === "/components") return <ComponentsView />;
   if (pathname.startsWith("/components/")) return <ComponentDetailView />;
@@ -1629,6 +1630,239 @@ function CategoriesView() {
                   create.mutate({
                     params: { path: { appId: context.appId ?? "" } },
                     body: { ...body, key: form.key },
+                  });
+              }}
+            >
+              {t("save")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+    </>
+  );
+}
+
+function OpenApiDocsView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const toast = useKumoToastManager();
+  const [dialog, setDialog] = useState(false);
+  const [editing, setEditing] = useState<{ id: string } | null>(null);
+  const [form, setForm] = useState({ name: "", json: "", isDefault: false });
+  const [jsonInvalid, setJsonInvalid] = useState(false);
+  const query = api.useQuery("get", "/api/v1/apps/{appId}/openapi-docs", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const create = api.useMutation("post", "/api/v1/apps/{appId}/openapi-docs", {
+    onSuccess: () => {
+      setDialog(false);
+      toast.add({ title: t("created") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const update = api.useMutation("patch", "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}", {
+    onSuccess: () => {
+      setDialog(false);
+      setEditing(null);
+      toast.add({ title: t("updated") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const remove = api.useMutation("delete", "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}", {
+    onSuccess: () => {
+      toast.add({ title: t("deleted") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const items = query.data ?? [];
+  return (
+    <>
+      <PageHeader title={t("openapiDocs")}>
+        <Button
+          variant="primary"
+          icon={Plus}
+          onClick={() => {
+            setEditing(null);
+            setForm({ name: "", json: "", isDefault: false });
+            setJsonInvalid(false);
+            setDialog(true);
+          }}
+        >
+          {t("create")}
+        </Button>
+      </PageHeader>
+      {query.error ? <ErrorState error={query.error} /> : null}
+      <LayerCard className="w-full overflow-x-auto p-0">
+        <Table layout="fixed">
+          <colgroup>
+            <col />
+            <col style={{ width: "140px" }} />
+            <col style={{ width: "140px" }} />
+            <col style={{ width: "56px" }} />
+          </colgroup>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{t("openApiName")}</Table.Head>
+              <Table.Head>{t("openApiEndpoints")}</Table.Head>
+              <Table.Head>{t("status")}</Table.Head>
+              <Table.Head sticky="right">
+                <span className="sr-only">{t("actions")}</span>
+              </Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {items.map((item) => (
+              <Table.Row key={item.id}>
+                <Table.Cell>{item.name}</Table.Cell>
+                <Table.Cell>
+                  {
+                    Object.keys((item.json as { paths?: Record<string, unknown> })?.paths ?? {})
+                      .length
+                  }
+                </Table.Cell>
+                <Table.Cell>
+                  {item.isDefault ? <Badge variant="green">{t("default")}</Badge> : "—"}
+                </Table.Cell>
+                <Table.Cell sticky="right" className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenu.Trigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          shape="square"
+                          aria-label={t("moreOptions")}
+                        >
+                          <DotsThree weight="bold" size={16} />
+                        </Button>
+                      }
+                    />
+                    <DropdownMenu.Content>
+                      <DropdownMenu.Item
+                        icon={PencilSimple}
+                        onClick={() => {
+                          setEditing(item);
+                          setForm({
+                            name: item.name,
+                            json: JSON.stringify(item.json, null, 2),
+                            isDefault: item.isDefault,
+                          });
+                          setJsonInvalid(false);
+                          setDialog(true);
+                        }}
+                      >
+                        {t("edit")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        icon={Star}
+                        onClick={() =>
+                          update.mutate({
+                            params: {
+                              path: { appId: context.appId ?? "", openApiDocId: item.id },
+                            },
+                            body: { isDefault: !item.isDefault },
+                          })
+                        }
+                      >
+                        {item.isDefault ? t("removeDefault") : t("setDefault")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Item
+                        icon={Trash}
+                        variant="danger"
+                        onClick={() =>
+                          remove.mutate({
+                            params: {
+                              path: { appId: context.appId ?? "", openApiDocId: item.id },
+                            },
+                          })
+                        }
+                      >
+                        {t("delete")}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu>
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table>
+      </LayerCard>
+      <Dialog.Root open={dialog} onOpenChange={setDialog}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>
+            {editing ? t("edit") : t("create")} {t("openapiDocs")}
+          </Dialog.Title>
+          <div className="grid gap-4 py-4">
+            <Input
+              label={t("openApiName")}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+            <Textarea
+              label={t("openApiJson")}
+              className="font-mono"
+              rows={14}
+              value={form.json}
+              error={jsonInvalid ? t("openApiJsonInvalid") : undefined}
+              onChange={(e) => {
+                const next = e.target.value;
+                setForm({ ...form, json: next });
+                if (next.trim() === "") {
+                  setJsonInvalid(false);
+                  return;
+                }
+                try {
+                  const parsed = JSON.parse(next);
+                  setJsonInvalid(
+                    typeof parsed !== "object" ||
+                      parsed === null ||
+                      Array.isArray(parsed) ||
+                      typeof (parsed as { paths?: unknown }).paths !== "object" ||
+                      (parsed as { paths?: unknown }).paths === null ||
+                      Array.isArray((parsed as { paths?: unknown }).paths),
+                  );
+                } catch {
+                  setJsonInvalid(true);
+                }
+              }}
+            />
+            <Switch
+              checked={form.isDefault}
+              label={t("default")}
+              onCheckedChange={(checked) => setForm({ ...form, isDefault: checked })}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+            <Button
+              variant="primary"
+              disabled={jsonInvalid || form.name.trim() === ""}
+              onClick={() => {
+                let parsedJson: Record<string, unknown>;
+                try {
+                  parsedJson = JSON.parse(form.json);
+                } catch {
+                  setJsonInvalid(true);
+                  return;
+                }
+                const body = {
+                  name: form.name,
+                  json: parsedJson,
+                  isDefault: form.isDefault,
+                };
+                if (editing)
+                  update.mutate({
+                    params: {
+                      path: { appId: context.appId ?? "", openApiDocId: editing.id },
+                    },
+                    body,
+                  });
+                else
+                  create.mutate({
+                    params: { path: { appId: context.appId ?? "" } },
+                    body,
                   });
               }}
             >

@@ -98,13 +98,15 @@ interface SceneDocument {
     css?: unknown;
     i18n?: unknown;
   };
-  spec: { root: string; elements: Record<string, UIElement>; state?: Record<string, unknown> };
+  spec: { root: string | null; elements: Record<string, UIElement>; state?: Record<string, unknown> };
 }
 ` +
       "```" +
       `
 
 OpenScene 的 page wrapper（页面外壳）将 json-render 的 flat identity map（flat Spec）放在 \`spec\` 字段中。节点身份**只有** \`spec.elements\` 的 map key：\`root\` 和每个 \`children\`、\`slots\` 引用都指向一个 key，element value 不得重复保存 id，也不得持久化 adapter 私有字段。json-render 原生处理 \`$state\`、\`$bindState\`、\`$bindItem\`、\`$template\`、\`$computed\`、\`$cond\`、visibility、repeat、watch 和 action binding。
+
+\`spec.root\` 可以为 \`null\`：新建页面/模板不再自动创建 root 节点，作者手动添加的第一个节点会成为 root，运行时在存在 root 之前不渲染任何内容。
 
 ## OpenScene 指令
 
@@ -141,13 +143,15 @@ interface SceneDocument {
     css?: unknown;
     i18n?: unknown;
   };
-  spec: { root: string; elements: Record<string, UIElement>; state?: Record<string, unknown> };
+  spec: { root: string | null; elements: Record<string, UIElement>; state?: Record<string, unknown> };
 }
 ` +
     "```" +
     `
 
 The OpenScene page wrapper contains json-render's flat identity map (the flat Spec) in its \`spec\` field. Node identity is **only** the map key in \`spec.elements\`: \`root\` and every \`children\` or \`slots\` reference point to a key. Element values must not duplicate an id or persist adapter-private fields. json-render natively owns \`$state\`, \`$bindState\`, \`$bindItem\`, \`$template\`, \`$computed\`, \`$cond\`, visibility, repeat, watch, and action binding.
+
+\`spec.root\` may be \`null\`: a newly created page/template has no root node. The first node the author adds manually becomes the root, and the runtime renders nothing until one exists.
 
 ## OpenScene directives
 

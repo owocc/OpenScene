@@ -425,13 +425,26 @@ type RootTranslation = {
      */
     layerName: string;
     /**
-     * A​p​p​ ​独​立​运​行​时
+     * A​p​p​ 独​立​运​行​时
      */
     runtimeTitle: string;
     /**
      * 画​布​通​过​目​标​ ​A​p​p​ ​i​f​r​a​m​e​ ​进​行​沙​箱​渲​染​。​S​t​u​d​i​o​ ​仅​通​过​ ​P​r​e​v​i​e​w​ ​B​r​i​d​g​e​ ​传​递​文​档​快​照​。
      */
     runtimeDesc: string;
+    openapi: {
+      docs: string;
+      noDocs: string;
+      loadFailed: string;
+      embedded: string;
+      operation: string;
+      method: string;
+      pathParams: string;
+      queryParams: string;
+      body: string;
+      loading: string;
+      invalidJson: string;
+    };
   };
   status: {
     /**
@@ -933,6 +946,19 @@ export type TranslationFunctions = {
      * 画布通过目标 App iframe 进行沙箱渲染。Studio 仅通过 Preview Bridge 传递文档快照。
      */
     runtimeDesc: () => LocalizedString;
+    openapi: {
+      docs: () => LocalizedString;
+      noDocs: () => LocalizedString;
+      loadFailed: () => LocalizedString;
+      embedded: () => LocalizedString;
+      operation: () => LocalizedString;
+      method: () => LocalizedString;
+      pathParams: () => LocalizedString;
+      queryParams: () => LocalizedString;
+      body: () => LocalizedString;
+      loading: () => LocalizedString;
+      invalidJson: () => LocalizedString;
+    };
   };
   status: {
     /**

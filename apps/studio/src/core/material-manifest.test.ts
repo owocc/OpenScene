@@ -2,6 +2,7 @@ import { APP_TYPE_WEB } from "@openscene/constants";
 import { describe, expect, it } from "vite-plus/test";
 
 import { materialManifestToAdapterMeta } from "./material-manifest";
+import { inspectAdapterMeta } from "./meta";
 
 describe("App material manifest adapter", () => {
   it("maps union schema, enum and explicit editor metadata", () => {
@@ -35,5 +36,27 @@ describe("App material manifest adapter", () => {
       { label: "brand", value: "brand" },
     ]);
     expect(card.props.width.editor).toMatchObject({ control: "unit", units: ["px", "%"] });
+  });
+
+  it("maps an openapi editor control and passes adapter inspection", () => {
+    const adapter = materialManifestToAdapterMeta({
+      protocolVersion: "1.0",
+      app: { key: "demo", type: APP_TYPE_WEB },
+      components: {
+        ApiBox: {
+          title: "API Box",
+          props: {
+            openapi: {
+              type: "object",
+              "x-editor": { control: "openapi" },
+            },
+          },
+        },
+      },
+    });
+
+    const component = adapter.components[0];
+    expect(component.props.openapi.editor.control).toBe("openapi");
+    expect(inspectAdapterMeta(adapter)).toEqual([]);
   });
 });

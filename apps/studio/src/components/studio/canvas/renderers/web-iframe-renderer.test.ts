@@ -63,7 +63,10 @@ describe("Studio Web iframe bridge v2 handshake", () => {
     ).toBe(true);
     expect(
       RendererPortMessageSchema.safeParse(
-        createBridgeEnvelope("s", "RENDERER_ERROR", { message: "render failed" }),
+        createBridgeEnvelope("s", "DOCUMENT_RENDERED", {
+          schemaVersion: "1.0.0",
+          root: null,
+        }),
       ).success,
     ).toBe(true);
   });

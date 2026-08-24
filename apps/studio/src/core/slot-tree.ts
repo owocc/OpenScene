@@ -196,14 +196,16 @@ export function collectDescendants(document: SceneDocument, rootId: string) {
   return removed;
 }
 
-export function deleteElementRecursive(document: SceneDocument, elementId: string) {
+export function deleteElementRecursive(document: SceneDocument, elementId: string): SceneDocument {
   if (elementId === document.spec.root) {
-    const root = document.spec.elements[elementId];
+    // Removing the root leaves the document without a root; the author adds
+    // the next node manually and it becomes the new root.
     return {
       ...document,
       spec: {
-        ...document.spec,
-        elements: { [elementId]: { type: root?.type ?? "View", props: {}, children: [] } },
+        root: null,
+        elements: {},
+        ...(document.spec.state === undefined ? {} : { state: document.spec.state }),
       },
     };
   }

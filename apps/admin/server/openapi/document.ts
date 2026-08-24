@@ -24,6 +24,7 @@ export function createOpenApiDocument(): Record<string, unknown> {
       { name: "Categories" },
       { name: "Locales" },
       { name: "Assets" },
+      { name: "OpenAPI Docs" },
       { name: "Studio Sessions" },
       { name: "Runtime" },
     ],

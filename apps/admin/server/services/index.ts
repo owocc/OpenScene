@@ -3,6 +3,7 @@ import type { AppDatabase } from "../db/client";
 import { hashSecret, newId, newSecret, nowIso } from "../db/ids";
 import {
   appKeys,
+  appOpenApiDocs,
   apps,
   assets,
   categories,
@@ -48,6 +49,9 @@ import {
   LocaleCreateSchema,
   LocalePatchSchema,
   LocaleSchema,
+  OpenApiDocCreateSchema,
+  OpenApiDocPatchSchema,
+  OpenApiDocSchema,
   PaginationQuerySchema,
   PreviewProfileCreateSchema,
   PreviewProfilePatchSchema,
@@ -1126,6 +1130,113 @@ export async function deleteLocale(
     .where(and(eq(locales.appId, appId), eq(locales.id, localeId)))
     .run();
 }
+export async function listAppOpenApiDocs(db: AppDatabase, appId: string): Promise<unknown[]> {
+  await getAppRow(db, appId);
+  return (
+    await db
+      .select()
+      .from(appOpenApiDocs)
+      .where(eq(appOpenApiDocs.appId, appId))
+      .orderBy(asc(appOpenApiDocs.createdAt))
+      .all()
+  ).map(openApiDocRecord);
+}
+
+export async function createAppOpenApiDoc(
+  db: AppDatabase,
+  appId: string,
+  input: unknown,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const body = OpenApiDocCreateSchema.parse(input);
+  const timestamp = nowIso();
+  const row = {
+    id: newId("openapi"),
+    appId,
+    name: body.name,
+    json: JSON.stringify(body.json),
+    isDefault: body.isDefault ?? false,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  await db.transaction(async (tx) => {
+    if (row.isDefault)
+      await tx
+        .update(appOpenApiDocs)
+        .set({ isDefault: false, updatedAt: timestamp })
+        .where(eq(appOpenApiDocs.appId, appId))
+        .run();
+    await tx.insert(appOpenApiDocs).values(row).run();
+  });
+  return OpenApiDocSchema.parse(openApiDocRecord(row));
+}
+
+export async function getAppOpenApiDoc(
+  db: AppDatabase,
+  appId: string,
+  docId: string,
+): Promise<unknown> {
+  const row = await db
+    .select()
+    .from(appOpenApiDocs)
+    .where(and(eq(appOpenApiDocs.appId, appId), eq(appOpenApiDocs.id, docId)))
+    .get();
+  if (!row) throw notFound();
+  return OpenApiDocSchema.parse(openApiDocRecord(row));
+}
+
+export async function updateAppOpenApiDoc(
+  db: AppDatabase,
+  appId: string,
+  docId: string,
+  input: unknown,
+): Promise<unknown> {
+  const existing = await db
+    .select()
+    .from(appOpenApiDocs)
+    .where(and(eq(appOpenApiDocs.appId, appId), eq(appOpenApiDocs.id, docId)))
+    .get();
+  if (!existing) throw notFound();
+  const body = OpenApiDocPatchSchema.parse(input);
+  const timestamp = nowIso();
+  await db.transaction(async (tx) => {
+    if (body.isDefault)
+      await tx
+        .update(appOpenApiDocs)
+        .set({ isDefault: false, updatedAt: timestamp })
+        .where(eq(appOpenApiDocs.appId, appId))
+        .run();
+    await tx
+      .update(appOpenApiDocs)
+      .set({
+        name: body.name ?? existing.name,
+        json: body.json !== undefined ? JSON.stringify(body.json) : existing.json,
+        isDefault: body.isDefault ?? existing.isDefault,
+        updatedAt: timestamp,
+      })
+      .where(and(eq(appOpenApiDocs.appId, appId), eq(appOpenApiDocs.id, docId)))
+      .run();
+  });
+  return getAppOpenApiDoc(db, appId, docId);
+}
+
+export async function deleteAppOpenApiDoc(
+  db: AppDatabase,
+  appId: string,
+  docId: string,
+): Promise<void> {
+  const row = await db
+    .select()
+    .from(appOpenApiDocs)
+    .where(and(eq(appOpenApiDocs.appId, appId), eq(appOpenApiDocs.id, docId)))
+    .get();
+  if (!row) throw notFound();
+  if (row.isDefault) throw conflict("The default OpenAPI document cannot be deleted");
+  await db
+    .delete(appOpenApiDocs)
+    .where(and(eq(appOpenApiDocs.appId, appId), eq(appOpenApiDocs.id, docId)))
+    .run();
+}
 
 export async function listAssets(db: AppDatabase, appId: string): Promise<unknown[]> {
   await getAppRow(db, appId);
@@ -1574,6 +1685,17 @@ function localeRecord(row: typeof locales.$inferSelect): unknown {
     appId: row.appId,
     code: row.code,
     name: row.name,
+    isDefault: row.isDefault,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+function openApiDocRecord(row: typeof appOpenApiDocs.$inferSelect): unknown {
+  return {
+    id: row.id,
+    appId: row.appId,
+    name: row.name,
+    json: JSON.parse(row.json) as unknown,
     isDefault: row.isDefault,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

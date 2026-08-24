@@ -2,9 +2,10 @@ import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
 import type { AppManifest, ComponentManifest } from "@openscene/protocol";
 import { z } from "zod";
 import type {
-  OpenSceneSolidActionDefinition,
-  OpenSceneSolidComponentDefinition,
   OpenSceneHandlerFactory,
+  OpenSceneSolidActionDefinition,
+  OpenSceneSolidApp,
+  OpenSceneSolidComponentDefinition,
 } from "./catalog.js";
 
 function schemaJson(schema: z.ZodType | undefined): Record<string, unknown> {
@@ -95,6 +96,15 @@ export function defineOpenSceneSolidAction(
   return definition;
 }
 
+export type {
+  DefineOpenSceneSolidAppOptions,
+  OpenSceneHandlerFactory,
+  OpenSceneSolidActionDefinition,
+  OpenSceneSolidApp,
+  OpenSceneSolidComponentDefinition,
+  SolidRenderer,
+} from "./catalog.js";
+
 export function defineOpenSceneSolidApp(
   options: {
     appKey?: string;
@@ -105,7 +115,7 @@ export function defineOpenSceneSolidApp(
       | Record<string, OpenSceneSolidComponentDefinition>;
     actions?: OpenSceneSolidActionDefinition[] | Record<string, OpenSceneSolidActionDefinition>;
   } = {},
-) {
+): OpenSceneSolidApp {
   const components = { ...baseSolidComponents } as Record<
     string,
     OpenSceneSolidComponentDefinition
@@ -145,5 +155,5 @@ export function defineOpenSceneSolidApp(
     componentDefinitions: components,
     actionDefinitions: actions,
     manifest,
-  };
+  } as OpenSceneSolidApp;
 }

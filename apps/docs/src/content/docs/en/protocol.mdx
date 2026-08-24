@@ -35,11 +35,17 @@ interface SceneDocument {
     css?: unknown;
     i18n?: unknown;
   };
-  spec: { root: string; elements: Record<string, UIElement>; state?: Record<string, unknown> };
+  spec: {
+    root: string | null;
+    elements: Record<string, UIElement>;
+    state?: Record<string, unknown>;
+  };
 }
 ```
 
 The OpenScene page wrapper contains json-render's flat identity map (the flat Spec) in its `spec` field. Node identity is **only** the map key in `spec.elements`: `root` and every `children` or `slots` reference point to a key. Element values must not duplicate an id or persist adapter-private fields. json-render natively owns `$state`, `$bindState`, `$bindItem`, `$template`, `$computed`, `$cond`, visibility, repeat, watch, and action binding.
+
+`spec.root` may be `null`: a newly created page/template has no root node. The first node the author adds manually becomes the root, and the runtime renders nothing until one exists.
 
 ## OpenScene directives
 
@@ -109,7 +115,7 @@ interface SceneDocument {
   schemaVersion: typeof SCENE_DOCUMENT_SCHEMA_VERSION;
   pageInfo: ScenePageInfo;
   globalConfig: SceneGlobalConfig;
-  spec: Spec;
+  spec: Omit<Spec, "root"> & { root: string | null };
   [key: string]: unknown;
 }
 ```
@@ -133,7 +139,7 @@ const SceneDocumentSchema: z.ZodType<SceneDocument> = z
   .catchall(z.unknown())
   .superRefine((document, context) => {
     const { root, elements, state } = document.spec;
-    if (!(root in elements)) {
+    if (root !== null && !(root in elements)) {
       context.addIssue({
         code: "custom",
         path: ["spec", "root"],
@@ -200,10 +206,10 @@ function createEmptySceneDocument(): SceneDocument {
     },
     globalConfig: {},
     spec: {
-      root: "root",
-      elements: {
-        root: { type: "View", props: {}, children: [] },
-      },
+      // No root node: the author adds the first element manually and it
+      // becomes the root. The runtime renders nothing until then.
+      root: null,
+      elements: {},
       state: {},
     },
   };
@@ -386,6 +392,56 @@ interface StudioBridgeEnvelope<TType extends string = string, TPayload = unknown
 }
 ```
 
+## SceneNodeSnapshot
+
+Serializable runtime node detail shown by Studio's tree and property panel.
+The element map key is the identity; the snapshot duplicates it so the
+receiving side can address nodes without the key.
+
+**Kind:** Interface
+
+```ts
+interface SceneNodeSnapshot {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  children: string[];
+  slots: Record<string, string[]>;
+}
+```
+
+## SceneDocumentSnapshot
+
+Serializable JSON-render tree snapshot sent when a renderer connects.
+
+**Kind:** Interface
+
+```ts
+interface SceneDocumentSnapshot {
+  /** Root element key; null when the document has no root yet. */
+  root: string | null;
+  elements: Record<string, SceneNodeSnapshot>;
+  state: Record<string, unknown>;
+}
+```
+
+## ElementRect
+
+Bounding box of a rendered element, relative to the iframe viewport.
+Studio draws the selection/hover outlines on top of the frame from these
+coordinates, so the iframe content itself stays untouched.
+
+**Kind:** Interface
+
+```ts
+interface ElementRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+```
+
 ## BridgeEnvelopeSchema
 
 Base schema used to reject messages from another protocol/version.
@@ -450,6 +506,7 @@ const StudioPortMessageSchema = z.discriminatedUnion("type", [
       selectedElementIds: z.array(nonEmptyString),
     }),
   ),
+  envelope("ELEMENT_GEOMETRY_REQUEST", z.object({ elementId: nonEmptyString })),
 ]);
 ```
 
@@ -465,7 +522,7 @@ const RendererPortMessageSchema = z.discriminatedUnion("type", [
     "DOCUMENT_RENDERED",
     z.object({
       schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
-      root: nonEmptyString,
+      root: nonEmptyString.nullable(),
     }),
   ),
   envelope(
@@ -474,7 +531,25 @@ const RendererPortMessageSchema = z.discriminatedUnion("type", [
       elementIds: z.array(nonEmptyString),
       primaryElementId: nonEmptyString.nullable(),
       source: z.enum(["click", "marquee"]),
+      rects: z.record(z.string(), ElementRectSchema),
     }),
+  ),
+  envelope(
+    "ELEMENT_HOVER",
+    z.object({ elementId: nonEmptyString.nullable(), rect: ElementRectSchema.nullable() }),
+  ),
+  envelope(
+    "ELEMENT_GEOMETRY",
+    z.object({
+      elementId: nonEmptyString,
+      rect: ElementRectSchema,
+      scrollLeft: z.number().nonnegative(),
+      scrollTop: z.number().nonnegative(),
+    }),
+  ),
+  envelope(
+    "FRAME_SCROLL",
+    z.object({ scrollLeft: z.number().nonnegative(), scrollTop: z.number().nonnegative() }),
   ),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
 ]);

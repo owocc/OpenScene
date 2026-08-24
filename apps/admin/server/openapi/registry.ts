@@ -19,6 +19,10 @@ import {
   LocaleCreateSchema,
   LocalePatchSchema,
   LocaleSchema,
+  OpenApiDocCreateSchema,
+  OpenApiDocPatchSchema,
+  OpenApiDocSchema,
+  OpenApiDocSummarySchema,
   PreviewProfileCreateSchema,
   PreviewProfilePatchSchema,
   PreviewProfileSchema,
@@ -59,6 +63,8 @@ const schemas = [
   ["RuntimeDelivery", OpenApiJsonObjectSchema],
   ["AppKeyRotation", AppKeyRotationSchema],
   ["Problem", ProblemSchema],
+  ["OpenApiDoc", OpenApiDocSchema],
+  ["OpenApiDocSummary", OpenApiDocSummarySchema],
 ] as const;
 for (const [name, schema] of [...schemas].sort(([a], [b]) => a.localeCompare(b)))
   registry.register(name, schema);
@@ -82,6 +88,8 @@ const ListResourceSchema = ListResponseSchema(ResourceSchema);
 const ListCategorySchema = z.array(CategorySchema);
 const ListLocaleSchema = z.array(LocaleSchema);
 const ListAssetSchema = z.array(AssetSchema);
+const ListOpenApiDocSchema = z.array(OpenApiDocSchema);
+const ListOpenApiDocSummarySchema = z.array(OpenApiDocSummarySchema);
 
 type Operation = {
   method: "get" | "post" | "patch" | "delete";
@@ -360,6 +368,7 @@ const operations: Operation[] = [
     response: ListAssetSchema,
     params: true,
   },
+  ...openApiDocOperations(),
   {
     method: "post",
     path: "/api/v1/apps/{appId}/assets/upload-intents",
@@ -421,6 +430,22 @@ const operations: Operation[] = [
     tag: "Studio Sessions",
     response: JsonObjectSchema,
     body: DraftPatchSchema,
+    params: true,
+  },
+  {
+    method: "get",
+    path: "/api/v1/studio-sessions/{sessionId}/openapi-docs",
+    operationId: "listSessionOpenApiDocs",
+    tag: "Studio Sessions",
+    response: ListOpenApiDocSummarySchema,
+    params: true,
+  },
+  {
+    method: "get",
+    path: "/api/v1/studio-sessions/{sessionId}/openapi-docs/{openApiDocId}",
+    operationId: "getSessionOpenApiDoc",
+    tag: "Studio Sessions",
+    response: OpenApiDocSchema,
     params: true,
   },
   {
@@ -626,6 +651,54 @@ function localeOperations(): Operation[] {
       path: "/api/v1/apps/{appId}/locales/{localeId}",
       operationId: "deleteLocale",
       tag: "Locales",
+      response: z.void(),
+      params: true,
+      status: 204,
+    },
+  ];
+}
+function openApiDocOperations(): Operation[] {
+  return [
+    {
+      method: "get",
+      path: "/api/v1/apps/{appId}/openapi-docs",
+      operationId: "listOpenApiDocs",
+      tag: "OpenAPI Docs",
+      response: ListOpenApiDocSchema,
+      params: true,
+    },
+    {
+      method: "post",
+      path: "/api/v1/apps/{appId}/openapi-docs",
+      operationId: "createOpenApiDoc",
+      tag: "OpenAPI Docs",
+      response: OpenApiDocSchema,
+      body: OpenApiDocCreateSchema,
+      params: true,
+      status: 201,
+    },
+    {
+      method: "get",
+      path: "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}",
+      operationId: "getOpenApiDoc",
+      tag: "OpenAPI Docs",
+      response: OpenApiDocSchema,
+      params: true,
+    },
+    {
+      method: "patch",
+      path: "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}",
+      operationId: "updateOpenApiDoc",
+      tag: "OpenAPI Docs",
+      response: OpenApiDocSchema,
+      body: OpenApiDocPatchSchema,
+      params: true,
+    },
+    {
+      method: "delete",
+      path: "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}",
+      operationId: "deleteOpenApiDoc",
+      tag: "OpenAPI Docs",
       response: z.void(),
       params: true,
       status: 204,

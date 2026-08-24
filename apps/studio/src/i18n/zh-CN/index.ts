@@ -122,6 +122,19 @@ const zh_CN: BaseTranslation = {
     runtimeTitle: "App 独立运行时",
     runtimeDesc:
       "画布通过目标 App iframe 进行沙箱渲染。Studio 仅通过 Preview Bridge 传递文档快照。",
+    openapi: {
+      docs: "OpenAPI 文档",
+      noDocs: "当前 App 没有 OpenAPI 文档，请先在 Admin 中添加。",
+      loadFailed: "OpenAPI 文档加载失败",
+      embedded: "内嵌文档",
+      operation: "接口路径",
+      method: "请求方式",
+      pathParams: "路径参数",
+      queryParams: "查询参数",
+      body: "请求体 JSON",
+      loading: "加载中…",
+      invalidJson: "JSON 格式暂时无效",
+    },
   },
   status: {
     loadingTitle: "正在加载 App 会话",

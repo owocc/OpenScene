@@ -80,6 +80,7 @@
         "@openscene/constants": "workspace:*",
         "@openscene/javascript": "workspace:*",
         "@openscene/protocol": "workspace:*",
+        "@openscene/schema": "workspace:*",
         "@tailwindcss/vite": "^4",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -116,6 +117,7 @@
       "dependencies": {
         "@openscene/constants": "workspace:*",
         "@openscene/javascript": "workspace:*",
+        "@openscene/schema": "workspace:*",
         "@openscene/solid": "workspace:*",
         "solid-js": "^1.9.14",
         "zod": "^4.0.0",

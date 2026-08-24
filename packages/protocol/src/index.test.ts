@@ -20,16 +20,19 @@ function bridge(type: string, payload: unknown) {
 }
 
 describe("canonical scene documents", () => {
-  it("creates a schema-valid flat document with a stable root", () => {
+  it("creates a schema-valid empty document without a root", () => {
     const document = createEmptySceneDocument();
 
     expect(SceneDocumentSchema.safeParse(document).success).toBe(true);
     expect(document.schemaVersion).toBe(SCENE_DOCUMENT_SCHEMA_VERSION);
-    expect(document.spec.elements.root).toEqual({ type: "View", props: {}, children: [] });
+    expect(document.spec.root).toBeNull();
+    expect(document.spec.elements).toEqual({});
   });
 
   it("accepts json-render element references and rejects dangling edges", () => {
     const document = createEmptySceneDocument();
+    document.spec.root = "root";
+    document.spec.elements.root = { type: "View", props: {}, children: [] };
     document.spec.elements.root.slots = { header: ["header"] };
     document.spec.elements.header = {
       type: "Text",
@@ -46,15 +49,28 @@ describe("canonical scene documents", () => {
     expect(SceneDocumentSchema.safeParse(document).success).toBe(false);
   });
 
+  it("rejects a root id that is not present in elements", () => {
+    const document = createEmptySceneDocument();
+    document.spec.root = "missing";
+    document.spec.elements.root = { type: "View", props: {}, children: [] };
+    expect(SceneDocumentSchema.safeParse(document).success).toBe(false);
+  });
+
   it("rejects adapter identity and reserved runtime state fields", () => {
     const propsDocument = createEmptySceneDocument();
+    propsDocument.spec.root = "root";
+    propsDocument.spec.elements.root = { type: "View", props: {}, children: [] };
     propsDocument.spec.elements.root.props.__opensceneNodeId = "root";
     expect(SceneDocumentSchema.safeParse(propsDocument).success).toBe(false);
 
     const stateDocument = createEmptySceneDocument();
+    stateDocument.spec.root = "root";
+    stateDocument.spec.elements.root = { type: "View", props: {}, children: [] };
     stateDocument.spec.state = { __scene: { pageInfo: {} } };
     expect(SceneDocumentSchema.safeParse(stateDocument).success).toBe(false);
     const identityDocument = createEmptySceneDocument();
+    identityDocument.spec.root = "root";
+    identityDocument.spec.elements.root = { type: "View", props: {}, children: [] };
     Object.assign(identityDocument.spec.elements.root, { id: "root" });
     expect(SceneDocumentSchema.safeParse(identityDocument).success).toBe(false);
   });

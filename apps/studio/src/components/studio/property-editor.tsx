@@ -12,7 +12,17 @@ import {
   type DynamicMode,
   type JsonValue,
 } from "@/core/document";
+import { LOCAL_TEST_SESSION_ID } from "@/core/local-test-session";
 import type { ComponentMeta, EditorMeta, PropMeta } from "@/core/meta";
+import { useI18n } from "@/i18n";
+import { useQueryStore } from "@/stores";
+import { createOpenSceneClient } from "@openscene/api-client";
+import {
+  openApiMethods,
+  type OpenApiMethod,
+  type OpenApiRequestParams,
+  type OpenApiValue,
+} from "@openscene/schema";
 
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
@@ -294,6 +304,487 @@ function JsonControl({ meta, value, onChange }: ControlProps) {
     </div>
   );
 }
+type OpenApiDocSummary = {
+  id: string;
+  appId: string;
+  name: string;
+  isDefault: boolean;
+};
+
+type OpenApiDocClient = {
+  GET: (
+    path: string,
+    options: unknown,
+  ) => Promise<{
+    data?: unknown;
+    error?: unknown;
+    response: Response;
+  }>;
+};
+
+const EMBEDDED_DOC = "__embedded__";
+
+function isOpenApiValue(value: JsonValue | undefined): value is OpenApiValue {
+  return (
+    isRecord(value) &&
+    isRecord(value.json) &&
+    typeof value.path === "string" &&
+    typeof value.method === "string"
+  );
+}
+
+function getPaths(json: Record<string, JsonValue> | undefined) {
+  if (!isRecord(json)) return undefined;
+  const paths = json.paths;
+  return isRecord(paths) ? paths : undefined;
+}
+
+function firstAvailableMethod(
+  pathItem: Record<string, JsonValue> | undefined,
+): OpenApiMethod | undefined {
+  if (!isRecord(pathItem)) return undefined;
+  return openApiMethods.find((method) => method in pathItem);
+}
+
+function buildInitialValue(json: Record<string, JsonValue>): OpenApiValue | undefined {
+  const paths = getPaths(json);
+  if (!paths) return undefined;
+  const firstPath = Object.keys(paths)[0];
+  if (!firstPath) return undefined;
+  const pathItem = isRecord(paths[firstPath]) ? paths[firstPath] : undefined;
+  const method = firstAvailableMethod(pathItem);
+  if (!method) return undefined;
+  return { json, path: firstPath, method, params: {} };
+}
+
+type OpenApiParam = {
+  name: string;
+  in: string;
+  required?: boolean;
+  schema?: { type?: string };
+};
+
+function mergedOperationParams(
+  pathItem: Record<string, JsonValue> | undefined,
+  operation: Record<string, JsonValue> | undefined,
+): OpenApiParam[] {
+  const byKey = new Map<string, OpenApiParam>();
+  const addParams = (list: unknown) => {
+    if (!Array.isArray(list)) return;
+    for (const entry of list) {
+      if (!isRecord(entry)) continue;
+      const name = entry.name;
+      const location = entry.in;
+      if (typeof name !== "string" || typeof location !== "string") continue;
+      const schema = isRecord(entry.schema) ? entry.schema : undefined;
+      byKey.set(`${location}:${name}`, {
+        name,
+        in: location,
+        required: entry.required === true,
+        schema: schema
+          ? { type: typeof schema.type === "string" ? schema.type : undefined }
+          : undefined,
+      });
+    }
+  };
+  addParams(isRecord(pathItem) ? pathItem.parameters : undefined);
+  addParams(isRecord(operation) ? operation.parameters : undefined);
+  return [...byKey.values()];
+}
+
+function pruneParams(
+  params: OpenApiRequestParams | undefined,
+  pathItem: Record<string, JsonValue> | undefined,
+  operation: Record<string, JsonValue> | undefined,
+): OpenApiRequestParams | undefined {
+  const merged = mergedOperationParams(pathItem, operation);
+  const pathKeys = new Set(merged.filter((p) => p.in === "path").map((p) => p.name));
+  const queryKeys = new Set(merged.filter((p) => p.in === "query").map((p) => p.name));
+  const next: OpenApiRequestParams = {};
+  if (params?.path) {
+    const path: Record<string, string> = {};
+    for (const [key, item] of Object.entries(params.path)) {
+      if (pathKeys.has(key)) path[key] = item;
+    }
+    if (Object.keys(path).length > 0) next.path = path;
+  }
+  if (params?.query) {
+    const query: Record<string, JsonValue> = {};
+    for (const [key, item] of Object.entries(params.query)) {
+      if (queryKeys.has(key)) query[key] = item;
+    }
+    if (Object.keys(query).length > 0) next.query = query;
+  }
+  if (
+    isRecord(operation) &&
+    "requestBody" in operation &&
+    params?.body !== undefined &&
+    next.body === undefined
+  ) {
+    next.body = params.body;
+  }
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function OpenApiControl({ value, onChange }: ControlProps) {
+  const { LL } = useI18n();
+  const session = useMemo(() => {
+    const query = useQueryStore.getState();
+    if (!query.serverUrl || !query.sessionId || !query.token) return null;
+    if (query.sessionId === LOCAL_TEST_SESSION_ID) return null;
+    return {
+      baseUrl: query.serverUrl.replace(/\/$/, ""),
+      sessionId: query.sessionId,
+      token: query.token,
+    };
+  }, []);
+  const client = useMemo<OpenApiDocClient | null>(() => {
+    if (!session) return null;
+    return createOpenSceneClient({
+      baseUrl: session.baseUrl,
+      headers: { "x-openscene-session-token": session.token },
+    }) as unknown as OpenApiDocClient;
+  }, [session]);
+  const [embeddedJson] = useState<Record<string, JsonValue> | null>(() =>
+    isRecord(value) && getPaths(isRecord(value.json) ? value.json : undefined)
+      ? (value as OpenApiValue).json
+      : null,
+  );
+  const [docJson, setDocJson] = useState<Record<string, JsonValue> | undefined>(
+    () => embeddedJson ?? undefined,
+  );
+  const [activeDocId, setActiveDocId] = useState<string | null>(() =>
+    embeddedJson ? EMBEDDED_DOC : null,
+  );
+  const [docs, setDocs] = useState<OpenApiDocSummary[] | null>(null);
+  const [docsError, setDocsError] = useState(false);
+  const [docLoading, setDocLoading] = useState(false);
+  const [bodyText, setBodyText] = useState(() => {
+    if (isOpenApiValue(value) && isRecord(value.params) && value.params.body !== undefined) {
+      try {
+        return JSON.stringify(value.params.body, null, 2);
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  });
+  const [bodyError, setBodyError] = useState(false);
+
+  useEffect(() => {
+    if (!client || !session) return;
+    let cancelled = false;
+    void client
+      .GET(`/api/v1/studio-sessions/${session.sessionId}/openapi-docs`, {})
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error || !Array.isArray(result.data)) {
+          setDocsError(true);
+          return;
+        }
+        setDocs(result.data as OpenApiDocSummary[]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, session]);
+
+  const loadDoc = useMemo(
+    () => async (docId: string) => {
+      if (!client || !session) return;
+      setDocLoading(true);
+      try {
+        const result = await client.GET(
+          `/api/v1/studio-sessions/${session.sessionId}/openapi-docs/${docId}`,
+          {},
+        );
+        const data = isRecord(result.data) ? result.data : undefined;
+        const json = isRecord(data?.json) ? (data.json as Record<string, JsonValue>) : undefined;
+        if (result.error || !json) {
+          setDocsError(true);
+          return;
+        }
+        const initial = buildInitialValue(json);
+        if (initial) onChange(initial);
+        setDocJson(json);
+        setActiveDocId(docId);
+      } finally {
+        setDocLoading(false);
+      }
+    },
+    [client, session, onChange],
+  );
+
+  useEffect(() => {
+    if (!session || !docs || docs.length === 0 || docJson) return;
+    const target = docs.find((doc) => doc.isDefault) ?? docs[0];
+    if (!target) return;
+    void loadDoc(target.id);
+  }, [docs, docJson, session, loadDoc]);
+
+  const current = isOpenApiValue(value) ? value : undefined;
+  const paths = getPaths(docJson);
+  const pathKeys = paths ? Object.keys(paths) : [];
+  const activePath =
+    paths && current && typeof current.path === "string" && current.path in paths
+      ? current.path
+      : pathKeys[0];
+  const pathItem = activePath
+    ? isRecord(paths?.[activePath])
+      ? (paths[activePath] as Record<string, JsonValue>)
+      : undefined
+    : undefined;
+  const pathMethods = pathItem ? openApiMethods.filter((method) => method in pathItem) : [];
+  const activeMethod =
+    current && pathMethods.includes(current.method) ? current.method : pathMethods[0];
+  const operation =
+    pathItem && activeMethod && isRecord(pathItem[activeMethod])
+      ? (pathItem[activeMethod] as Record<string, JsonValue>)
+      : undefined;
+  const mergedParams = mergedOperationParams(pathItem, operation);
+  const pathParams = mergedParams.filter((param) => param.in === "path");
+  const queryParams = mergedParams.filter((param) => param.in === "query");
+  const hasRequestBody = isRecord(operation) && "requestBody" in operation;
+  const noDocsVisible = !docsError && !docLoading && !docJson && (docs?.length ?? 0) === 0;
+
+  const selectPath = (path: string) => {
+    const item = isRecord(paths?.[path]) ? (paths[path] as Record<string, JsonValue>) : undefined;
+    const method = firstAvailableMethod(item);
+    if (!method) return;
+    const op =
+      item && isRecord(item[method]) ? (item[method] as Record<string, JsonValue>) : undefined;
+    const next: OpenApiValue = {
+      json: docJson ?? {},
+      path,
+      method,
+      params: pruneParams(current?.params, item, op),
+    };
+    onChange(next);
+  };
+  const selectMethod = (method: OpenApiMethod) => {
+    const op =
+      pathItem && isRecord(pathItem[method])
+        ? (pathItem[method] as Record<string, JsonValue>)
+        : undefined;
+    const next: OpenApiValue = {
+      json: docJson ?? {},
+      path: activePath,
+      method,
+      params: pruneParams(current?.params, pathItem, op),
+    };
+    onChange(next);
+  };
+  const setPathParam = (name: string, next: string) => {
+    const updated: OpenApiValue = {
+      json: docJson ?? {},
+      path: activePath,
+      method: activeMethod ?? "get",
+      params: {
+        ...current?.params,
+        path: { ...current?.params?.path, [name]: next },
+      },
+    };
+    onChange(updated);
+  };
+  const setQueryParam = (name: string, next: JsonValue) => {
+    const updated: OpenApiValue = {
+      json: docJson ?? {},
+      path: activePath,
+      method: activeMethod ?? "get",
+      params: {
+        ...current?.params,
+        query: { ...current?.params?.query, [name]: next },
+      },
+    };
+    onChange(updated);
+  };
+  const setBody = (text: string) => {
+    setBodyText(text);
+    try {
+      const parsed: unknown = JSON.parse(text);
+      setBodyError(false);
+      const updated: OpenApiValue = {
+        json: docJson ?? {},
+        path: activePath,
+        method: activeMethod ?? "get",
+        params: { ...current?.params, body: parsed as JsonValue },
+      };
+      onChange(updated);
+    } catch {
+      setBodyError(true);
+    }
+  };
+
+  return (
+    <div className="grid gap-2">
+      {docs !== null && (embeddedJson !== null || (docs?.length ?? 0) > 0) ? (
+        <label className="grid gap-1">
+          <span className="text-[10px] text-muted-foreground">{LL.properties.openapi.docs()}</span>
+          <select
+            className={inputClassName}
+            value={activeDocId ?? ""}
+            onChange={(event) => {
+              if (event.target.value === EMBEDDED_DOC) return;
+              void loadDoc(event.target.value);
+            }}
+          >
+            {embeddedJson !== null && (
+              <option value={EMBEDDED_DOC}>{LL.properties.openapi.embedded()}</option>
+            )}
+            {(docs ?? []).map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      {docLoading ? (
+        <span className="text-[10px] text-muted-foreground">{LL.properties.openapi.loading()}</span>
+      ) : docsError && !docJson ? (
+        <span className="text-[10px] text-destructive">{LL.properties.openapi.loadFailed()}</span>
+      ) : noDocsVisible ? (
+        <span className="text-[10px] text-muted-foreground">{LL.properties.openapi.noDocs()}</span>
+      ) : (
+        pathKeys.length > 0 && (
+          <>
+            <label className="grid gap-1">
+              <span className="text-[10px] text-muted-foreground">
+                {LL.properties.openapi.operation()}
+              </span>
+              <select
+                className={inputClassName}
+                value={activePath}
+                onChange={(event) => selectPath(event.target.value)}
+              >
+                {pathKeys.map((path) => {
+                  const item = isRecord(paths?.[path])
+                    ? (paths[path] as Record<string, JsonValue>)
+                    : undefined;
+                  const op =
+                    item && isRecord(item[openApiMethods.find((method) => method in item) ?? "get"])
+                      ? (item[openApiMethods.find((method) => method in item) ?? "get"] as Record<
+                          string,
+                          JsonValue
+                        >)
+                      : undefined;
+                  const summary = typeof op?.summary === "string" ? op.summary : undefined;
+                  const operationId =
+                    typeof op?.operationId === "string" ? op.operationId : undefined;
+                  const label = [path, summary ?? operationId].filter(Boolean).join(" — ");
+                  return (
+                    <option key={path} value={path}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-[10px] text-muted-foreground">
+                {LL.properties.openapi.method()}
+              </span>
+              <select
+                className={inputClassName}
+                value={activeMethod}
+                onChange={(event) => selectMethod(event.target.value as OpenApiMethod)}
+              >
+                {pathMethods.map((method) => (
+                  <option key={method} value={method}>
+                    {method.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {pathParams.length > 0 && (
+              <div className="grid gap-1.5">
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {LL.properties.openapi.pathParams()}
+                </span>
+                {pathParams.map((param) => (
+                  <label key={`${param.in}:${param.name}`} className="grid gap-1">
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {param.name}
+                      {param.required ? " *" : ""}
+                    </span>
+                    <input
+                      className={inputClassName}
+                      value={current?.params?.path?.[param.name] ?? ""}
+                      onChange={(event) => setPathParam(param.name, event.target.value)}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+            {queryParams.length > 0 && (
+              <div className="grid gap-1.5">
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {LL.properties.openapi.queryParams()}
+                </span>
+                {queryParams.map((param) => {
+                  const type = param.schema?.type ?? "string";
+                  const value = current?.params?.query?.[param.name];
+                  return (
+                    <label key={`${param.in}:${param.name}`} className="grid gap-1">
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        {param.name}
+                        {param.required ? " *" : ""}
+                      </span>
+                      {type === "integer" || type === "number" ? (
+                        <input
+                          className={inputClassName}
+                          type="number"
+                          value={typeof value === "number" ? value : ""}
+                          onChange={(event) => {
+                            if (event.target.value === "") {
+                              setQueryParam(param.name, "");
+                              return;
+                            }
+                            const next = Number(event.target.value);
+                            if (Number.isFinite(next)) setQueryParam(param.name, next);
+                          }}
+                        />
+                      ) : type === "boolean" ? (
+                        <input
+                          type="checkbox"
+                          checked={value === true}
+                          onChange={(event) => setQueryParam(param.name, event.target.checked)}
+                        />
+                      ) : (
+                        <input
+                          className={inputClassName}
+                          value={typeof value === "string" ? value : value === null ? "" : ""}
+                          onChange={(event) => setQueryParam(param.name, event.target.value)}
+                        />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {hasRequestBody && (
+              <label className="grid gap-1">
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {LL.properties.openapi.body()}
+                </span>
+                <textarea
+                  className={textareaClassName}
+                  value={bodyText}
+                  onChange={(event) => setBody(event.target.value)}
+                />
+                {bodyError && (
+                  <span className="text-[10px] text-destructive">
+                    {LL.properties.openapi.invalidJson()}
+                  </span>
+                )}
+              </label>
+            )}
+          </>
+        )
+      )}
+    </div>
+  );
+}
 
 function ActionControl({ meta }: ControlProps) {
   return (
@@ -318,6 +809,7 @@ const controlRegistry: Record<string, ControlRenderer> = {
   array: JsonControl,
   class: TextControl,
   action: ActionControl,
+  openapi: OpenApiControl,
 };
 
 function DynamicValueControl({

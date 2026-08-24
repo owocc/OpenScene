@@ -46,7 +46,8 @@ export interface SceneNodeSnapshot {
 
 /** Serializable JSON-render tree snapshot sent when a renderer connects. */
 export interface SceneDocumentSnapshot {
-  root: string;
+  /** Root element key; null when the document has no root yet. */
+  root: string | null;
   elements: Record<string, SceneNodeSnapshot>;
   state: Record<string, unknown>;
 }
@@ -123,7 +124,7 @@ export const RendererPortMessageSchema = z.discriminatedUnion("type", [
     "DOCUMENT_RENDERED",
     z.object({
       schemaVersion: z.literal(SCENE_DOCUMENT_SCHEMA_VERSION),
-      root: nonEmptyString,
+      root: nonEmptyString.nullable(),
     }),
   ),
   envelope(

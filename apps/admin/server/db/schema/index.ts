@@ -48,6 +48,20 @@ export const previewProfiles = sqliteTable(
   },
   (table) => [index("preview_profiles_app_index").on(table.appId)],
 );
+export const appOpenApiDocs = sqliteTable(
+  "app_openapi_docs",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id")
+      .notNull()
+      .references(() => apps.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    json: text("json").notNull(),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [index("app_openapi_docs_app_index").on(table.appId)],
+);
 
 export const manifestRevisions = sqliteTable(
   "manifest_revisions",
@@ -305,6 +319,7 @@ export const schema = {
   apps,
   previewProfiles,
   manifestRevisions,
+  appOpenApiDocs,
   appKeys,
   pages,
   templates,
@@ -320,6 +335,7 @@ export const schema = {
 
 export type AppRow = typeof apps.$inferSelect;
 export type PreviewProfileRow = typeof previewProfiles.$inferSelect;
+export type AppOpenApiDocRow = typeof appOpenApiDocs.$inferSelect;
 export type PageRow = typeof pages.$inferSelect;
 export type TemplateRow = typeof templates.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;

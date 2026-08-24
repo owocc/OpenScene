@@ -50,7 +50,19 @@ describe("OpenScene Solid catalog adapter", () => {
   test("base components and canonical documents are catalog-compatible", () => {
     const app = defineOpenSceneSolidApp();
     const document = createEmptySceneDocument();
-    expect(app.catalog.validate(document.spec).success).toBe(true);
+    // A freshly created document has no root yet; json-render's spec
+    // validation rejects it, which is why the renderer skips validation
+    // until the author adds the first node.
+    expect(app.catalog.validate(document.spec).success).toBe(false);
+    const rooted = {
+      ...document,
+      spec: {
+        root: "root",
+        elements: { root: { type: "View", props: {}, children: [] } },
+        state: {},
+      },
+    };
+    expect(app.catalog.validate(rooted.spec).success).toBe(true);
     expect(Object.keys(baseSolidComponents)).toEqual(["View", "Text", "Button"]);
   });
 });

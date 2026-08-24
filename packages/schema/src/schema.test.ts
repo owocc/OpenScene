@@ -2,9 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   isInputSchemaBase,
+  isOpenApiSchema,
   isSizeSchema,
   isUnitSchema,
   isWebInputSchema,
+  openApiMethods,
+  openApiSchema,
   sizeFieldKeys,
   sizeFieldPresets,
   sizeSchema,
@@ -90,5 +93,34 @@ describe("schema guards", () => {
     expect(isSizeSchema({ type: "unit", fields: [] })).toBe(false);
     expect(isWebInputSchema({ type: "color", units: [] })).toBe(false);
     expect(isWebInputSchema(undefined)).toBe(false);
+  });
+});
+
+describe("openapi schema", () => {
+  it("defaults to the full method list", () => {
+    const schema = openApiSchema();
+    expect(schema.type).toBe("openapi");
+    expect(schema.methods).toEqual([...openApiMethods]);
+  });
+
+  it("allows restricting the selectable methods", () => {
+    const schema = openApiSchema({ methods: ["get"] });
+    expect(schema.methods).toEqual(["get"]);
+  });
+
+  it("carries optional editor metadata", () => {
+    const schema = openApiSchema({ title: "API", required: true });
+    expect(schema.title).toBe("API");
+    expect(schema.required).toBe(true);
+  });
+
+  it("is recognized by the openapi and web guards", () => {
+    expect(isOpenApiSchema(openApiSchema())).toBe(true);
+    expect(isWebInputSchema(openApiSchema())).toBe(true);
+  });
+
+  it("rejects openapi-shaped objects without a methods array", () => {
+    expect(isOpenApiSchema({ type: "openapi" })).toBe(false);
+    expect(isOpenApiSchema({ type: "openapi", methods: "get" })).toBe(false);
   });
 });

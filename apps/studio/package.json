@@ -19,6 +19,7 @@
     "@openscene/constants": "workspace:*",
     "@openscene/javascript": "workspace:*",
     "@openscene/protocol": "workspace:*",
+    "@openscene/schema": "workspace:*",
     "@tailwindcss/vite": "^4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -52,13 +52,19 @@ describe("Studio editor state", () => {
     expect(replaced.selectedNodeId).toBeNull();
   });
 
-  it("clamps zoom and keeps locale in sync with the canonical document", () => {
+  it("makes the first added node the root and clears it again on delete", () => {
     const state = createEditorState(emptyDocument, 0);
-    const zoomed = editorReducer(state, { type: "viewport.patch", patch: { zoom: 9 } });
-    const next = editorReducer(state, { type: "locale.switch", locale: "zh-CN" });
-    expect(zoomed.viewport.zoom).toBe(3);
-    expect(next.locale).toBe("zh-CN");
-    expect(next.document.pageInfo.locale).toBe("zh-CN");
-    expect(next.document.spec.state?.lang).toBe("zh-CN");
+    const added = editorReducer(state, {
+      type: "node.add",
+      elementId: "view-1",
+      element: { type: "View", props: {}, children: [] },
+    });
+    expect(added.document.spec.root).toBe("view-1");
+    expect(added.selectedNodeId).toBe("view-1");
+
+    const deleted = editorReducer(added, { type: "node.delete", elementId: "view-1" });
+    expect(deleted.document.spec.root).toBeNull();
+    expect(deleted.document.spec.elements).toEqual({});
+    expect(deleted.selectedNodeId).toBeNull();
   });
 });

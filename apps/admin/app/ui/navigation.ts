@@ -49,6 +49,7 @@ export const navigationGroups = [
       { href: "/assets", key: "assets", icon: "image" },
       { href: "/categories", key: "categories", icon: "tag" },
       { href: "/locales", key: "locales", icon: "globe" },
+      { href: "/openapi-docs", key: "openapiDocs", icon: "code" },
       { href: "/settings", key: "settings", icon: "sliders" },
     ],
   },

@@ -17,7 +17,7 @@ import {
   type ComponentRenderProps,
   type ComponentRegistry,
 } from "@json-render/solid";
-import type { UIElement } from "@json-render/core";
+import type { Spec, UIElement } from "@json-render/core";
 import {
   openSceneDirectives,
   type OpenSceneClient,
@@ -149,7 +149,7 @@ function createIdentityRegistry(registry: Record<string, unknown>): ComponentReg
 }
 
 interface PreparedSpec {
-  root: string;
+  root: string | null;
   elements: Record<string, UIElement>;
   state?: Record<string, unknown>;
 }
@@ -183,10 +183,15 @@ function prepareSpec(document: SceneDocument, app: OpenSceneSolidApp): PreparedS
     elements: cleanElements,
     ...(source.state === undefined ? {} : { state: source.state }),
   };
-  const validation = app.catalog.validate(cleanSpec);
-  if (!validation.success) {
-    const issue = validation.error?.issues[0];
-    throw new Error(issue?.message ?? "OpenScene Solid catalog validation failed");
+  // json-render validation rejects specs without a root, but a freshly
+  // created page has none until the author adds the first node; the Renderer
+  // renders nothing in that case. Skip validation (and rendering) for them.
+  if (source.root !== null) {
+    const validation = app.catalog.validate(cleanSpec);
+    if (!validation.success) {
+      const issue = validation.error?.issues[0];
+      throw new Error(issue?.message ?? "OpenScene Solid catalog validation failed");
+    }
   }
   const elements = Object.fromEntries(
     Object.entries(cleanElements).map(([nodeId, element]) => [
@@ -244,10 +249,10 @@ export function OpenSceneRenderer(): JSX.Element {
             <SelectionCanvas>
               <ErrorBoundary fallback={(error) => <ErrorSurface error={error} />}>
                 <Show when={renderSlot() === 0}>
-                  <Renderer spec={spec()} registry={identityRegistry()} />
+                  <Renderer spec={spec() as unknown as Spec} registry={identityRegistry()} />
                 </Show>
                 <Show when={renderSlot() === 1}>
-                  <Renderer spec={spec()} registry={identityRegistry()} />
+                  <Renderer spec={spec() as unknown as Spec} registry={identityRegistry()} />
                 </Show>
               </ErrorBoundary>
             </SelectionCanvas>

@@ -14,7 +14,8 @@ export type EditorControl =
   | "object"
   | "array"
   | "class"
-  | "action";
+  | "action"
+  | "openapi";
 
 export interface EditorOption {
   label: string;
@@ -113,6 +114,7 @@ const SUPPORTED_EDITOR_CONTROLS = new Set<EditorControl>([
   "array",
   "class",
   "action",
+  "openapi",
 ]);
 
 export function inspectAdapterMeta(adapter: AdapterMeta): MetaIssue[] {

@@ -123,6 +123,19 @@ const en_US: Translation = {
     runtimeTitle: "App-owned runtime",
     runtimeDesc:
       "Preview is rendered by the target App iframe. Studio only sends document snapshots through Preview Bridge.",
+    openapi: {
+      docs: "OpenAPI document",
+      noDocs: "No OpenAPI documents configured for this app. Add one in Admin first.",
+      loadFailed: "Failed to load OpenAPI documents",
+      embedded: "Embedded document",
+      operation: "Operation path",
+      method: "Method",
+      pathParams: "Path parameters",
+      queryParams: "Query parameters",
+      body: "Request body JSON",
+      loading: "Loading…",
+      invalidJson: "Invalid JSON",
+    },
   },
   status: {
     loadingTitle: "Loading App session",

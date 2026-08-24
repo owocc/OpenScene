@@ -15,6 +15,7 @@ import {
   bootstrapStudioSession,
   completeAsset,
   createApp,
+  createAppOpenApiDoc,
   createCategory,
   createLocale,
   createPreviewProfile,
@@ -24,12 +25,14 @@ import {
   createUploadIntent,
   createVersion,
   deleteApp,
+  deleteAppOpenApiDoc,
   deleteAsset,
   deleteCategory,
   deleteLocale,
   deletePreviewProfile,
   deleteResource,
   getApp,
+  getAppOpenApiDoc,
   getAsset,
   getCategory,
   getDocument,
@@ -41,6 +44,7 @@ import {
   getRelease,
   getResource,
   getVersion,
+  listAppOpenApiDocs,
   listApps,
   listAssets,
   listCategories,
@@ -57,6 +61,7 @@ import {
   storageHealth,
   syncManifest,
   updateApp,
+  updateAppOpenApiDoc,
   updateCategory,
   updateDraft,
   updateLocale,
@@ -174,6 +179,25 @@ async function handleRequest(
         "cache-control": "no-store",
       });
     }
+    if (path[0] === "studio-sessions" && path[2] === "openapi-docs") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const appId = authContext.appId!;
+      if (path.length === 3 && method === "GET")
+        return json(
+          (await listAppOpenApiDocs(db, appId)).map((doc) => {
+            const { json: _json, ...rest } = doc as Record<string, unknown>;
+            return rest;
+          }),
+          200,
+          { "cache-control": "no-store" },
+        );
+      if (path.length === 4 && method === "GET")
+        return json(await getAppOpenApiDoc(db, appId, path[3]), 200, {
+          "cache-control": "no-store",
+        });
+      throw notFound();
+    }
 
     const appId = path[0] === "apps" ? path[1] : undefined;
     const requirement =
@@ -191,6 +215,7 @@ async function handleRequest(
     if (path[2] === "preview-profiles") return await previewRoutes(request, db, method, path);
     if (path[2] === "app-keys") return await appKeyRoutes(db, method, path);
     if (path[2] === "manifest") return await manifestRoutes(request, db, method, path);
+    if (path[2] === "openapi-docs") return await openApiDocRoutes(request, db, method, path);
     if (path[2] === "pages" || path[2] === "templates")
       return await resourceRoutes(request, db, method, path);
     if (path[2] === "documents") return await documentRoutes(request, db, method, path);
@@ -377,6 +402,27 @@ async function localeRoutes(
   if (method === "PATCH") return json(await updateLocale(db, appId, id, await body(request)));
   if (method === "DELETE") {
     await deleteLocale(db, appId, id);
+    return noContent();
+  }
+  throw notFound();
+}
+async function openApiDocRoutes(
+  request: NextRequest,
+  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
+  method: Method,
+  path: string[],
+): Promise<Response> {
+  const appId = path[1];
+  if (path.length === 3 && method === "GET") return json(await listAppOpenApiDocs(db, appId));
+  if (path.length === 3 && method === "POST")
+    return json(await createAppOpenApiDoc(db, appId, await body(request)), 201);
+  const openApiDocId = path[3];
+  if (!openApiDocId) throw notFound();
+  if (method === "GET") return json(await getAppOpenApiDoc(db, appId, openApiDocId));
+  if (method === "PATCH")
+    return json(await updateAppOpenApiDoc(db, appId, openApiDocId, await body(request)));
+  if (method === "DELETE") {
+    await deleteAppOpenApiDoc(db, appId, openApiDocId);
     return noContent();
   }
   throw notFound();
