@@ -55,7 +55,7 @@ describe("State variables logic for json-render", () => {
     },
   };
 
-  it("extracts state variables while excluding reserved keys", () => {
+  it("extracts state variables including protected lang variable when present", () => {
     const vars = getStateVariables(baseDoc.spec.state);
     const keys = vars.map((v) => v.key);
     expect(keys).toContain("title");
@@ -66,12 +66,23 @@ describe("State variables logic for json-render", () => {
     expect(keys).toContain("userProfile");
     expect(keys).toContain("tags");
 
-    // Reserved keys MUST not be listed as normal user variables
+    // lang is present and marked as protected
+    const langVar = vars.find((v) => v.key === "lang");
+    expect(langVar).toBeDefined();
+    expect(langVar?.isProtected).toBe(true);
+    expect(langVar?.value).toBe("en-US");
+
+    // Reserved dictionary keys MUST not be listed as normal user variables
     expect(keys).not.toContain("i18n");
-    expect(keys).not.toContain("lang");
     expect(keys).not.toContain("__scene");
   });
 
+  it("does not include lang variable when not present in state", () => {
+    const stateWithoutLang = { title: "Hello", count: 10 };
+    const vars = getStateVariables(stateWithoutLang);
+    expect(vars.map((v) => v.key)).toEqual(["title", "count"]);
+    expect(vars.some((v) => v.key === "lang")).toBe(false);
+  });
   it("infers variable types accurately and gets default values", () => {
     expect(inferVariableType("hello")).toBe("string");
     expect(inferVariableType(123)).toBe("number");

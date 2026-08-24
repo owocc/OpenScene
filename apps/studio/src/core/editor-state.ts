@@ -180,18 +180,24 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...commit(state, action.document),
         locale: action.document.pageInfo?.locale || state.locale || "en-US",
       };
-    case "locale.switch":
+    case "locale.switch": {
+      const hasLangInState = state.document.spec.state && "lang" in state.document.spec.state;
       return {
         ...commit(state, {
           ...state.document,
           pageInfo: { ...state.document.pageInfo, locale: action.locale },
           spec: {
             ...state.document.spec,
-            state: { ...state.document.spec.state, lang: action.locale },
+            ...(hasLangInState
+              ? { state: { ...state.document.spec.state, lang: action.locale } }
+              : state.document.spec.state
+                ? { state: state.document.spec.state }
+                : {}),
           },
         }),
         locale: action.locale,
       };
+    }
     case "surface.set":
       return { ...state, surface: action.surface };
     case "tool.set":

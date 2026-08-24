@@ -152,6 +152,10 @@ const en_US: Translation = {
       defaultLocaleBadge: "Default",
       serverLocalesTitle: "App Locales from Server",
       noLocalesFound: "No matching languages found.",
+      addLangVariable: "Add Language Variable (lang)",
+      langBadge: "Protected",
+      langVariableDesc: "Current runtime language code, selectable from app locales",
+      confirmDeleteLang: "Are you sure you want to remove the language variable (lang) from state?",
     },
   },
   toolbar: {

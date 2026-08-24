@@ -264,6 +264,7 @@ export function VariablesPanel({
     [document.spec.state],
   );
 
+  const hasLangVariable = useMemo(() => variables.some((v) => v.key === "lang"), [variables]);
   // References map for each variable in document elements
   const referencesMap = useMemo(() => {
     const map = new Map<string, VariableReference[]>();
@@ -468,25 +469,44 @@ export function VariablesPanel({
           <div className="flex items-center gap-1.5">
             <VariableIcon className="size-4 text-primary" />
             <span className="text-xs font-semibold text-foreground">
-              {LL.panels.variables.title()}
+              {activeTab === "variables"
+                ? LL.panels.variables.variablesTab()
+                : LL.panels.variables.localesTab()}
             </span>
             <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-medium">
-              {variables.length}
+              {activeTab === "variables" ? variables.length : effectiveLocales.length}
             </Badge>
           </div>
           {activeTab === "variables" && (
-            <Button
-              size="xs"
-              variant="default"
-              className="h-6 gap-1 px-2 text-xs"
-              onClick={openAddDialog}
-            >
-              <Plus className="size-3" />
-              <span>{LL.panels.variables.addVariable()}</span>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {!hasLangVariable && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="h-6 gap-1 px-1.5 text-[11px] border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10"
+                  onClick={() => {
+                    const initialCode = locale || effectiveLocales[0]?.code || "en-US";
+                    setVariable("lang", initialCode);
+                    onLocaleChange(initialCode);
+                  }}
+                  title={LL.panels.variables.addLangVariable()}
+                >
+                  <Globe className="size-3" />
+                  <span>{LL.panels.variables.addLangVariable()}</span>
+                </Button>
+              )}
+              <Button
+                size="xs"
+                variant="default"
+                className="h-6 gap-1 px-2 text-xs"
+                onClick={openAddDialog}
+              >
+                <Plus className="size-3" />
+                <span>{LL.panels.variables.addVariable()}</span>
+              </Button>
+            </div>
           )}
         </div>
-
         {/* Tab switch */}
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5">
           <button
@@ -664,9 +684,14 @@ export function VariablesPanel({
                 return (
                   <div
                     key={v.key}
-                    className="group flex flex-col rounded-lg border border-border/60 bg-card p-2.5 shadow-xs transition-all hover:border-border hover:shadow-xs"
+                    className={cn(
+                      "group flex flex-col rounded-lg border p-2.5 shadow-xs transition-all hover:shadow-xs",
+                      v.key === "lang"
+                        ? "border-sky-500/30 bg-sky-500/5 hover:border-sky-500/50"
+                        : "border-border/60 bg-card hover:border-border",
+                    )}
                   >
-                    {/* Top Row: Key, Type, Refs, Actions */}
+                    {/* Top Row: Key, Type/Badge, Refs, Actions */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <span className="font-mono text-xs font-semibold text-foreground truncate">
@@ -695,16 +720,26 @@ export function VariablesPanel({
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "h-4.5 gap-1 px-1.5 text-[10px] font-normal border",
-                            config.badgeClass,
-                          )}
-                        >
-                          <TypeIcon className="size-2.5" />
-                          <span>{config.label}</span>
-                        </Badge>
+                        {v.key === "lang" ? (
+                          <Badge
+                            variant="outline"
+                            className="h-4.5 gap-1 px-1.5 text-[10px] font-normal border border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                          >
+                            <Globe className="size-2.5" />
+                            <span>{LL.panels.variables.langBadge()}</span>
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-4.5 gap-1 px-1.5 text-[10px] font-normal border",
+                              config.badgeClass,
+                            )}
+                          >
+                            <TypeIcon className="size-2.5" />
+                            <span>{config.label}</span>
+                          </Badge>
+                        )}
 
                         {/* References count badge */}
                         {refs.length > 0 ? (
@@ -735,25 +770,29 @@ export function VariablesPanel({
                             <MoreVertical className="size-3.5" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-36 text-xs">
-                            <DropdownMenuItem onClick={() => openEditDialog(v)}>
-                              <Edit2 className="size-3.5 mr-2" />
-                              <span>{LL.panels.variables.editVariable()}</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openRenameDialog(v)}>
-                              <FileCode className="size-3.5 mr-2" />
-                              <span>{LL.panels.variables.renameVariable()}</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDuplicate(v)}>
-                              <Copy className="size-3.5 mr-2" />
-                              <span>{LL.panels.variables.duplicate()}</span>
-                            </DropdownMenuItem>
+                            {v.key !== "lang" && (
+                              <>
+                                <DropdownMenuItem onClick={() => openEditDialog(v)}>
+                                  <Edit2 className="size-3.5 mr-2" />
+                                  <span>{LL.panels.variables.editVariable()}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openRenameDialog(v)}>
+                                  <FileCode className="size-3.5 mr-2" />
+                                  <span>{LL.panels.variables.renameVariable()}</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicate(v)}>
+                                  <Copy className="size-3.5 mr-2" />
+                                  <span>{LL.panels.variables.duplicate()}</span>
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             {refs.length > 0 && (
                               <DropdownMenuItem onClick={() => setInspectingRefsVar(v)}>
                                 <Eye className="size-3.5 mr-2" />
                                 <span>{LL.panels.variables.referencesTitle()}</span>
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuSeparator />
+                            {v.key !== "lang" && <DropdownMenuSeparator />}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => setDeletingVar(v)}
@@ -768,7 +807,31 @@ export function VariablesPanel({
 
                     {/* Middle Row: Inline Value Editor / Preview */}
                     <div className="mt-2">
-                      {v.type === "boolean" ? (
+                      {v.key === "lang" ? (
+                        <div className="flex flex-col gap-1">
+                          <select
+                            className="h-7 w-full font-mono text-xs bg-muted/40 rounded-lg border border-border/60 px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                            value={String(v.value ?? "")}
+                            onChange={(e) => {
+                              const nextCode = e.target.value;
+                              setVariable("lang", nextCode);
+                              onLocaleChange(nextCode);
+                            }}
+                          >
+                            {effectiveLocales.map((item) => (
+                              <option key={item.code} value={item.code}>
+                                {item.name} ({item.code})
+                                {item.isDefault
+                                  ? ` - ${LL.panels.variables.defaultLocaleBadge()}`
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-[10px] text-muted-foreground">
+                            {LL.panels.variables.langVariableDesc()}
+                          </span>
+                        </div>
+                      ) : v.type === "boolean" ? (
                         <div className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
                           <span className="font-mono text-[11px] text-muted-foreground">
                             {v.value === true ? "true" : "false"}
@@ -853,7 +916,6 @@ export function VariablesPanel({
           </div>
         )}
       </div>
-
       {/* Add Variable Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1197,17 +1259,18 @@ export function VariablesPanel({
               <span>{LL.panels.variables.confirmDeleteTitle()}</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {deletingVar && (referencesMap.get(deletingVar.key)?.length ?? 0) > 0
-                ? LL.panels.variables.confirmDeleteWithRefs({
-                    name: deletingVar.key,
-                    count: referencesMap.get(deletingVar.key)?.length ?? 0,
-                  })
-                : deletingVar
-                  ? LL.panels.variables.confirmDelete({ name: deletingVar.key })
-                  : ""}
+              {deletingVar?.key === "lang"
+                ? LL.panels.variables.confirmDeleteLang()
+                : deletingVar && (referencesMap.get(deletingVar.key)?.length ?? 0) > 0
+                  ? LL.panels.variables.confirmDeleteWithRefs({
+                      name: deletingVar.key,
+                      count: referencesMap.get(deletingVar.key)?.length ?? 0,
+                    })
+                  : deletingVar
+                    ? LL.panels.variables.confirmDelete({ name: deletingVar.key })
+                    : ""}
             </DialogDescription>
           </DialogHeader>
-
           {deletingVar && (referencesMap.get(deletingVar.key)?.length ?? 0) > 0 && (
             <div className="max-h-36 overflow-auto rounded-lg border border-destructive/20 bg-destructive/5 p-2 text-xs">
               <div className="font-semibold text-destructive mb-1 text-[11px]">

@@ -579,6 +579,22 @@ type RootTranslation = {
        * 未​找​到​匹​配​的​语​言
        */
       noLocalesFound: string;
+      /**
+       * 添​加​语​言​变​量​ ​(​l​a​n​g​)
+       */
+      addLangVariable: string;
+      /**
+       * 系​统​保​护
+       */
+      langBadge: string;
+      /**
+       * 当​前​运​行​时​的​语​言​代​码​，​仅​可​选​择​应​用​支​持​的​语​言
+       */
+      langVariableDesc: string;
+      /**
+       * 确​定​要​从​状​态​中​移​除​语​言​变​量​ ​(​l​a​n​g​)​ ​吗​？
+       */
+      confirmDeleteLang: string;
     };
   };
   toolbar: {
@@ -1493,6 +1509,22 @@ export type TranslationFunctions = {
        * 未找到匹配的语言
        */
       noLocalesFound: () => LocalizedString;
+      /**
+       * 添加语言变量 (lang)
+       */
+      addLangVariable: () => LocalizedString;
+      /**
+       * 系统保护
+       */
+      langBadge: () => LocalizedString;
+      /**
+       * 当前运行时的语言代码，仅可选择应用支持的语言
+       */
+      langVariableDesc: () => LocalizedString;
+      /**
+       * 确定要从状态中移除语言变量 (lang) 吗？
+       */
+      confirmDeleteLang: () => LocalizedString;
     };
   };
   toolbar: {

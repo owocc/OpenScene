@@ -233,6 +233,7 @@ export interface StateVariable {
   value: JsonValue;
   type: StateVariableType;
   path: string;
+  isProtected?: boolean;
 }
 
 export interface VariableReference {
@@ -323,6 +324,17 @@ export function convertVariableValue(value: unknown, targetType: StateVariableTy
 export function getStateVariables(state: Record<string, unknown> | undefined): StateVariable[] {
   if (!state || !isRecord(state)) return [];
   const variables: StateVariable[] = [];
+
+  if ("lang" in state && typeof state.lang === "string") {
+    variables.push({
+      key: "lang",
+      value: state.lang as JsonValue,
+      type: "string",
+      path: "/lang",
+      isProtected: true,
+    });
+  }
+
   for (const [key, value] of Object.entries(state)) {
     if (!isReservedStateRoot(key)) {
       variables.push({
