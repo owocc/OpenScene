@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Braces,
@@ -14,6 +14,7 @@ import {
   Layers,
   MoreVertical,
   Plus,
+  RotateCcw,
   Search,
   Sparkles,
   ToggleLeft,
@@ -22,7 +23,9 @@ import {
   Variable as VariableIcon,
 } from "lucide-react";
 import type { SceneDocument } from "@openscene/protocol";
+import { createOpenSceneClient } from "@openscene/api-client";
 import { useI18n } from "@/i18n";
+import { useQueryStore } from "@/stores/query-store";
 import { cn } from "@/lib/utils";
 import {
   convertVariableValue,
@@ -39,6 +42,27 @@ function formatDisplayString(val: unknown): string {
   if (typeof val === "string") return val;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
   return "";
+}
+
+const KNOWN_LOCALE_NAMES: Record<string, string> = {
+  "en-US": "English (US)",
+  "zh-CN": "简体中文",
+  "zh-TW": "繁體中文",
+  "ja-JP": "日本語",
+  "ko-KR": "한국어",
+  "fr-FR": "Français",
+  "de-DE": "Deutsch",
+  "es-ES": "Español",
+  "ru-RU": "Русский",
+  "it-IT": "Italiano",
+  "pt-BR": "Português",
+};
+
+export interface ServerLocaleOption {
+  id?: string;
+  code: string;
+  name: string;
+  isDefault?: boolean;
 }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +154,7 @@ export function VariablesPanel({
   const storeDeleteVariable = useStudioStore((s) => s.deleteVariable);
   const storeRenameVariable = useStudioStore((s) => s.renameVariable);
   const showNotice = useStudioStore((s) => s.showNotice);
+  const bootstrap = useStudioStore((s) => s.bootstrap);
 
   const document = docProp ?? storeDocument;
   const setVariable = setVarProp ?? storeSetVariable;
@@ -138,11 +163,86 @@ export function VariablesPanel({
 
   const [activeTab, setActiveTab] = useState<"variables" | "locales">("variables");
   const [searchQuery, setSearchQuery] = useState("");
+  const [localeSearchQuery, setLocaleSearchQuery] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [editingVar, setEditingVar] = useState<StateVariable | null>(null);
+  // Server locales state
+  const [serverLocales, setServerLocales] = useState<ServerLocaleOption[]>([]);
+  const [isLoadingLocales, setIsLoadingLocales] = useState(false);
+
+  const fetchServerLocales = useCallback(async () => {
+    const appId = bootstrap?.app?.id;
+    const query = useQueryStore.getState();
+    if (!appId || !query.serverUrl || !query.token || appId === "local-test-app") {
+      return;
+    }
+    setIsLoadingLocales(true);
+    try {
+      const client = createOpenSceneClient({
+        baseUrl: query.serverUrl.replace(/\/$/, ""),
+        headers: { "x-openscene-session-token": query.token },
+      });
+      const { data, error } = await client.GET("/api/v1/apps/{appId}/locales", {
+        params: { path: { appId } },
+      });
+      if (!error && Array.isArray(data)) {
+        setServerLocales(
+          data.map((item) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            isDefault: item.isDefault,
+          })),
+        );
+      }
+    } catch (err) {
+      console.warn("[OpenScene Studio] Failed to fetch server locales:", err);
+    } finally {
+      setIsLoadingLocales(false);
+    }
+  }, [bootstrap?.app?.id]);
+
+  useEffect(() => {
+    void fetchServerLocales();
+  }, [fetchServerLocales]);
+
+  const effectiveLocales = useMemo<ServerLocaleOption[]>(() => {
+    if (serverLocales.length > 0) {
+      const list: ServerLocaleOption[] = serverLocales.map((l) => ({
+        id: l.id,
+        code: l.code,
+        name: l.name || KNOWN_LOCALE_NAMES[l.code] || l.code,
+        isDefault: l.isDefault,
+      }));
+      for (const code of locales) {
+        if (!list.some((item) => item.code === code)) {
+          list.push({
+            code,
+            name: KNOWN_LOCALE_NAMES[code] || code,
+            isDefault: false,
+          });
+        }
+      }
+      return list;
+    }
+
+    return locales.map((code) => ({
+      code,
+      name: KNOWN_LOCALE_NAMES[code] || code,
+      isDefault: code === "en-US",
+    }));
+  }, [serverLocales, locales]);
+
+  const filteredLocales = useMemo(() => {
+    if (!localeSearchQuery.trim()) return effectiveLocales;
+    const q = localeSearchQuery.toLowerCase().trim();
+    return effectiveLocales.filter(
+      (l) => l.code.toLowerCase().includes(q) || l.name.toLowerCase().includes(q),
+    );
+  }, [effectiveLocales, localeSearchQuery]);
 
   // Dialog states
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [editingVar, setEditingVar] = useState<StateVariable | null>(null);
   const [renamingVar, setRenamingVar] = useState<StateVariable | null>(null);
   const [deletingVar, setDeletingVar] = useState<StateVariable | null>(null);
   const [inspectingRefsVar, setInspectingRefsVar] = useState<StateVariable | null>(null);
@@ -429,36 +529,103 @@ export function VariablesPanel({
             />
           </div>
         )}
+
+        {activeTab === "locales" && effectiveLocales.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder={LL.panels.variables.searchLocalesPlaceholder()}
+                value={localeSearchQuery}
+                onChange={(e) => setLocaleSearchQuery(e.target.value)}
+                className="h-7 pl-8 pr-2 text-xs"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+              onClick={() => void fetchServerLocales()}
+              title={LL.panels.variables.refreshLocales()}
+              disabled={isLoadingLocales}
+            >
+              <RotateCcw
+                className={cn("size-3.5", isLoadingLocales && "animate-spin text-primary")}
+              />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {activeTab === "locales" ? (
-          /* Locales / i18n switcher */
+          /* Locales / i18n switcher with server options */
           <div className="flex flex-col gap-2">
-            <div className="mb-1 text-xs font-medium text-muted-foreground">
-              {LL.panels.variables.locales()}
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                {serverLocales.length > 0
+                  ? LL.panels.variables.serverLocalesTitle()
+                  : LL.panels.variables.locales()}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {filteredLocales.length} / {effectiveLocales.length}
+              </span>
             </div>
-            <div className="grid gap-1.5">
-              {locales.map((item) => (
-                <button
-                  key={item}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg border p-2.5 text-xs transition-colors",
-                    locale === item
-                      ? "border-primary/50 bg-primary/10 font-semibold text-primary"
-                      : "border-border/60 bg-card hover:bg-muted/60 text-foreground",
-                  )}
-                  onClick={() => onLocaleChange(item)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Globe className="size-3.5 opacity-70" />
-                    <span>{item}</span>
-                  </div>
-                  {locale === item && <Check className="size-3.5 text-primary" />}
-                </button>
-              ))}
-            </div>
+
+            {filteredLocales.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-6 text-center">
+                <Globe className="size-5 text-muted-foreground mb-1.5 opacity-60" />
+                <p className="text-xs text-muted-foreground">
+                  {LL.panels.variables.noLocalesFound()}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-1.5">
+                {filteredLocales.map((item) => {
+                  const isSelected = locale === item.code;
+                  return (
+                    <button
+                      key={item.code}
+                      type="button"
+                      className={cn(
+                        "flex items-center justify-between rounded-lg border p-2.5 text-xs transition-colors cursor-pointer text-left",
+                        isSelected
+                          ? "border-primary/50 bg-primary/10 font-semibold text-primary shadow-xs"
+                          : "border-border/60 bg-card hover:bg-muted/60 text-foreground",
+                      )}
+                      onClick={() => onLocaleChange(item.code)}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Globe
+                          className={cn(
+                            "size-3.5 shrink-0",
+                            isSelected ? "text-primary" : "text-muted-foreground opacity-70",
+                          )}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate">{item.name}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {item.code}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.isDefault && (
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] font-normal">
+                            {LL.panels.variables.defaultLocaleBadge()}
+                          </Badge>
+                        )}
+                        {isSelected && <Check className="size-3.5 text-primary" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           /* Variables List */

@@ -540,11 +540,11 @@ type RootTranslation = {
        */
       variableCount: RequiredParams<"count">;
       /**
-       * 多​语​言
+       * 语​言​变​量​ ​(​i​1​8​n​)
        */
       localesTab: string;
       /**
-       * 变​量​列​表
+       * 状​态​变​量
        */
       variablesTab: string;
       /**
@@ -559,6 +559,26 @@ type RootTranslation = {
        * 收​起
        */
       collapseJson: string;
+      /**
+       * 搜​索​语​言​名​称​或​代​号​.​.​.
+       */
+      searchLocalesPlaceholder: string;
+      /**
+       * 刷​新​语​言​选​项
+       */
+      refreshLocales: string;
+      /**
+       * 默​认
+       */
+      defaultLocaleBadge: string;
+      /**
+       * 服​务​器​应​用​语​言
+       */
+      serverLocalesTitle: string;
+      /**
+       * 未​找​到​匹​配​的​语​言
+       */
+      noLocalesFound: string;
     };
   };
   toolbar: {
@@ -1434,11 +1454,11 @@ export type TranslationFunctions = {
        */
       variableCount: (arg: { count: unknown }) => LocalizedString;
       /**
-       * 多语言
+       * 语言变量 (i18n)
        */
       localesTab: () => LocalizedString;
       /**
-       * 变量列表
+       * 状态变量
        */
       variablesTab: () => LocalizedString;
       /**
@@ -1453,6 +1473,26 @@ export type TranslationFunctions = {
        * 收起
        */
       collapseJson: () => LocalizedString;
+      /**
+       * 搜索语言名称或代号...
+       */
+      searchLocalesPlaceholder: () => LocalizedString;
+      /**
+       * 刷新语言选项
+       */
+      refreshLocales: () => LocalizedString;
+      /**
+       * 默认
+       */
+      defaultLocaleBadge: () => LocalizedString;
+      /**
+       * 服务器应用语言
+       */
+      serverLocalesTitle: () => LocalizedString;
+      /**
+       * 未找到匹配的语言
+       */
+      noLocalesFound: () => LocalizedString;
     };
   };
   toolbar: {
