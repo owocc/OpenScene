@@ -5,7 +5,6 @@ import {
   AppPatchSchema,
   AppKeyRotationSchema,
   AppSchema,
-  AppManifestSchema,
   AssetCompleteSchema,
   AssetSchema,
   BootstrapSchema,
@@ -40,6 +39,12 @@ import {
   UploadIntentSchema,
   VersionCreateSchema,
   VersionSchema,
+  AiChatRequestSchema,
+  AiChatResponseSchema,
+  AiConfigSchema,
+  AiConfigStatusSchema,
+  AiConfigUpdateSchema,
+  AiTestSchema,
 } from "../validation/schemas";
 
 extendZodWithOpenApi(z);
@@ -59,12 +64,16 @@ const schemas = [
   ["Manifest", OpenApiJsonObjectSchema],
   ["ManifestRevision", OpenApiJsonObjectSchema],
   ["Bootstrap", OpenApiJsonObjectSchema],
-  ["StudioSession", StudioSessionSchema],
-  ["RuntimeDelivery", OpenApiJsonObjectSchema],
+  ["OpenApiDocSummary", OpenApiDocSummarySchema],
+
   ["AppKeyRotation", AppKeyRotationSchema],
   ["Problem", ProblemSchema],
   ["OpenApiDoc", OpenApiDocSchema],
-  ["OpenApiDocSummary", OpenApiDocSummarySchema],
+  ["AiConfig", AiConfigSchema],
+  ["AiConfigUpdate", AiConfigUpdateSchema],
+  ["AiChatRequest", AiChatRequestSchema],
+  ["AiChatResponse", AiChatResponseSchema],
+  ["AiConfigStatus", AiConfigStatusSchema],
 ] as const;
 for (const [name, schema] of [...schemas].sort(([a], [b]) => a.localeCompare(b)))
   registry.register(name, schema);
@@ -463,6 +472,39 @@ const operations: Operation[] = [
     tag: "Runtime",
     response: JsonObjectSchema,
     params: true,
+  },
+
+  {
+    method: "get",
+    path: "/api/v1/ai/config",
+    operationId: "getAiConfig",
+    tag: "AI",
+    response: AiConfigStatusSchema,
+  },
+  {
+    method: "patch",
+    path: "/api/v1/ai/config",
+    operationId: "patchAiConfig",
+    tag: "AI",
+    response: AiConfigSchema,
+    body: AiConfigUpdateSchema,
+  },
+  {
+    method: "post",
+    path: "/api/v1/ai/config/test",
+    operationId: "testAiConfig",
+    tag: "AI",
+    response: AiTestSchema,
+    body: AiConfigUpdateSchema,
+  },
+  {
+    method: "post",
+    path: "/api/v1/ai/chat",
+    operationId: "chatWithAi",
+    tag: "AI",
+    response: AiChatResponseSchema,
+    body: AiChatRequestSchema,
+    headers: AppKeyHeaderSchema,
   },
 ];
 

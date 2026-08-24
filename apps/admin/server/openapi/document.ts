@@ -27,6 +27,8 @@ export function createOpenApiDocument(): Record<string, unknown> {
       { name: "OpenAPI Docs" },
       { name: "Studio Sessions" },
       { name: "Runtime" },
+
+      { name: "AI" },
     ],
   });
   const paths = Object.fromEntries(

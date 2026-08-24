@@ -14,6 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.46",
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@aws-sdk/client-s3": "^3.1115.0",
     "@aws-sdk/s3-request-presigner": "^3.1115.0",
@@ -24,6 +25,7 @@
     "@openscene/protocol": "workspace:*",
     "@scalar/nextjs-api-reference": "^0.11.16",
     "@tanstack/react-query": "^5.90.12",
+    "ai": "^7.0.77",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.1",
     "openapi-fetch": "^0.17.0",

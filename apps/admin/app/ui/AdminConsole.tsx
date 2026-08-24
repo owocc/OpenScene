@@ -145,6 +145,8 @@ export function AdminConsole() {
   if (pathname === "/components") return <ComponentsView />;
   if (pathname.startsWith("/components/")) return <ComponentDetailView />;
   if (pathname === "/settings") return <SettingsView />;
+
+  if (pathname === "/ai") return <AiView />;
   return <NotFoundView />;
 }
 
@@ -2668,6 +2670,148 @@ function SettingsView() {
           </div>
         </Dialog>
       </Dialog.Root>
+    </>
+  );
+}
+
+function AiView() {
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const queryClient = useQueryClient();
+  const query = api.useQuery("get", "/api/v1/ai/config");
+  const update = api.useMutation("patch", "/api/v1/ai/config", {
+    onSuccess: () => {
+      toast.add({ title: t("aiSaved") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const testMutation = api.useMutation("post", "/api/v1/ai/config/test");
+  const [provider, setProvider] = useState<"openai">("openai");
+  const [model, setModel] = useState("gpt-4o-mini");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  const config = query.data?.config ?? null;
+  useEffect(() => {
+    if (config) {
+      setProvider(config.provider);
+      setModel(config.model);
+      setBaseUrl(config.baseUrl ?? "");
+      setEnabled(config.enabled);
+    }
+  }, [config]);
+
+  function save() {
+    update.mutate({
+      body: {
+        provider,
+        model,
+        baseUrl: baseUrl || undefined,
+        apiKey: apiKey || undefined,
+        enabled,
+      },
+    });
+  }
+
+  function runTest() {
+    setTestResult(null);
+    testMutation.mutate(
+      {
+        body: {
+          provider,
+          model,
+          baseUrl: baseUrl || undefined,
+          apiKey: apiKey || undefined,
+          enabled,
+        },
+      },
+      {
+        onSuccess: (data) => setTestResult(data ?? null),
+        onError: (error) =>
+          setTestResult({
+            ok: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                  ? error
+                  : "Unknown error",
+          }),
+      },
+    );
+  }
+
+  return (
+    <>
+      <PageHeader title={t("ai")} description={t("aiDescription")} />
+      {query.error ? <ErrorState error={query.error} /> : null}
+      <LayerCard className="mb-4 max-w-2xl">
+        <LayerCard.Secondary>{t("aiConfiguration")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-4">
+          <Select
+            label={t("aiProvider")}
+            value={provider}
+            items={{ openai: "OpenAI" }}
+            onValueChange={(value) => {
+              if (value === "openai") setProvider("openai");
+            }}
+          />
+          <Input
+            label={t("aiModel")}
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+            placeholder="gpt-4o-mini"
+          />
+          <Input
+            label={t("aiBaseUrl")}
+            type="url"
+            value={baseUrl}
+            onChange={(event) => setBaseUrl(event.target.value)}
+            placeholder="https://api.openai.com/v1"
+          />
+          <Input
+            label={t("aiApiKey")}
+            type="password"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={config?.hasApiKey ? t("aiApiKeySet") : t("aiApiKeyPlaceholder")}
+          />
+          {config?.hasApiKey && !apiKey ? (
+            <Text variant="secondary">{t("aiApiKeyHint")}</Text>
+          ) : null}
+          <Switch
+            checked={enabled}
+            label={t("aiEnabled")}
+            onCheckedChange={(checked) => setEnabled(checked)}
+          />
+          <div className="flex gap-2">
+            <Button variant="primary" loading={update.isPending} onClick={save}>
+              {t("save")}
+            </Button>
+            <Button loading={testMutation.isPending} onClick={runTest}>
+              {t("aiTest")}
+            </Button>
+          </div>
+          {testMutation.error ? <ErrorState error={testMutation.error} /> : null}
+          {testResult ? (
+            <Text variant="secondary">
+              {testResult.ok
+                ? t("aiTestSuccess")
+                : `${t("aiTestFailed")}${testResult.error ? `: ${testResult.error}` : ""}`}
+            </Text>
+          ) : null}
+        </LayerCard.Primary>
+      </LayerCard>
+      <LayerCard className="max-w-2xl">
+        <LayerCard.Secondary>{t("aiConsumption")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-2">
+          <Text variant="secondary">{t("aiConsumptionDescription")}</Text>
+          <Code code={`POST /api/v1/ai/chat`} />
+          <Text variant="secondary">{t("aiConsumptionHint")}</Text>
+        </LayerCard.Primary>
+      </LayerCard>
     </>
   );
 }

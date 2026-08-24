@@ -69,7 +69,11 @@ import {
   updateResource,
   updateStudioDraft,
 } from "../../../../server/services";
+
+import { chatWithAi, getAiConfig, testAiConfig, upsertAiConfig } from "../../../../server/ai";
 import {
+  AiChatRequestSchema,
+  AiConfigUpdateSchema,
   AppManifestSchema,
   UiSessionCreateSchema,
   UiSessionSchema,
@@ -199,6 +203,8 @@ async function handleRequest(
       throw notFound();
     }
 
+    if (path[0] === "ai") return await aiRoutes(request, db, method, path);
+
     const appId = path[0] === "apps" ? path[1] : undefined;
     const requirement =
       path[0] === "apps" && path[2] === "manifest" && path[3] === "push" ? "app-key" : "management";
@@ -256,6 +262,41 @@ async function appKeyRoutes(
 ): Promise<Response> {
   if (path.length !== 4 || path[3] !== "rotate" || method !== "POST") throw notFound();
   return json(await rotateAppKey(db, path[1]));
+}
+
+async function aiRoutes(
+  request: NextRequest,
+  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
+  method: Method,
+  path: string[],
+): Promise<Response> {
+  // Global, management-protected configuration endpoints.
+  if (path[1] === "config") {
+    if (method === "GET") {
+      await authenticate(request, db, "management");
+      return json(await getAiConfig(db));
+    }
+    if (method === "PATCH") {
+      await authenticate(request, db, "management");
+      assertManagementCsrf(request, method);
+      const input = await parseBody(request, AiConfigUpdateSchema);
+      return json(await upsertAiConfig(db, input));
+    }
+    if (path[2] === "test" && method === "POST") {
+      await authenticate(request, db, "management");
+      assertManagementCsrf(request, method);
+      const input = await parseBody(request, AiConfigUpdateSchema.partial());
+      return json(await testAiConfig(db, input));
+    }
+    throw notFound();
+  }
+  // Client consumption endpoint: every call must present a valid App Key to prevent abuse.
+  if (path[1] === "chat" && method === "POST") {
+    await authenticate(request, db, "app-key");
+    const input = await parseBody(request, AiChatRequestSchema);
+    return await chatWithAi(db, input);
+  }
+  throw notFound();
 }
 
 async function previewRoutes(
@@ -542,6 +583,23 @@ function withCors(response: Response, request: NextRequest, path: string[]): Res
       "access-control-allow-headers",
       "content-type, x-openscene-session-token, authorization",
     );
+  } else if (path[0] === "ai") {
+    headers.set("vary", appendVary(headers.get("vary"), "Origin"));
+    if (path[1] === "chat") {
+      // Public consumption endpoint: any origin may call it, but the App Key is required.
+      headers.set("access-control-allow-origin", "*");
+      headers.set("access-control-allow-methods", "POST, OPTIONS");
+      headers.set("access-control-allow-headers", "content-type, x-openscene-app-key");
+    } else {
+      const aiOrigin = request.headers.get("origin");
+      if (
+        aiOrigin &&
+        (aiOrigin === request.nextUrl.origin || config.auth.managementOrigins.includes(aiOrigin))
+      )
+        headers.set("access-control-allow-origin", aiOrigin);
+      headers.set("access-control-allow-methods", "GET, PUT, POST, OPTIONS");
+      headers.set("access-control-allow-headers", "content-type");
+    }
   }
   return new Response(response.body, {
     status: response.status,

@@ -315,6 +315,20 @@ export const schemaMigrations = sqliteTable(
   (table) => [primaryKey({ columns: [table.id] })],
 );
 
+export const aiConfig = sqliteTable(
+  "ai_config",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider", { enum: ["openai"] }).notNull(),
+    model: text("model").notNull(),
+    baseUrl: text("base_url"),
+    apiKeyEnc: text("api_key_enc").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [index("ai_config_provider_index").on(table.provider)],
+);
+
 export const schema = {
   apps,
   previewProfiles,
@@ -330,7 +344,7 @@ export const schema = {
   locales,
   assets,
   studioSessions,
-  schemaMigrations,
+  aiConfig,
 };
 
 export type AppRow = typeof apps.$inferSelect;
@@ -343,3 +357,5 @@ export type DocumentVersionRow = typeof documentVersions.$inferSelect;
 export type ReleaseRow = typeof releases.$inferSelect;
 export type AssetRow = typeof assets.$inferSelect;
 export type StudioSessionRow = typeof studioSessions.$inferSelect;
+
+export type AiConfigRow = typeof aiConfig.$inferSelect;

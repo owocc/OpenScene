@@ -12,6 +12,7 @@ import {
   Globe,
   Image,
   SlidersHorizontal,
+  Sparkle,
   SquaresFour,
   Tag,
 } from "@phosphor-icons/react";
@@ -37,6 +38,7 @@ const icons = {
   globe: Globe,
   image: Image,
   sliders: SlidersHorizontal,
+  sparkle: Sparkle,
   squares: SquaresFour,
   tag: Tag,
 } as const;

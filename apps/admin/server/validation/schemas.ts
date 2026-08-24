@@ -354,4 +354,71 @@ export const PaginationQuerySchema = z.object({
   categoryId: IdSchema.optional(),
 });
 
+export const AiProviderSchema = z
+  .enum(["openai"])
+  .openapi({ description: "AI provider integration" });
+
+export const AiMessageSchema = z
+  .object({
+    role: z.enum(["system", "user", "assistant"]),
+    content: z.string().min(1).max(32_000),
+  })
+  .openapi({ description: "A single chat message" });
+
+// Public AI configuration: the API key is never returned, only whether one is set.
+export const AiConfigSchema = z.object({
+  id: IdSchema,
+  provider: AiProviderSchema,
+  model: z.string().min(1).max(200),
+  baseUrl: z.string().url().optional().nullable(),
+  enabled: z.boolean(),
+  hasApiKey: z.boolean(),
+  createdAt: IsoDateSchema,
+  updatedAt: IsoDateSchema,
+});
+
+// Wrapper for the global AI configuration GET: always returned, `config` is absent until set.
+export const AiConfigStatusSchema = z.object({
+  configured: z.boolean(),
+  config: AiConfigSchema.optional(),
+});
+
+export const AiConfigUpdateSchema = z.object({
+  provider: AiProviderSchema,
+  model: z.string().min(1).max(200),
+  baseUrl: z.string().url().optional().or(z.literal("")).nullable(),
+  apiKey: z.string().min(1).max(4_000).optional(),
+  enabled: z.boolean(),
+});
+
+export const AiTestSchema = z.object({
+  ok: z.boolean(),
+  model: z.string().optional(),
+  error: z.string().optional(),
+});
+
+// Client consumption request. `format` selects the response representation.
+export const AiChatRequestSchema = z
+  .object({
+    messages: z.array(AiMessageSchema).min(1).max(20),
+    model: z.string().min(1).max(200).optional(),
+    system: z.string().max(8_000).optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().int().min(1).max(8_192).optional(),
+    format: z.enum(["json", "text", "stream"]).default("json"),
+  })
+  .openapi({ description: "AI chat completion request" });
+
+export const AiChatUsageSchema = z.object({
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+});
+
+export const AiChatResponseSchema = z.object({
+  model: z.string(),
+  content: z.string(),
+  usage: AiChatUsageSchema,
+});
+
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

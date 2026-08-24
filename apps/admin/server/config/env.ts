@@ -28,6 +28,10 @@ const envSchema = z.object({
   OPENSCENE_ALLOWED_MIME_TYPES: z
     .string()
     .default("image/jpeg,image/png,image/webp,image/gif,application/pdf"),
+  OPENSCENE_AI_ENCRYPTION_KEY: z
+    .string()
+    .min(1)
+    .default("openscene-dev-ai-encryption-key-change-in-production"),
 });
 
 export type AppConfig = {
@@ -54,6 +58,7 @@ export type AppConfig = {
   };
   api: { publicBaseUrl: string };
   studio: { publicBaseUrl: string; sessionTtlSeconds: number; uiSessionTtlSeconds: number };
+  ai: { encryptionKey: string };
   security: { maxUploadBytes: number; allowedMimeTypes: string[] };
 };
 
@@ -115,6 +120,7 @@ export function getConfig(): AppConfig {
       sessionTtlSeconds: env.OPENSCENE_SESSION_TTL_SECONDS,
       uiSessionTtlSeconds: env.OPENSCENE_UI_SESSION_TTL_SECONDS,
     },
+    ai: { encryptionKey: env.OPENSCENE_AI_ENCRYPTION_KEY },
     security: {
       maxUploadBytes: env.OPENSCENE_MAX_UPLOAD_BYTES,
       allowedMimeTypes: splitCsv(env.OPENSCENE_ALLOWED_MIME_TYPES),
