@@ -319,7 +319,7 @@ export const aiConfig = sqliteTable(
   "ai_config",
   {
     id: text("id").primaryKey(),
-    provider: text("provider", { enum: ["openai"] }).notNull(),
+    provider: text("provider", { enum: ["openai", "openai-responses", "anthropic"] }).notNull(),
     model: text("model").notNull(),
     baseUrl: text("base_url"),
     apiKeyEnc: text("api_key_enc").notNull(),

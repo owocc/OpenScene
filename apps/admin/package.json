@@ -14,6 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.41",
     "@ai-sdk/openai": "^4.0.46",
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@aws-sdk/client-s3": "^3.1115.0",

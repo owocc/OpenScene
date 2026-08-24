@@ -354,9 +354,9 @@ export const PaginationQuerySchema = z.object({
   categoryId: IdSchema.optional(),
 });
 
-export const AiProviderSchema = z
-  .enum(["openai"])
-  .openapi({ description: "AI provider integration" });
+export const AiProviderSchema = z.enum(["openai", "openai-responses", "anthropic"]).openapi({
+  description: "AI provider integration (openai chat, openai-responses, anthropic messages)",
+});
 
 export const AiMessageSchema = z
   .object({

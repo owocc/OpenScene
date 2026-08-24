@@ -2686,7 +2686,7 @@ function AiView() {
     },
   });
   const testMutation = api.useMutation("post", "/api/v1/ai/config/test");
-  const [provider, setProvider] = useState<"openai">("openai");
+  const [provider, setProvider] = useState<"openai" | "openai-responses" | "anthropic">("openai");
   const [model, setModel] = useState("gpt-4o-mini");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -2753,9 +2753,14 @@ function AiView() {
           <Select
             label={t("aiProvider")}
             value={provider}
-            items={{ openai: "OpenAI" }}
+            items={{
+              openai: "OpenAI",
+              "openai-responses": "OpenAI Responses",
+              anthropic: "Anthropic",
+            }}
             onValueChange={(value) => {
-              if (value === "openai") setProvider("openai");
+              if (value === "openai" || value === "openai-responses" || value === "anthropic")
+                setProvider(value);
             }}
           />
           <Input

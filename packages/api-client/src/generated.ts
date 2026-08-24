@@ -723,10 +723,10 @@ export interface components {
     AiConfig: {
       id: string;
       /**
-       * @description AI provider integration
+       * @description AI provider integration (openai chat, openai-responses, anthropic messages)
        * @enum {string}
        */
-      provider: "openai";
+      provider: "openai" | "openai-responses" | "anthropic";
       model: string;
       /** Format: uri */
       baseUrl?: string | null;
@@ -742,10 +742,10 @@ export interface components {
       config?: {
         id: string;
         /**
-         * @description AI provider integration
+         * @description AI provider integration (openai chat, openai-responses, anthropic messages)
          * @enum {string}
          */
-        provider: "openai";
+        provider: "openai" | "openai-responses" | "anthropic";
         model: string;
         /** Format: uri */
         baseUrl?: string | null;
@@ -759,10 +759,10 @@ export interface components {
     };
     AiConfigUpdate: {
       /**
-       * @description AI provider integration
+       * @description AI provider integration (openai chat, openai-responses, anthropic messages)
        * @enum {string}
        */
-      provider: "openai";
+      provider: "openai" | "openai-responses" | "anthropic";
       model: string;
       baseUrl?: string | "" | unknown;
       apiKey?: string;
@@ -1242,10 +1242,10 @@ export interface operations {
             config?: {
               id: string;
               /**
-               * @description AI provider integration
+               * @description AI provider integration (openai chat, openai-responses, anthropic messages)
                * @enum {string}
                */
-              provider: "openai";
+              provider: "openai" | "openai-responses" | "anthropic";
               model: string;
               /** Format: uri */
               baseUrl?: string | null;
@@ -1386,10 +1386,10 @@ export interface operations {
       content: {
         "application/json": {
           /**
-           * @description AI provider integration
+           * @description AI provider integration (openai chat, openai-responses, anthropic messages)
            * @enum {string}
            */
-          provider: "openai";
+          provider: "openai" | "openai-responses" | "anthropic";
           model: string;
           baseUrl?: string | "" | unknown;
           apiKey?: string;
@@ -1407,10 +1407,10 @@ export interface operations {
           "application/json": {
             id: string;
             /**
-             * @description AI provider integration
+             * @description AI provider integration (openai chat, openai-responses, anthropic messages)
              * @enum {string}
              */
-            provider: "openai";
+            provider: "openai" | "openai-responses" | "anthropic";
             model: string;
             /** Format: uri */
             baseUrl?: string | null;
@@ -1550,10 +1550,10 @@ export interface operations {
       content: {
         "application/json": {
           /**
-           * @description AI provider integration
+           * @description AI provider integration (openai chat, openai-responses, anthropic messages)
            * @enum {string}
            */
-          provider: "openai";
+          provider: "openai" | "openai-responses" | "anthropic";
           model: string;
           baseUrl?: string | "" | unknown;
           apiKey?: string;

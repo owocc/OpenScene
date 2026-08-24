@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { generateText, streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
 import type { AppDatabase } from "../db/client";
 import { aiConfig } from "../db/schema";
 import { nowIso } from "../db/ids";
@@ -16,9 +17,7 @@ import {
   AiTestSchema,
 } from "../validation/schemas";
 import type { z } from "zod";
-
 const GLOBAL_ID = "global";
-const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 export type AiConfigInput = z.infer<typeof AiConfigUpdateSchema>;
 export type AiChatInput = z.infer<typeof AiChatRequestSchema>;
@@ -101,9 +100,8 @@ export async function testAiConfig(db: AppDatabase, input: Partial<AiConfigInput
     );
   }
   try {
-    const openai = createOpenAI({ apiKey, baseURL: baseUrl || OPENAI_DEFAULT_BASE_URL });
     await generateText({
-      model: openai(model),
+      model: buildModel(provider, apiKey, baseUrl, model),
       messages: [{ role: "user", content: "Reply with the single word: ok" }],
       maxOutputTokens: 8,
     });
@@ -115,20 +113,33 @@ export async function testAiConfig(db: AppDatabase, input: Partial<AiConfigInput
 }
 
 type ResolvedConfig = {
-  provider: "openai";
+  provider: "openai" | "openai-responses" | "anthropic";
   model: string;
-  baseUrl: string;
+  baseUrl: string | undefined;
   apiKey: string;
 };
+
+function buildModel(
+  provider: ResolvedConfig["provider"],
+  apiKey: string,
+  baseUrl: string | undefined,
+  model: string,
+) {
+  if (provider === "anthropic") {
+    return createAnthropic({ apiKey, baseURL: baseUrl })(model);
+  }
+  const openai = createOpenAI({ apiKey, baseURL: baseUrl });
+  return provider === "openai-responses" ? openai.responses(model) : openai.chat(model);
+}
 
 async function resolveConfig(db: AppDatabase): Promise<ResolvedConfig> {
   const row = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
   if (!row || !row.enabled) throw forbidden("AI is not configured or is disabled");
   const apiKey = decryptSecret(row.apiKeyEnc, getConfig().ai.encryptionKey);
   return {
-    provider: "openai",
+    provider: row.provider as ResolvedConfig["provider"],
     model: row.model,
-    baseUrl: row.baseUrl || OPENAI_DEFAULT_BASE_URL,
+    baseUrl: row.baseUrl ?? undefined,
     apiKey,
   };
 }
@@ -140,8 +151,12 @@ async function resolveConfig(db: AppDatabase): Promise<ResolvedConfig> {
  */
 export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<Response> {
   const config = await resolveConfig(db);
-  const openai = createOpenAI({ apiKey: config.apiKey, baseURL: config.baseUrl });
-  const model = openai(input.model ?? config.model);
+  const model = buildModel(
+    config.provider,
+    config.apiKey,
+    config.baseUrl,
+    input.model ?? config.model,
+  );
   const messages = input.messages.map((message) => ({
     role: message.role,
     content: message.content,
