@@ -13,16 +13,12 @@ const zh_CN: BaseTranslation = {
   sidebar: {
     pages: "页面",
     agents: "物料契约",
-    assets: "组件库",
-    tools: "模式工具",
     variables: "变量与语言",
     collapse: "收起面板",
     expand: "展开大纲",
     expandProperties: "展开属性面板",
     pagesTabTooltip: "页面与图层大纲",
     agentsTabTooltip: "物料契约",
-    assetsTabTooltip: "组件物料库",
-    toolsTabTooltip: "模式与工具",
     variablesTabTooltip: "变量与国际化",
   },
   panels: {
@@ -45,12 +41,7 @@ const zh_CN: BaseTranslation = {
       rev: "修订版本 {rev:number}",
       diagnostics: "契约诊断信息",
     },
-    assets: {
-      title: "物料组件库 (Assets)",
-      description: "已加载 {count:number} 种 App 预置物料组件。",
-    },
     tools: {
-      modes: "编辑模式",
       visual: "可视化编辑模式",
       text: "文档编辑模式",
       developer: "开发者模式",

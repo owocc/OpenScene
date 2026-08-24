@@ -56,7 +56,7 @@ describe("query-store pure functions", () => {
       panX: 50,
       panY: -30,
       rotated: true,
-      panel: "assets",
+      panel: "variables",
     });
 
     expect(formatted.search).toContain("server-url=https%3A%2F%2Fapi.example.com");
@@ -64,7 +64,9 @@ describe("query-store pure functions", () => {
     expect(formatted.search).toContain("surface=text");
     expect(formatted.search).toContain("nodeId=button-1");
     expect(formatted.search).toContain("rotated=true");
-    expect(formatted.search).toContain("panel=assets");
+
+    expect(formatted.search).toContain("panel=variables");
+
     expect(formatted.hash).toBe("#token=xyz789");
   });
 
@@ -150,14 +152,14 @@ describe("applyAppSettings (bootstrap hydration)", () => {
 
   it("loads per-app view settings and global preferences after bootstrap", () => {
     stubBrowser({
-      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets", zoom: 2 }),
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "variables", zoom: 2 }),
       "openscene:studio:preferences": JSON.stringify({ locale: "zh-CN" }),
     });
 
     useQueryStore.getState().applyAppSettings("app-1");
     const state = useQueryStore.getState();
     expect(state.appId).toBe("app-1");
-    expect(state.panel).toBe("assets");
+    expect(state.panel).toBe("variables");
     expect(state.zoom).toBe(2);
     expect(state.locale).toBe("zh-CN");
   });
@@ -173,7 +175,7 @@ describe("applyAppSettings (bootstrap hydration)", () => {
 
   it("keys view state by app id so different apps stay isolated", () => {
     stubBrowser({
-      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets" }),
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "agents" }),
       "openscene:studio:view:app-2": JSON.stringify({ panel: "pages", rotated: true }),
       "openscene:studio:preferences": JSON.stringify({ locale: "en-US" }),
     });
@@ -187,15 +189,29 @@ describe("applyAppSettings (bootstrap hydration)", () => {
 
   it("keeps URL query parameters authoritative over persisted values", () => {
     stubBrowser({
-      "openscene:studio:view:app-1": JSON.stringify({ panel: "assets", zoom: 2 }),
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "variables", zoom: 2 }),
     });
     const url = new URLSearchParams();
-    url.set("panel", "tools");
+    url.set("panel", "agents");
     // Re-stub with an explicit URL param so the store sees it.
     const params = window.location as unknown as { search: string; hash: string };
     params.search = `?${url.toString()}`;
 
     useQueryStore.getState().applyAppSettings("app-3");
-    expect(useQueryStore.getState().panel).toBe("tools");
+    expect(useQueryStore.getState().panel).toBe("agents");
+  });
+
+  it("falls back to the default panel when a removed tab is requested", () => {
+    stubBrowser({
+      "openscene:studio:view:app-1": JSON.stringify({ panel: "variables" }),
+    });
+    const url = new URLSearchParams();
+    url.set("panel", "assets");
+    // Re-stub with an explicit URL param so the store sees it.
+    const params = window.location as unknown as { search: string; hash: string };
+    params.search = `?${url.toString()}`;
+
+    useQueryStore.getState().applyAppSettings("app-4");
+    expect(useQueryStore.getState().panel).toBe("pages");
   });
 });

@@ -13,16 +13,12 @@ const en_US: Translation = {
   sidebar: {
     pages: "Pages",
     agents: "Agents",
-    assets: "Assets",
-    tools: "Tools",
     variables: "Variables",
     collapse: "Collapse panel",
     expand: "Expand outline",
     expandProperties: "Expand properties",
     pagesTabTooltip: "Pages & Layers",
     agentsTabTooltip: "Material Contract (Agents)",
-    assetsTabTooltip: "Component Library (Assets)",
-    toolsTabTooltip: "Modes & Tools (Tools)",
     variablesTabTooltip: "Variables & i18n (Variables)",
   },
   panels: {
@@ -46,12 +42,7 @@ const en_US: Translation = {
       rev: "rev {rev}",
       diagnostics: "Contract Diagnostics",
     },
-    assets: {
-      title: "Component Library (Assets)",
-      description: "Loaded {count} preset App material components.",
-    },
     tools: {
-      modes: "Editor Modes",
       visual: "Visual editor mode",
       text: "Document edit mode",
       developer: "Developer mode",

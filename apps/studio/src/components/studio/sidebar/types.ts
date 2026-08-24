@@ -1,10 +1,8 @@
 import {
-  Briefcase,
   Code2,
   Eye,
   FileText,
   Hexagon,
-  PlusCircle,
   Sparkles,
   SquareMousePointer,
   type LucideIcon,
@@ -17,9 +15,9 @@ import type { AdapterRegistry } from "@/core/registry";
 import type { ComponentMeta } from "@/core/meta";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 
-export type SidebarTab = "pages" | "agents" | "assets" | "tools" | "variables";
+export type SidebarTab = "pages" | "agents" | "variables";
 
-export const sidebarTabIds: SidebarTab[] = ["pages", "agents", "assets", "tools", "variables"];
+export const sidebarTabIds: SidebarTab[] = ["pages", "agents", "variables"];
 
 export function isSidebarTab(value: string | null | undefined): value is SidebarTab {
   return value != null && (sidebarTabIds as readonly string[]).includes(value);
@@ -109,7 +107,6 @@ export interface StudioSidebarProps {
   document: SceneDocument;
   registry: AdapterRegistry;
   selectedId: string;
-  surface: Surface;
   revision: number;
   valid: boolean;
   locale: string;
@@ -140,8 +137,6 @@ export const navTabs: Array<{
 }> = [
   { id: "pages", label: "Pages", icon: FileText },
   { id: "agents", label: "Agents", icon: Sparkles },
-  { id: "assets", label: "Assets", icon: PlusCircle },
-  { id: "tools", label: "Tools", icon: Briefcase },
   { id: "variables", label: "Variables", icon: Hexagon },
 ];
 

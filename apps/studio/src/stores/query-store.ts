@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 import type { ActiveToolMode, Surface } from "@/core/editor-state";
-import type { SidebarTab } from "@/components/studio/sidebar/types";
+import { isSidebarTab, type SidebarTab } from "@/components/studio/sidebar/types";
 
-const sidebarTabValues: SidebarTab[] = ["pages", "agents", "assets", "tools", "variables"];
+const sidebarTabValues: SidebarTab[] = ["pages", "agents", "variables"];
 import {
   loadAppViewSettings,
   loadPreferences,
@@ -143,14 +143,7 @@ export function parseQueryParams(search: string, hash = ""): StudioQueryParams {
 
   // 9. Sidebar & Panels
   const panelRaw = searchParams.get("panel") || searchParams.get("tab");
-  const panel: SidebarTab | null =
-    panelRaw === "agents" ||
-    panelRaw === "assets" ||
-    panelRaw === "tools" ||
-    panelRaw === "variables" ||
-    panelRaw === "pages"
-      ? panelRaw
-      : "pages";
+  const panel: SidebarTab | null = isSidebarTab(panelRaw) ? panelRaw : "pages";
 
   const sidebarCollapsed = searchParams.get("sidebarCollapsed") === "true";
   const propsCollapsed = searchParams.get("propsCollapsed") === "true";

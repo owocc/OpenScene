@@ -56,14 +56,6 @@ type RootTranslation = {
      */
     agents: string;
     /**
-     * 组​件​库
-     */
-    assets: string;
-    /**
-     * 模​式​工​具
-     */
-    tools: string;
-    /**
      * 变​量​与​语​言
      */
     variables: string;
@@ -87,14 +79,6 @@ type RootTranslation = {
      * 物​料​契​约
      */
     agentsTabTooltip: string;
-    /**
-     * 组​件​物​料​库
-     */
-    assetsTabTooltip: string;
-    /**
-     * 模​式​与​工​具
-     */
-    toolsTabTooltip: string;
     /**
      * 变​量​与​国​际​化
      */
@@ -168,22 +152,7 @@ type RootTranslation = {
        */
       diagnostics: string;
     };
-    assets: {
-      /**
-       * 物​料​组​件​库​ ​(​A​s​s​e​t​s​)
-       */
-      title: string;
-      /**
-       * 已​加​载​ ​{​c​o​u​n​t​}​ ​种​ ​A​p​p​ ​预​置​物​料​组​件​。
-       * @param {number} count
-       */
-      description: RequiredParams<"count">;
-    };
     tools: {
-      /**
-       * 编​辑​模​式
-       */
-      modes: string;
       /**
        * 可​视​化​编​辑​模​式
        */
@@ -575,14 +544,6 @@ export type TranslationFunctions = {
      */
     agents: () => LocalizedString;
     /**
-     * 组件库
-     */
-    assets: () => LocalizedString;
-    /**
-     * 模式工具
-     */
-    tools: () => LocalizedString;
-    /**
      * 变量与语言
      */
     variables: () => LocalizedString;
@@ -606,14 +567,6 @@ export type TranslationFunctions = {
      * 物料契约
      */
     agentsTabTooltip: () => LocalizedString;
-    /**
-     * 组件物料库
-     */
-    assetsTabTooltip: () => LocalizedString;
-    /**
-     * 模式与工具
-     */
-    toolsTabTooltip: () => LocalizedString;
     /**
      * 变量与国际化
      */
@@ -684,21 +637,7 @@ export type TranslationFunctions = {
        */
       diagnostics: () => LocalizedString;
     };
-    assets: {
-      /**
-       * 物料组件库 (Assets)
-       */
-      title: () => LocalizedString;
-      /**
-       * 已加载 {count} 种 App 预置物料组件。
-       */
-      description: (arg: { count: number }) => LocalizedString;
-    };
     tools: {
-      /**
-       * 编辑模式
-       */
-      modes: () => LocalizedString;
       /**
        * 可视化编辑模式
        */

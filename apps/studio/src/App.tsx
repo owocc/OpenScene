@@ -488,7 +488,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             registry={registry}
             selectedId={selectedId}
             hoverNodeId={hoverNodeId}
-            surface={surface}
             revision={revision}
             valid={validation.valid}
             locale={locale}

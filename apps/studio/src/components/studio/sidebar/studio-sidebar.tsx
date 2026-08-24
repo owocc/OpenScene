@@ -11,9 +11,7 @@ import { useQueryStore, useShortcutsStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { LogoMenu } from "./logo-menu";
 import { AgentsPanel } from "./panels/agents-panel";
-import { AssetsPanel } from "./panels/assets-panel";
 import { PagesPanel } from "./panels/pages-panel";
-import { ToolsPanel } from "./panels/tools-panel";
 import { VariablesPanel } from "./panels/variables-panel";
 import { isSidebarTab, navTabs, type SidebarTab, type StudioSidebarProps } from "./types";
 
@@ -28,7 +26,6 @@ export function StudioSidebar({
   registry,
   selectedId,
   hoverNodeId,
-  surface,
   revision,
   valid,
   locale,
@@ -85,10 +82,6 @@ export function StudioSidebar({
         return LL.sidebar.pages();
       case "agents":
         return LL.sidebar.agents();
-      case "assets":
-        return LL.sidebar.assets();
-      case "tools":
-        return LL.sidebar.tools();
       case "variables":
         return LL.sidebar.variables();
     }
@@ -100,10 +93,6 @@ export function StudioSidebar({
         return LL.sidebar.pagesTabTooltip();
       case "agents":
         return LL.sidebar.agentsTabTooltip();
-      case "assets":
-        return LL.sidebar.assetsTabTooltip();
-      case "tools":
-        return LL.sidebar.toolsTabTooltip();
       case "variables":
         return LL.sidebar.variablesTabTooltip();
     }
@@ -205,7 +194,9 @@ export function StudioSidebar({
                       const isActive = activeTab === item.id;
                       return (
                         <div key={item.id} className="flex w-full flex-col items-center">
-                          {index === 4 && <div className="my-1 h-px w-8 bg-border/80" />}
+                          {index === navTabs.length - 1 && (
+                            <div className="my-1 h-px w-8 bg-border/80" />
+                          )}
                           <div
                             className="group flex w-full cursor-pointer flex-col items-center gap-0.5 py-1"
                             onClick={() => handleTabClick(item.id)}
@@ -292,14 +283,6 @@ export function StudioSidebar({
                         revision={revision}
                         diagnostics={diagnostics}
                       />
-                    )}
-
-                    {activeTab === "assets" && (
-                      <AssetsPanel components={components} onSelectComponent={onAddComponent} />
-                    )}
-
-                    {activeTab === "tools" && (
-                      <ToolsPanel surface={surface} onSurfaceChange={onSurfaceChange} />
                     )}
 
                     {activeTab === "variables" && (
