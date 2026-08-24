@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Braces,
@@ -14,7 +14,6 @@ import {
   Layers,
   MoreVertical,
   Plus,
-  RotateCcw,
   Search,
   Sparkles,
   ToggleLeft,
@@ -23,9 +22,7 @@ import {
   Variable as VariableIcon,
 } from "lucide-react";
 import type { SceneDocument } from "@openscene/protocol";
-import { createOpenSceneClient } from "@openscene/api-client";
 import { useI18n } from "@/i18n";
-import { useQueryStore } from "@/stores/query-store";
 import { cn } from "@/lib/utils";
 import {
   convertVariableValue,
@@ -188,56 +185,8 @@ export function VariablesPanel({
   const [localeSearchQuery, setLocaleSearchQuery] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [editingVar, setEditingVar] = useState<StateVariable | null>(null);
-  // Server locales state
-  const [serverLocales, setServerLocales] = useState<ServerLocaleOption[]>([]);
-  const [isLoadingLocales, setIsLoadingLocales] = useState(false);
-
-  const fetchServerLocales = useCallback(async () => {
-    const query = useQueryStore.getState();
-    const appId = bootstrap?.app?.id || query.appId;
-    const serverUrl = query.serverUrl;
-    const token = query.token;
-    if (!appId || !serverUrl || !token || appId === "local-test-app") {
-      return;
-    }
-    setIsLoadingLocales(true);
-    try {
-      const client = createOpenSceneClient({
-        baseUrl: serverUrl.replace(/\/$/, ""),
-        headers: { "x-openscene-session-token": token },
-      });
-      const { data, error, response } = await client.GET("/api/v1/apps/{appId}/locales", {
-        params: { path: { appId } },
-      });
-      if (error || !Array.isArray(data)) {
-        console.warn(
-          "[OpenScene Studio] Failed to fetch server locales:",
-          error || `Status ${response?.status}`,
-        );
-        return;
-      }
-      console.log("[OpenScene Studio] Loaded server locales for app:", { appId, locales: data });
-      setServerLocales(
-        data.map((item) => ({
-          id: item.id,
-          code: item.code,
-          name: item.name || KNOWN_LOCALE_NAMES[item.code] || item.code,
-          isDefault: item.isDefault,
-        })),
-      );
-    } catch (err) {
-      console.warn("[OpenScene Studio] Failed to fetch server locales:", err);
-    } finally {
-      setIsLoadingLocales(false);
-    }
-  }, [bootstrap?.app?.id]);
-
-  useEffect(() => {
-    void fetchServerLocales();
-  }, [fetchServerLocales]);
-
   const effectiveLocales = useMemo<ServerLocaleOption[]>(() => {
-    const rawLocales = serverLocales.length > 0 ? serverLocales : (bootstrap?.locales ?? []);
+    const rawLocales = bootstrap?.locales;
     if (rawLocales && rawLocales.length > 0) {
       return rawLocales.map((l) => ({
         id: l.id,
@@ -252,7 +201,7 @@ export function VariablesPanel({
       name: KNOWN_LOCALE_NAMES[code] || code,
       isDefault: code === "en" || code === "en-US",
     }));
-  }, [bootstrap?.locales, serverLocales, locales]);
+  }, [bootstrap?.locales, locales]);
 
   const filteredLocales = useMemo(() => {
     if (!localeSearchQuery.trim()) return effectiveLocales;
@@ -572,30 +521,15 @@ export function VariablesPanel({
         )}
 
         {activeTab === "locales" && effectiveLocales.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder={LL.panels.variables.searchLocalesPlaceholder()}
-                value={localeSearchQuery}
-                onChange={(e) => setLocaleSearchQuery(e.target.value)}
-                className="h-7 pl-8 pr-2 text-xs"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-              onClick={() => void fetchServerLocales()}
-              title={LL.panels.variables.refreshLocales()}
-              disabled={isLoadingLocales}
-            >
-              <RotateCcw
-                className={cn("size-3.5", isLoadingLocales && "animate-spin text-primary")}
-              />
-            </Button>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder={LL.panels.variables.searchLocalesPlaceholder()}
+              value={localeSearchQuery}
+              onChange={(e) => setLocaleSearchQuery(e.target.value)}
+              className="h-7 pl-8 pr-2 text-xs"
+            />
           </div>
         )}
       </div>
@@ -607,7 +541,7 @@ export function VariablesPanel({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-xs font-medium text-muted-foreground">
-                {serverLocales.length > 0
+                {bootstrap?.locales && bootstrap.locales.length > 0
                   ? LL.panels.variables.serverLocalesTitle()
                   : LL.panels.variables.locales()}
               </span>
