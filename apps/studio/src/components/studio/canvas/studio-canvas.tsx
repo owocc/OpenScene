@@ -205,7 +205,7 @@ export function StudioCanvas({
                 <span className="text-[10px] text-muted-foreground/60">rev {revision}</span>
               </div>
               <div className="relative h-full w-full border border-border bg-background shadow-md">
-                <div className="h-full w-full overflow-hidden">{previewElement}</div>
+                {previewElement}
               </div>
             </div>
 
@@ -259,12 +259,12 @@ export function StudioCanvas({
 
                 {/* Artboard Container with ShineBorder matching main canvas */}
                 <div className="relative h-full w-full border border-border bg-background shadow-md">
-                  <div className="h-full w-full overflow-hidden">{aiPreviewElement}</div>
+                  {aiPreviewElement}
                   <ShineBorder
                     borderWidth={2}
                     duration={8}
                     shineColor={["#A07CFE", "#FE8FB5", "#FFBE7B"]}
-                    className="z-20 pointer-events-none"
+                    className="z-40 pointer-events-none"
                   />
                 </div>
               </div>
