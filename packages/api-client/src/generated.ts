@@ -1094,6 +1094,7 @@ export interface components {
       } | null;
       /** @enum {string} */
       status: "active" | "disabled" | "draft" | "published";
+      defaultPromptId?: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -8328,6 +8329,7 @@ export interface operations {
               } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
+              defaultPromptId?: string | null;
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
@@ -8479,6 +8481,7 @@ export interface operations {
             templateId: string;
             versionId: string;
           };
+          defaultPromptId?: string | null;
         };
       };
     };
@@ -8503,6 +8506,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -8658,6 +8662,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -8939,6 +8944,7 @@ export interface operations {
            * @enum {string}
            */
           status?: "active" | "disabled" | "draft" | "published";
+          defaultPromptId?: string | null;
         };
       };
     };
@@ -8963,6 +8969,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -10977,6 +10984,7 @@ export interface operations {
               } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
+              defaultPromptId?: string | null;
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
@@ -11128,6 +11136,7 @@ export interface operations {
             templateId: string;
             versionId: string;
           };
+          defaultPromptId?: string | null;
         };
       };
     };
@@ -11152,6 +11161,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -11307,6 +11317,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -11588,6 +11599,7 @@ export interface operations {
            * @enum {string}
            */
           status?: "active" | "disabled" | "draft" | "published";
+          defaultPromptId?: string | null;
         };
       };
     };
@@ -11612,6 +11624,7 @@ export interface operations {
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
+            defaultPromptId?: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -12751,6 +12764,7 @@ export interface operations {
               kind: "page" | "template";
               title: string;
               documentId: string;
+              defaultPromptId?: string | null;
             };
             draft: {
               revision: number;
@@ -12876,6 +12890,9 @@ export interface operations {
             };
             /** Format: uri */
             returnUrl: string;
+            prompts?: {
+              [key: string]: unknown;
+            }[];
           };
         };
       };

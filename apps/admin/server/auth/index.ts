@@ -7,7 +7,13 @@ import { hashSecret } from "../db/ids";
 import { appKeys, studioSessions } from "../db/schema";
 import type { AppDatabase } from "../db/client";
 
-export type AuthRequirement = "management" | "app-key" | "runtime" | "session" | "public";
+export type AuthRequirement =
+  | "management"
+  | "app-key"
+  | "runtime"
+  | "session"
+  | "client"
+  | "public";
 export type AuthContext = {
   kind: "management" | "app-key" | "runtime" | "session" | "public";
   appId?: string;
@@ -51,6 +57,43 @@ export async function authenticate(
       .get();
     if (!key || (appId && key.appId !== appId)) throw notFound();
     return { kind: "app-key", appId: key.appId };
+  }
+  if (requirement === "client") {
+    const appKeySecret = request.headers.get(config.auth.appKeyHeader);
+    if (appKeySecret) {
+      const key = await db
+        .select()
+        .from(appKeys)
+        .where(
+          and(
+            eq(appKeys.keyHash, hashSecret(appKeySecret)),
+            eq(appKeys.kind, "app"),
+            isNull(appKeys.revokedAt),
+          ),
+        )
+        .get();
+      if (!key || (appId && key.appId !== appId)) throw notFound();
+      return { kind: "app-key", appId: key.appId };
+    }
+
+    const sessionSecret = request.headers.get("x-openscene-session-token") ?? bearerToken(request);
+    if (sessionSecret) {
+      const session = await db
+        .select()
+        .from(studioSessions)
+        .where(eq(studioSessions.tokenHash, hashSecret(sessionSecret)))
+        .get();
+      if (
+        session &&
+        new Date(session.expiresAt).getTime() > Date.now() &&
+        (!appId || session.appId === appId)
+      ) {
+        return { kind: "session", appId: session.appId, sessionId: session.id };
+      }
+    }
+
+    if (isManagementRequest(request, config)) return { kind: "management" };
+    throw unauthorized("An App Key or valid Studio Session is required");
   }
 
   if (requirement === "runtime") {

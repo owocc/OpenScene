@@ -16,11 +16,21 @@ export function createLocalTestBootstrap(origin = "http://localhost:5174"): Stud
       kind: "page",
       title: "Local Test Page",
       documentId: "local-document",
+      defaultPromptId: null,
     },
     draft: { revision: 1, document },
     manifest: null as AppManifest | null,
     preview: { url: `${baseOrigin}/`, allowedOrigin: baseOrigin, profileId: "local-test" },
     capabilities: { saveDraft: false, createVersion: false, publish: false, uploadAsset: false },
     returnUrl: `${baseOrigin}/`,
+    prompts: [
+      {
+        id: "prompt-default",
+        key: "default",
+        name: "Default Prompt",
+        isDefault: true,
+        enabled: true,
+      },
+    ],
   };
 }

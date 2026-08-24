@@ -105,6 +105,10 @@ export const messages = {
     promptsDescription:
       "Manage modular AI prompt profiles for different modules, scenes, and components in this app.",
     promptKey: "Key",
+    pageDefaultPrompt: "Default prompt profile",
+    pageDefaultPromptDescription:
+      "Select the default AI prompt profile bound to this page. Studio will automatically load this prompt when editing.",
+    noneDefaultPrompt: "None (Use app default)",
     promptName: "Name",
     promptDescriptionLabel: "Description",
     promptCreate: "New prompt profile",
@@ -234,6 +238,10 @@ export const messages = {
     promptKey: "标识符 (Key)",
     promptName: "名称",
     promptDescriptionLabel: "描述",
+    pageDefaultPrompt: "默认绑定提示词",
+    pageDefaultPromptDescription:
+      "选择绑定到此页面的默认 AI 提示词配置。Studio 编辑此页面时将自动优先加载该提示词。",
+    noneDefaultPrompt: "无（使用应用默认提示词）",
     promptCreate: "新建提示词配置",
     promptEdit: "编辑提示词配置",
     promptDelete: "删除提示词配置",

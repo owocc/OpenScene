@@ -10,10 +10,25 @@ import {
 import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
 import { useQueryStore } from "@/stores/query-store";
 
+export interface AppPromptInfo {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+  enabled: boolean;
+}
+
 export interface StudioBootstrap {
   session: { id: string; expiresAt: string };
   app: { id: string; key: string; name: string; type: AppType };
-  resource: { id: string; kind: "page" | "template"; title: string; documentId: string };
+  resource: {
+    id: string;
+    kind: "page" | "template";
+    title: string;
+    documentId: string;
+    defaultPromptId?: string | null;
+  };
   draft: { revision: number; document: SceneDocument };
   manifest: AppManifest | null;
   preview: { url: string; allowedOrigin: string; profileId: string };
@@ -24,8 +39,8 @@ export interface StudioBootstrap {
     uploadAsset: boolean;
   };
   returnUrl: string;
+  prompts?: AppPromptInfo[];
 }
-
 export type StudioBootstrapState =
   | { status: "loading" }
   | { status: "standalone" }

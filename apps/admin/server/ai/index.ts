@@ -15,7 +15,7 @@ import { nowIso } from "../db/ids";
 import { getConfig } from "../config/env";
 import { forbidden, validation } from "../errors";
 import { encryptSecret, decryptSecret } from "./encryption";
-import { AppManifestSchema } from "@openscene/protocol";
+import { AppManifestSchema, extractAgentUiActions } from "@openscene/protocol";
 import {
   AiChatRequestSchema,
   AiChatResponseSchema,
@@ -392,6 +392,7 @@ export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<R
     });
   }
 
+  const uiActions = extractAgentUiActions(result.text) ?? undefined;
   return Response.json(
     AiChatResponseSchema.parse({
       model: input.model ?? config.model,
@@ -401,6 +402,7 @@ export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<R
         outputTokens: result.usage.outputTokens ?? 0,
         totalTokens: result.usage.totalTokens ?? 0,
       },
+      uiActions,
     }),
     { status: 200, headers: { "cache-control": "no-store" } },
   );

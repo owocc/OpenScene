@@ -1,0 +1,1 @@
+ALTER TABLE `pages` ADD `default_prompt_id` text;

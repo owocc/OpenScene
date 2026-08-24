@@ -46,6 +46,7 @@ export function StudioSidebar({
   onRedo,
   onCopyJson,
   onSave,
+  onApplyAgentActions,
 }: StudioSidebarProps) {
   const { LL } = useI18n();
   const queryPanel = useQueryStore((s) => s.panel);
@@ -282,6 +283,7 @@ export function StudioSidebar({
                         valid={valid}
                         revision={revision}
                         diagnostics={diagnostics}
+                        onApplyAgentActions={onApplyAgentActions}
                       />
                     )}
 

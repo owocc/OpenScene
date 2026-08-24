@@ -1,5 +1,6 @@
 import { APP_TYPES } from "@openscene/constants";
 import {
+  AgentUiActionSchema,
   AppManifestSchema,
   ComponentManifestSchema,
   RuntimePageDeliverySchema,
@@ -87,6 +88,7 @@ export const ResourceSchema = z.object({
   documentId: IdSchema,
   sourceTemplate: z.object({ templateId: IdSchema, versionId: IdSchema }).nullable(),
   status: ResourceStatusSchema,
+  defaultPromptId: IdSchema.nullable().optional(),
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
 });
@@ -191,6 +193,7 @@ export const BootstrapSchema = z.object({
     kind: ResourceKindSchema,
     title: z.string(),
     documentId: IdSchema,
+    defaultPromptId: IdSchema.nullable().optional(),
   }),
   draft: z.object({ revision: z.number().int().nonnegative(), document: SceneDocumentSchema }),
   manifest: AppManifestSchema.nullable(),
@@ -206,6 +209,7 @@ export const BootstrapSchema = z.object({
     uploadAsset: z.boolean(),
   }),
   returnUrl: z.string().url(),
+  prompts: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 export const RuntimeDeliverySchema = RuntimePageDeliverySchema;
 export const UploadIntentResponseSchema = z.object({
@@ -307,6 +311,7 @@ export const ResourceCreateSchema = z.object({
   categoryId: IdSchema.optional(),
   status: ResourceStatusSchema.default("draft"),
   sourceTemplate: z.object({ templateId: IdSchema, versionId: IdSchema }).optional(),
+  defaultPromptId: IdSchema.nullable().optional(),
 });
 export const ResourcePatchSchema = ResourceCreateSchema.partial()
   .omit({ sourceTemplate: true })
@@ -417,11 +422,65 @@ export const SystemPromptSchema = z
     updatedAt: IsoDateSchema,
   })
   .openapi({ description: "Global deployment system prompt configuration" });
-
 export const DEFAULT_APP_SYSTEM_PROMPT = [
-  "You are the AI assistant embedded in an OpenScene application.",
-  "Help users accomplish tasks using the components and APIs available to the app.",
-  "Be concise, accurate, and follow the application's conventions.",
+  "You are an expert AI assistant that helps users explore data, design interactive UI pages, and build visual applications in OpenScene.",
+  "",
+  "WORKFLOW:",
+  "1. Analyze user instructions and understand what UI, components, or updates they want to make.",
+  "2. Respond with a brief conversational explanation of what you are doing.",
+  "3. Output the UI modification action plan as a JSON array wrapped in a ```json or ```spec code block.",
+  "",
+  "UI ACTION PLAN SPECIFICATION:",
+  "Every response that creates or modifies UI must output an array of action items:",
+  "",
+  "Case A — Full Canvas Replacement (全量重绘 - single item array):",
+  "```json",
+  "[",
+  "  {",
+  '    "action": "replace_document",',
+  '    "document": {',
+  '      "protocolVersion": "1.0",',
+  '      "pageInfo": { "title": "Page Title" },',
+  '      "globalConfig": { "design": { "width": 390 } },',
+  '      "spec": {',
+  '        "root": "root",',
+  '        "elements": {',
+  '          "root": { "id": "root", "type": "View", "props": {}, "children": ["comp_1"] },',
+  '          "comp_1": { "id": "comp_1", "type": "Text", "props": { "text": "Hello OpenScene" } }',
+  "        }",
+  "      }",
+  "    }",
+  "  }",
+  "]",
+  "```",
+  "",
+  "Case B — Incremental Edits (增量插入、更新、删除):",
+  "```json",
+  "[",
+  "  {",
+  '    "action": "insert_element",',
+  '    "elementId": "btn_1",',
+  '    "element": { "type": "Button", "props": { "text": "Submit" } },',
+  '    "target": { "parentId": "root" }',
+  "  },",
+  "  {",
+  '    "action": "update_element",',
+  '    "elementId": "comp_1",',
+  '    "patch": { "props": { "text": "Updated Text" } }',
+  "  },",
+  "  {",
+  '    "action": "delete_element",',
+  '    "elementId": "old_comp"',
+  "  }",
+  "]",
+  "```",
+  "",
+  "RULES:",
+  "- Use only the components published for this app (see ## Available Components below).",
+  "- For complete redesigns or initial pages, use replace_document.",
+  "- For targeted changes, use insert_element, update_element, or delete_element.",
+  '- State binding: { "$state": "/path" } in props.',
+  '- Actions: "on": { "press": { "action": "setState", "params": { "statePath": "/path", "value": true } } }.',
 ].join("\n");
 
 export const AppPromptCreateSchema = z
@@ -494,6 +553,7 @@ export const AiChatResponseSchema = z.object({
   model: z.string(),
   content: z.string(),
   usage: AiChatUsageSchema,
+  uiActions: z.array(AgentUiActionSchema).optional(),
 });
 
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

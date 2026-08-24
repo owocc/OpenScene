@@ -658,6 +658,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
     description: "",
     status: "draft",
     categoryId: "",
+    defaultPromptId: "",
     templateId: "",
     versionId: "",
   });
@@ -730,6 +731,9 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       void queryClient.invalidateQueries();
     },
   });
+  const promptsQuery = api.useQuery("get", "/api/v1/apps/{appId}/prompts", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
   const result = kind === "pages" ? pageQuery : templateQuery;
   const resources = result.data?.items ?? [];
   const title = kind === "pages" ? t("pages") : t("templates");
@@ -742,10 +746,10 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       description: "",
       status: "draft",
       categoryId: "",
+      defaultPromptId: "",
       templateId: "",
       versionId: "",
     });
-    setDialog(true);
   }
   function openEdit(resource: Resource) {
     setEditing(resource);
@@ -755,10 +759,10 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       description: resource.description,
       status: resource.status,
       categoryId: resource.categoryId ?? "",
+      defaultPromptId: ((resource as Record<string, unknown>).defaultPromptId as string) ?? "",
       templateId: "",
       versionId: "",
     });
-    setDialog(true);
   }
   function submit() {
     const body = {
@@ -767,6 +771,11 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       description: form.description,
       status: form.status as "active" | "disabled" | "draft" | "published",
       ...(form.categoryId ? { categoryId: form.categoryId } : {}),
+      ...(form.defaultPromptId
+        ? { defaultPromptId: form.defaultPromptId }
+        : editing
+          ? { defaultPromptId: null }
+          : {}),
     };
     if (editing) {
       if (kind === "pages")
@@ -971,6 +980,22 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
                 if (typeof value === "string") setForm({ ...form, status: value });
               }}
             />
+            {kind === "pages" ? (
+              <Select
+                label={t("pageDefaultPrompt")}
+                value={form.defaultPromptId || "none"}
+                items={{
+                  none: t("noneDefaultPrompt"),
+                  ...Object.fromEntries(
+                    (promptsQuery.data ?? []).map((p) => [p.id, `${p.name} (${p.key})`]),
+                  ),
+                }}
+                onValueChange={(value) => {
+                  if (typeof value === "string")
+                    setForm({ ...form, defaultPromptId: value === "none" ? "" : value });
+                }}
+              />
+            ) : null}
             {kind === "pages" && !editing ? (
               <>
                 <Input
@@ -1086,6 +1111,15 @@ function ResourceDetailView() {
   const profilesQuery = api.useQuery("get", "/api/v1/apps/{appId}/preview-profiles", {
     params: { path: { appId: context.appId ?? "" } },
   });
+  const promptsQuery = api.useQuery("get", "/api/v1/apps/{appId}/prompts", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const updatePageMutation = api.useMutation("patch", "/api/v1/apps/{appId}/pages/{pageId}", {
+    onSuccess: () => {
+      toast.add({ title: t("updated") });
+      void queryClient.invalidateQueries();
+    },
+  });
   const version = api.useMutation("post", "/api/v1/apps/{appId}/documents/{documentId}/versions", {
     onSuccess: () => {
       toast.add({ title: t("created"), description: t("versions") });
@@ -1200,6 +1234,32 @@ function ResourceDetailView() {
           ))}
           <Input label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)} />
         </Surface>
+        {kind === "page" && (
+          <Surface className="grid gap-3 p-4">
+            <Text variant="heading" as="h2">
+              {t("pageDefaultPrompt")}
+            </Text>
+            <Text variant="secondary">{t("pageDefaultPromptDescription")}</Text>
+            <Select
+              label={t("pageDefaultPrompt")}
+              value={((resource as Record<string, unknown>)?.defaultPromptId as string) ?? "none"}
+              items={{
+                none: t("noneDefaultPrompt"),
+                ...Object.fromEntries(
+                  (promptsQuery.data ?? []).map((p) => [p.id, `${p.name} (${p.key})`]),
+                ),
+              }}
+              onValueChange={(val) => {
+                if (typeof val === "string") {
+                  updatePageMutation.mutate({
+                    params: { path: { appId: context.appId ?? "", pageId: resource.id } },
+                    body: { defaultPromptId: val === "none" ? null : val },
+                  });
+                }
+              }}
+            />
+          </Surface>
+        )}
       </div>
       <Surface className="mt-4 grid gap-2 p-4">
         <Text variant="heading" as="h2">
@@ -2918,9 +2978,64 @@ function SystemPromptView() {
 }
 
 const PROMPT_DEFAULT_SYSTEM = [
-  "You are the AI assistant embedded in an OpenScene application.",
-  "Help users accomplish tasks using the components and APIs available to the app.",
-  "Be concise, accurate, and follow the application's conventions.",
+  "You are an expert AI assistant that helps users explore data, design interactive UI pages, and build visual applications in OpenScene.",
+  "",
+  "WORKFLOW:",
+  "1. Analyze user instructions and understand what UI, components, or updates they want to make.",
+  "2. Respond with a brief conversational explanation of what you are doing.",
+  "3. Output the UI modification action plan as a JSON array wrapped in a ```json or ```spec code block.",
+  "",
+  "UI ACTION PLAN SPECIFICATION:",
+  "Every response that creates or modifies UI must output an array of action items:",
+  "",
+  "Case A — Full Canvas Replacement (全量重绘 - single item array):",
+  "```json",
+  "[",
+  "  {",
+  '    "action": "replace_document",',
+  '    "document": {',
+  '      "protocolVersion": "1.0",',
+  '      "pageInfo": { "title": "Page Title" },',
+  '      "globalConfig": { "design": { "width": 390 } },',
+  '      "spec": {',
+  '        "root": "root",',
+  '        "elements": {',
+  '          "root": { "id": "root", "type": "View", "props": {}, "children": ["comp_1"] },',
+  '          "comp_1": { "id": "comp_1", "type": "Text", "props": { "text": "Hello OpenScene" } }',
+  "        }",
+  "      }",
+  "    }",
+  "  }",
+  "]",
+  "```",
+  "",
+  "Case B — Incremental Edits (增量插入、更新、删除):",
+  "```json",
+  "[",
+  "  {",
+  '    "action": "insert_element",',
+  '    "elementId": "btn_1",',
+  '    "element": { "type": "Button", "props": { "text": "Submit" } },',
+  '    "target": { "parentId": "root" }',
+  "  },",
+  "  {",
+  '    "action": "update_element",',
+  '    "elementId": "comp_1",',
+  '    "patch": { "props": { "text": "Updated Text" } }',
+  "  },",
+  "  {",
+  '    "action": "delete_element",',
+  '    "elementId": "old_comp"',
+  "  }",
+  "]",
+  "```",
+  "",
+  "RULES:",
+  "- Use only the components published for this app (see ## Available Components below).",
+  "- For complete redesigns or initial pages, use replace_document.",
+  "- For targeted changes, use insert_element, update_element, or delete_element.",
+  '- State binding: { "$state": "/path" } in props.',
+  '- Actions: "on": { "press": { "action": "setState", "params": { "statePath": "/path", "value": true } } }.',
 ].join("\n");
 
 function PromptsListView() {

@@ -6,10 +6,15 @@ import { StudioSidebar } from "@/components/studio/sidebar";
 import { ShortcutsProvider } from "@/components/studio/shortcuts";
 import { PropertyEditor } from "@/components/studio/property-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { useQueryStore } from "@/stores";
+import { useQueryStore, useStudioStore } from "@/stores";
 import { useI18n } from "@/i18n";
 import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
-import { SceneDocumentSchema, type SceneDocument } from "@openscene/protocol";
+import {
+  applyAgentUiActionsToDocument,
+  SceneDocumentSchema,
+  type AgentUiAction,
+  type SceneDocument,
+} from "@openscene/protocol";
 import type { JsonValue } from "@/core/document";
 import { createEditorState, editorReducer, type EditorElement } from "@/core/editor-state";
 import { defaultProps } from "@/core/meta";
@@ -89,6 +94,12 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   // bootstrap; preferences are global. Applies them before the editor state
   // is initialized so the first render already sees persisted values.
   useQueryStore.getState().applyAppSettings(bootstrap.app.id);
+  useStudioStore.getState().init(bootstrap);
+
+  useEffect(() => {
+    useStudioStore.getState().init(bootstrap);
+  }, [bootstrap]);
+
   const adapterMeta = useMemo(
     () => materialManifestToAdapterMeta(bootstrap.manifest),
     [bootstrap.manifest],
@@ -416,6 +427,12 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const undo = () => dispatch({ type: "history.undo" });
   const redo = () => dispatch({ type: "history.redo" });
 
+  const handleApplyAgentActions = (actions: AgentUiAction[]) => {
+    const nextDoc = applyAgentUiActionsToDocument(document, actions);
+    dispatch({ type: "document.replace", document: nextDoc });
+    showNotice(`✨ ${LL.panels.agents.appliedToCanvasSuccess()}`);
+  };
+
   return (
     <ShortcutsProvider
       onSave={saveDocument}
@@ -518,6 +535,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             onRedo={redo}
             onCopyJson={() => void copyJson()}
             onSave={saveDocument}
+            onApplyAgentActions={handleApplyAgentActions}
           />
         )}
         {/* 4. Right Properties Panel (hidden when nothing is selected; resizable, max 60vw) */}

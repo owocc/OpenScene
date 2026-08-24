@@ -8,7 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { SceneDocument } from "@openscene/protocol";
+import type { AgentUiAction, SceneDocument } from "@openscene/protocol";
 
 import type { Surface, ViewportState } from "@/core/editor-state";
 import type { AdapterRegistry } from "@/core/registry";
@@ -128,6 +128,7 @@ export interface StudioSidebarProps {
   onRedo: () => void;
   onCopyJson: () => void;
   onSave: () => void;
+  onApplyAgentActions?: (actions: AgentUiAction[]) => void;
 }
 
 export const navTabs: Array<{

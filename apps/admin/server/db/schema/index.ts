@@ -193,6 +193,7 @@ export const pages = sqliteTable(
     sourceTemplateId: text("source_template_id"),
     sourceTemplateVersionId: text("source_template_version_id"),
     status: text("status", { enum: ["active", "disabled", "draft", "published"] }).notNull(),
+    defaultPromptId: text("default_prompt_id"),
     ...timestamps,
   },
   (table) => [

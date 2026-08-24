@@ -217,6 +217,19 @@ async function handleRequest(
         });
       throw notFound();
     }
+    if (path[0] === "studio-sessions" && path[2] === "prompts" && method === "GET") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const appId = authContext.appId!;
+      return json(await listAppPrompts(db, appId), 200, { "cache-control": "no-store" });
+    }
+    if (path[0] === "studio-sessions" && path[2] === "chat" && method === "POST") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const input = await parseBody(request, AiChatRequestSchema);
+      const appId = authContext.appId ?? input.appId;
+      return await chatWithAi(db, { ...input, appId });
+    }
 
     if (path[0] === "ai") return await aiRoutes(request, db, method, path);
 
@@ -347,12 +360,13 @@ async function aiRoutes(
     }
     throw notFound();
   }
-  // Client consumption endpoint: every call must present a valid App Key and its app id.
+  // Client consumption endpoint: every call must present a valid App Key or Studio Session and its app id.
   if (path[1] === "chat" && method === "POST") {
-    const authContext = await authenticate(request, db, "app-key");
+    const authContext = await authenticate(request, db, "client");
     const input = await parseBody(request, AiChatRequestSchema);
-    assertAppContext(authContext, input.appId);
-    return await chatWithAi(db, input);
+    const appId = authContext.appId ?? input.appId;
+    assertAppContext(authContext, appId);
+    return await chatWithAi(db, { ...input, appId });
   }
   throw notFound();
 }

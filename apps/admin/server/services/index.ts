@@ -84,6 +84,7 @@ type ResourceRecordInput = {
   sourceTemplateId?: string | null | undefined;
   sourceTemplateVersionId?: string | null | undefined;
   status: "active" | "disabled" | "draft" | "published";
+  defaultPromptId?: string | null | undefined;
   createdAt: string;
   updatedAt: string;
 };
@@ -779,6 +780,7 @@ export async function createResource(
     categoryId: body.categoryId,
     documentId,
     status: body.status,
+    defaultPromptId: kind === "page" ? (body.defaultPromptId ?? null) : null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -845,6 +847,16 @@ export async function updateResource(
       description: body.description ?? existing.description,
       categoryId: body.categoryId === undefined ? existing.categoryId : body.categoryId,
       status: body.status ?? existing.status,
+      ...(kind === "page"
+        ? {
+            defaultPromptId:
+              body.defaultPromptId !== undefined
+                ? body.defaultPromptId
+                : "defaultPromptId" in existing
+                  ? (existing.defaultPromptId as string | null)
+                  : null,
+          }
+        : {}),
       updatedAt: nowIso(),
     })
     .where(and(eq(table.appId, appId), eq(table.id, resourceId)))
@@ -1642,6 +1654,10 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
       kind: session.resourceKind,
       title: resource.title,
       documentId: resource.documentId,
+      defaultPromptId:
+        "defaultPromptId" in resource
+          ? ((resource as Record<string, unknown>).defaultPromptId as string | null)
+          : null,
     },
     draft: {
       revision: document.revision,
@@ -1651,6 +1667,7 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
     preview: { url: profile.url, allowedOrigin: origins[0], profileId: profile.id },
     capabilities: { saveDraft: true, createVersion: true, publish: true, uploadAsset: true },
     returnUrl: session.returnUrl,
+    prompts: await listAppPrompts(db, session.appId),
   };
 }
 
@@ -1926,6 +1943,7 @@ function resourceRecord(row: ResourceRecordInput): unknown {
           }
         : null,
     status: row.status,
+    defaultPromptId: "defaultPromptId" in row ? (row.defaultPromptId ?? null) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

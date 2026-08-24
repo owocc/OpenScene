@@ -106,13 +106,97 @@ type RootTranslation = {
     };
     agents: {
       /**
-       * A​p​p​ ​M​a​t​e​r​i​a​l​ ​契​约
+       * A​I​ ​智​能​助​手
        */
       title: string;
       /**
-       * S​t​u​d​i​o​ ​通​过​契​约​驱​动​渲​染​，​不​维​护​本​地​固​定​组​件​目​录​。
+       * 向​ ​A​I​ ​提​问​、​生​成​组​件​或​按​绑​定​的​提​示​词​模​块​辅​助​页​面​搭​建​。
        */
       description: string;
+      /**
+       * 新​建​对​话
+       */
+      newChat: string;
+      /**
+       * 暂​无​对​话​会​话
+       */
+      noSessions: string;
+      /**
+       * 开​始​新​的​对​话
+       */
+      startChat: string;
+      /**
+       * 向​ ​A​I​ ​助​手​提​问​或​输​入​指​令​…​（​S​h​i​f​t​+​E​n​t​e​r​ ​换​行​）
+       */
+      inputPlaceholder: string;
+      /**
+       * 发​送
+       */
+      send: string;
+      /**
+       * 停​止
+       */
+      stop: string;
+      /**
+       * 提​示​词​配​置
+       */
+      promptProfile: string;
+      /**
+       * 默​认​提​示​词
+       */
+      defaultProfile: string;
+      /**
+       * 附​件
+       */
+      attachments: string;
+      /**
+       * 添​加​附​件
+       */
+      addAttachment: string;
+      /**
+       * 移​除​附​件
+       */
+      removeAttachment: string;
+      /**
+       * 删​除​会​话
+       */
+      deleteSession: string;
+      /**
+       * 清​空​消​息
+       */
+      clearChat: string;
+      /**
+       * 复​制​消​息
+       */
+      copyMessage: string;
+      /**
+       * 已​复​制​！
+       */
+      copied: string;
+      /**
+       * 已​生​成​页​面​ ​U​I​ ​规​范
+       */
+      uiDocumentDetected: string;
+      /**
+       * 应​用​到​画​布
+       */
+      applyToCanvas: string;
+      /**
+       * 已​成​功​应​用​到​页​面​画​布​！
+       */
+      appliedToCanvasSuccess: string;
+      /**
+       * 个​组​件​元​素
+       */
+      elementsCount: string;
+      /**
+       * 查​看​ ​J​S​O​N​ ​规​范
+       */
+      viewJson: string;
+      /**
+       * 隐​藏​ ​J​S​O​N
+       */
+      hideJson: string;
       /**
        * A​p​p​ ​标​识
        */
@@ -127,7 +211,7 @@ type RootTranslation = {
       componentTypes: string;
       /**
        * {​c​o​u​n​t​}​ ​种
-       * @param {number} count
+       * @param {unknown} count
        */
       componentCount: RequiredParams<"count">;
       /**
@@ -144,7 +228,7 @@ type RootTranslation = {
       needsReview: string;
       /**
        * 修​订​版​本​ ​{​r​e​v​}
-       * @param {number} rev
+       * @param {unknown} rev
        */
       rev: RequiredParams<"rev">;
       /**
@@ -394,7 +478,7 @@ type RootTranslation = {
      */
     layerName: string;
     /**
-     * A​p​p​ 独​立​运​行​时
+     * A​p​p​ ​独​立​运​行​时
      */
     runtimeTitle: string;
     /**
@@ -402,16 +486,49 @@ type RootTranslation = {
      */
     runtimeDesc: string;
     openapi: {
+      /**
+       * O​p​e​n​A​P​I​ ​文​档
+       */
       docs: string;
+      /**
+       * 当​前​ ​A​p​p​ ​没​有​ ​O​p​e​n​A​P​I​ ​文​档​，​请​先​在​ ​A​d​m​i​n​ ​中​添​加​。
+       */
       noDocs: string;
+      /**
+       * O​p​e​n​A​P​I​ ​文​档​加​载​失​败
+       */
       loadFailed: string;
+      /**
+       * 内​嵌​文​档
+       */
       embedded: string;
+      /**
+       * 接​口​路​径
+       */
       operation: string;
+      /**
+       * 请​求​方​式
+       */
       method: string;
+      /**
+       * 路​径​参​数
+       */
       pathParams: string;
+      /**
+       * 查​询​参​数
+       */
       queryParams: string;
+      /**
+       * 请​求​体​ ​J​S​O​N
+       */
       body: string;
+      /**
+       * 加​载​中​…
+       */
       loading: string;
+      /**
+       * J​S​O​N​ ​格​式​暂​时​无​效
+       */
       invalidJson: string;
     };
   };
@@ -593,13 +710,97 @@ export type TranslationFunctions = {
     };
     agents: {
       /**
-       * App Material 契约
+       * AI 智能助手
        */
       title: () => LocalizedString;
       /**
-       * Studio 通过契约驱动渲染，不维护本地固定组件目录。
+       * 向 AI 提问、生成组件或按绑定的提示词模块辅助页面搭建。
        */
       description: () => LocalizedString;
+      /**
+       * 新建对话
+       */
+      newChat: () => LocalizedString;
+      /**
+       * 暂无对话会话
+       */
+      noSessions: () => LocalizedString;
+      /**
+       * 开始新的对话
+       */
+      startChat: () => LocalizedString;
+      /**
+       * 向 AI 助手提问或输入指令…（Shift+Enter 换行）
+       */
+      inputPlaceholder: () => LocalizedString;
+      /**
+       * 发送
+       */
+      send: () => LocalizedString;
+      /**
+       * 停止
+       */
+      stop: () => LocalizedString;
+      /**
+       * 提示词配置
+       */
+      promptProfile: () => LocalizedString;
+      /**
+       * 默认提示词
+       */
+      defaultProfile: () => LocalizedString;
+      /**
+       * 附件
+       */
+      attachments: () => LocalizedString;
+      /**
+       * 添加附件
+       */
+      addAttachment: () => LocalizedString;
+      /**
+       * 移除附件
+       */
+      removeAttachment: () => LocalizedString;
+      /**
+       * 删除会话
+       */
+      deleteSession: () => LocalizedString;
+      /**
+       * 清空消息
+       */
+      clearChat: () => LocalizedString;
+      /**
+       * 复制消息
+       */
+      copyMessage: () => LocalizedString;
+      /**
+       * 已复制！
+       */
+      copied: () => LocalizedString;
+      /**
+       * 已生成页面 UI 规范
+       */
+      uiDocumentDetected: () => LocalizedString;
+      /**
+       * 应用到画布
+       */
+      applyToCanvas: () => LocalizedString;
+      /**
+       * 已成功应用到页面画布！
+       */
+      appliedToCanvasSuccess: () => LocalizedString;
+      /**
+       * 个组件元素
+       */
+      elementsCount: () => LocalizedString;
+      /**
+       * 查看 JSON 规范
+       */
+      viewJson: () => LocalizedString;
+      /**
+       * 隐藏 JSON
+       */
+      hideJson: () => LocalizedString;
       /**
        * App 标识
        */
@@ -615,7 +816,7 @@ export type TranslationFunctions = {
       /**
        * {count} 种
        */
-      componentCount: (arg: { count: number }) => LocalizedString;
+      componentCount: (arg: { count: unknown }) => LocalizedString;
       /**
        * 契约状态
        */
@@ -631,7 +832,7 @@ export type TranslationFunctions = {
       /**
        * 修订版本 {rev}
        */
-      rev: (arg: { rev: number }) => LocalizedString;
+      rev: (arg: { rev: unknown }) => LocalizedString;
       /**
        * 契约诊断信息
        */
@@ -886,16 +1087,49 @@ export type TranslationFunctions = {
      */
     runtimeDesc: () => LocalizedString;
     openapi: {
+      /**
+       * OpenAPI 文档
+       */
       docs: () => LocalizedString;
+      /**
+       * 当前 App 没有 OpenAPI 文档，请先在 Admin 中添加。
+       */
       noDocs: () => LocalizedString;
+      /**
+       * OpenAPI 文档加载失败
+       */
       loadFailed: () => LocalizedString;
+      /**
+       * 内嵌文档
+       */
       embedded: () => LocalizedString;
+      /**
+       * 接口路径
+       */
       operation: () => LocalizedString;
+      /**
+       * 请求方式
+       */
       method: () => LocalizedString;
+      /**
+       * 路径参数
+       */
       pathParams: () => LocalizedString;
+      /**
+       * 查询参数
+       */
       queryParams: () => LocalizedString;
+      /**
+       * 请求体 JSON
+       */
       body: () => LocalizedString;
+      /**
+       * 加载中…
+       */
       loading: () => LocalizedString;
+      /**
+       * JSON 格式暂时无效
+       */
       invalidJson: () => LocalizedString;
     };
   };

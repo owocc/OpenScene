@@ -48,3 +48,26 @@ export { DraftRecordSchema } from "./draft-store.js";
 export type { DocumentDraftStore, DraftRecord } from "./draft-store.js";
 
 export type { DirectiveDefinition } from "@json-render/core";
+export {
+  ActionTargetSchema,
+  AgentUiActionPlanSchema,
+  AgentUiActionSchema,
+  DeleteElementActionSchema,
+  InsertElementActionSchema,
+  ReplaceDocumentActionSchema,
+  UIElementDataSchema,
+  UpdateElementActionSchema,
+  applyAgentUiActionsToDocument,
+  extractAgentUiActions,
+  normalizeAiDocument,
+  splitContentAndUiActions,
+} from "./agent-action.js";
+export type {
+  AgentUiAction,
+  AgentUiActionPlan,
+  DeleteElementAction,
+  InsertElementAction,
+  ReplaceDocumentAction,
+  UpdateElementAction,
+  ParsedAgentMessage,
+} from "./agent-action.js";
