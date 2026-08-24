@@ -72,8 +72,11 @@ export function WebIframeRenderer({
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
   // Tracks the last revision pushed to the renderer so every document change
-  // is forwarded deterministically at render time (no effect scheduling).
   const sentRevisionRef = useRef<number | null>(null);
+  const documentRef = useRef(document);
+  documentRef.current = document;
+  const revisionRef = useRef(revision);
+  revisionRef.current = revision;
   const editorUrl = useMemo(
     () => withEditorConnection(url, { studioOrigin: window.location.origin, sessionId }),
     [url, sessionId],
@@ -157,6 +160,15 @@ export function WebIframeRenderer({
         createBridgeEnvelope(sessionId, "STUDIO_CONNECT", undefined),
         { targetOrigin: allowedOrigin, transfer: [channel.port2] },
       );
+      const initMessage = createBridgeEnvelope(sessionId, "DOCUMENT_SET", {
+        document: documentRef.current,
+        revision: revisionRef.current,
+      });
+      const parsedDoc = StudioPortMessageSchema.safeParse(initMessage);
+      if (parsedDoc.success) {
+        channel.port1.postMessage(parsedDoc.data);
+        sentRevisionRef.current = revisionRef.current;
+      }
       setConnected(true);
     };
     window.addEventListener("message", receiveReady);

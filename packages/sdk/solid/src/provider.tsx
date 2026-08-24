@@ -16,6 +16,7 @@ import {
 } from "@json-render/solid";
 import type { Spec, UIElement } from "@json-render/core";
 import {
+  evaluateDynamicValue,
   openSceneDirectives,
   type OpenSceneClient,
   type OpenSceneClientState,
@@ -108,7 +109,10 @@ function removePrivateNodeId(element: UIElement): UIElement {
   return { ...element, props };
 }
 
-function createIdentityRegistry(registry: Record<string, unknown>): ComponentRegistry {
+function createIdentityRegistry(
+  registry: Record<string, unknown>,
+  getState: () => Record<string, unknown>,
+): ComponentRegistry {
   const result: ComponentRegistry = {};
   for (const [type, value] of Object.entries(registry)) {
     const renderer = value as Component<ComponentRenderProps>;
@@ -117,7 +121,23 @@ function createIdentityRegistry(registry: Record<string, unknown>): ComponentReg
       const privateId = elementProps.__opensceneNodeId;
       const nodeId = typeof privateId === "string" ? privateId : null;
       const cleanElement = removePrivateNodeId(renderProps.element);
-      const cleanProps: ComponentRenderProps = { ...renderProps, element: cleanElement };
+      const evaluatedProps = createMemo(
+        () => evaluateDynamicValue(cleanElement.props, getState()) as Record<string, unknown>,
+      );
+      const cleanProps = {
+        ...renderProps,
+        get props() {
+          return evaluatedProps();
+        },
+        get element() {
+          return {
+            ...cleanElement,
+            get props() {
+              return evaluatedProps();
+            },
+          };
+        },
+      } as unknown as ComponentRenderProps;
       return (
         <OpenSceneNodeProvider nodeId={nodeId ?? ""}>
           <span data-node-id={nodeId ?? undefined} style={{ display: "contents" }}>
@@ -199,7 +219,15 @@ function ErrorSurface(props: { error: unknown }): JSX.Element {
 export function OpenSceneRenderer(): JSX.Element {
   const context = useOpenScene();
   const snapshot = context.snapshot;
-  const identityRegistry = createMemo(() => createIdentityRegistry(context.app.registry));
+  const stateGetter = () => {
+    const doc = snapshot().document;
+    const docState = (doc?.spec?.state as Record<string, unknown> | undefined) ?? {};
+    const storeState = snapshot().runtimeStore?.getSnapshot() ?? {};
+    return { ...docState, ...storeState };
+  };
+  const identityRegistry = createMemo(() =>
+    createIdentityRegistry(context.app.registry, stateGetter),
+  );
   const prepared = createMemo(() => {
     const document = snapshot().document;
     if (!document) return { spec: null as PreparedSpec | null, error: null as Error | null };
