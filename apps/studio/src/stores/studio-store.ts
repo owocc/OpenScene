@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createEmptySceneDocument } from "@openscene/protocol";
 
 import type { JsonValue } from "@/core/document";
+import { isSlotNodeId } from "@/core/slot-tree";
 import {
   createEditorState,
   editorReducer,
@@ -25,6 +26,7 @@ export interface StudioStoreState extends EditorState {
   updateElement: (id: string, updater: (element: EditorElement) => EditorElement) => void;
   updateProp: (name: string, value: JsonValue) => void;
   selectNode: (nodeId: string | null) => void;
+  deleteNode: (nodeId?: string) => void;
   setSurface: (surface: Surface) => void;
   setToolMode: (mode: ActiveToolMode) => void;
   patchViewport: (patch: Partial<ViewportState>) => void;
@@ -76,6 +78,12 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => ({
       nodeIds: nodeId ? [nodeId] : [],
       primaryNodeId: nodeId,
     }),
+  deleteNode: (nodeId) => {
+    const targetId = nodeId ?? get().selectedNodeId;
+    if (targetId && !isSlotNodeId(targetId)) {
+      get().dispatch({ type: "node.delete", elementId: targetId });
+    }
+  },
   setSurface: (surface) => get().dispatch({ type: "surface.set", surface }),
   setToolMode: (mode) => get().dispatch({ type: "tool.set", mode }),
   patchViewport: (patch) => get().dispatch({ type: "viewport.patch", patch }),

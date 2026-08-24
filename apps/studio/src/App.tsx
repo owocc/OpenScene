@@ -444,6 +444,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
       onUndo={undo}
       onRedo={redo}
       onDeselect={() => dispatch({ type: "nodes.select", nodeIds: [], primaryNodeId: null })}
+      onDelete={removeSelected}
       onZoomIn={() =>
         dispatch({
           type: "viewport.patch",
@@ -640,14 +641,6 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                         <p>{LL.properties.empty()}</p>
                       </div>
                     )}
-                  </div>
-                  <div className="border-t border-border/80 p-3">
-                    <div className="text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-                      {LL.properties.runtimeTitle()}
-                    </div>
-                    <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-                      {LL.properties.runtimeDesc()}
-                    </p>
                   </div>
                 </aside>
               </div>

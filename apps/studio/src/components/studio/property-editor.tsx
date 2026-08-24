@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-
+import { Plus, Trash2 } from "lucide-react";
 import {
   dynamicMode,
   dynamicValue,
@@ -23,7 +23,7 @@ import {
   type OpenApiRequestParams,
   type OpenApiValue,
 } from "@openscene/schema";
-
+import { cn } from "@/lib/utils";
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
 const textareaClassName =
@@ -245,35 +245,180 @@ function SpacingControl({ meta, value, onChange }: ControlProps) {
   );
 }
 
-function StyleControl({ value, onChange }: ControlProps) {
-  const style = isRecord(value) ? value : {};
-  const fields = [
-    "display",
-    "position",
-    "fontSize",
-    "fontWeight",
-    "lineHeight",
-    "textAlign",
-    "color",
-    "background",
-    "borderRadius",
-    "boxShadow",
-  ];
+const COMMON_CSS_PROPERTIES = [
+  "display",
+  "flexDirection",
+  "justifyContent",
+  "alignItems",
+  "gap",
+  "flex",
+  "flexWrap",
+  "width",
+  "height",
+  "minWidth",
+  "maxWidth",
+  "minHeight",
+  "maxHeight",
+  "padding",
+  "paddingTop",
+  "paddingRight",
+  "paddingBottom",
+  "paddingLeft",
+  "margin",
+  "marginTop",
+  "marginRight",
+  "marginBottom",
+  "marginLeft",
+  "position",
+  "top",
+  "right",
+  "bottom",
+  "left",
+  "zIndex",
+  "color",
+  "backgroundColor",
+  "background",
+  "fontSize",
+  "fontWeight",
+  "lineHeight",
+  "letterSpacing",
+  "textAlign",
+  "border",
+  "borderWidth",
+  "borderStyle",
+  "borderColor",
+  "borderRadius",
+  "boxShadow",
+  "opacity",
+  "overflow",
+  "cursor",
+  "transform",
+  "transition",
+];
+
+interface StyleEntry {
+  id: string;
+  key: string;
+  value: string;
+}
+
+function objectToStyleEntries(obj: unknown): StyleEntry[] {
+  if (!isRecord(obj)) return [];
+  return Object.entries(obj).map(([key, val]) => ({
+    id: `${key}-${Math.random().toString(36).slice(2, 7)}`,
+    key,
+    value: typeof val === "string" || typeof val === "number" ? String(val) : JSON.stringify(val),
+  }));
+}
+
+function styleEntriesToRecord(entries: StyleEntry[]): Record<string, JsonValue> {
+  const result: Record<string, JsonValue> = {};
+  for (const entry of entries) {
+    const trimmedKey = entry.key.trim();
+    if (trimmedKey) {
+      result[trimmedKey] = entry.value;
+    }
+  }
+  return result;
+}
+
+function KeyValueControl({ meta, value, onChange }: ControlProps) {
+  const [entries, setEntries] = useState<StyleEntry[]>(() => objectToStyleEntries(value));
+
+  useEffect(() => {
+    const currentRecord = styleEntriesToRecord(entries);
+    const incomingRecord = isRecord(value) ? value : {};
+    const currentKeys = Object.keys(currentRecord);
+    const incomingKeys = Object.keys(incomingRecord);
+    const isDifferent =
+      currentKeys.length !== incomingKeys.length ||
+      incomingKeys.some((k) => stringValue(incomingRecord[k]) !== stringValue(currentRecord[k]));
+    if (isDifferent) {
+      setEntries(objectToStyleEntries(value));
+    }
+  }, [value]);
+
+  const updateEntry = (id: string, field: "key" | "value", newValue: string) => {
+    const next = entries.map((entry) =>
+      entry.id === id ? { ...entry, [field]: newValue } : entry,
+    );
+    setEntries(next);
+    onChange(styleEntriesToRecord(next));
+  };
+
+  const removeEntry = (id: string) => {
+    const next = entries.filter((entry) => entry.id !== id);
+    setEntries(next);
+    onChange(styleEntriesToRecord(next));
+  };
+
+  const addEntry = () => {
+    const newEntry: StyleEntry = {
+      id: `kv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      key: "",
+      value: "",
+    };
+    setEntries((prev) => [...prev, newEntry]);
+  };
+
+  const keyPlaceholder = meta.placeholder ?? "key";
+  const keywords =
+    meta.keywords && meta.keywords.length > 0 ? meta.keywords : COMMON_CSS_PROPERTIES;
+
   return (
-    <div className="grid gap-1.5">
-      {fields.map((field) => (
-        <label
-          key={field}
-          className="grid grid-cols-[5.5rem_1fr] items-center gap-2 text-[10px] text-muted-foreground"
-        >
-          <span className="font-mono">{field}</span>
-          <input
-            className={inputClassName}
-            value={stringValue(style[field])}
-            onChange={(event) => onChange({ ...style, [field]: event.target.value })}
-          />
-        </label>
-      ))}
+    <div className="grid gap-2">
+      <datalist id="common-kv-props">
+        {keywords.map((prop) => (
+          <option key={prop} value={prop} />
+        ))}
+      </datalist>
+      {entries.length > 0 ? (
+        <div className="grid gap-1.5">
+          <div className="grid grid-cols-[1fr_1fr_28px] items-center gap-1.5 px-0.5 text-[10px] font-medium text-muted-foreground">
+            <span>属性 (Key)</span>
+            <span>值 (Value)</span>
+            <span />
+          </div>
+          {entries.map((entry) => (
+            <div key={entry.id} className="grid grid-cols-[1fr_1fr_28px] items-center gap-1.5">
+              <input
+                className={cn(inputClassName, "font-mono text-[11px] placeholder:font-sans")}
+                placeholder={keyPlaceholder}
+                list="common-kv-props"
+                value={entry.key}
+                onChange={(e) => updateEntry(entry.id, "key", e.target.value)}
+              />
+              <input
+                className={cn(inputClassName, "font-mono text-[11px] placeholder:font-sans")}
+                placeholder="value"
+                value={entry.value}
+                onChange={(e) => updateEntry(entry.id, "value", e.target.value)}
+              />
+              <button
+                type="button"
+                className="flex size-7 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition hover:border-border hover:bg-muted hover:text-destructive focus-visible:outline-none"
+                onClick={() => removeEntry(entry.id)}
+                title="删除属性"
+                aria-label="Delete property"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-border/80 px-3 py-2 text-center text-[11px] text-muted-foreground">
+          暂无属性
+        </div>
+      )}
+      <button
+        type="button"
+        className="flex h-7.5 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/80 bg-muted/20 px-2.5 text-xs font-medium text-muted-foreground transition hover:border-border hover:bg-muted/50 hover:text-foreground focus-visible:outline-none"
+        onClick={addEntry}
+      >
+        <Plus className="size-3.5" />
+        <span>添加属性</span>
+      </button>
     </div>
   );
 }
@@ -793,8 +938,7 @@ function ActionControl({ meta }: ControlProps) {
     </div>
   );
 }
-
-const controlRegistry: Record<string, ControlRenderer> = {
+export const controlRegistry: Record<string, ControlRenderer> = {
   text: TextControl,
   textarea: TextareaControl,
   number: NumberControl,
@@ -804,13 +948,67 @@ const controlRegistry: Record<string, ControlRenderer> = {
   color: ColorControl,
   unit: UnitControl,
   spacing: SpacingControl,
-  style: StyleControl,
+  style: KeyValueControl,
+  "key-value": KeyValueControl,
+  keyvalue: KeyValueControl,
+  keyValue: KeyValueControl,
   object: JsonControl,
   array: JsonControl,
   class: TextControl,
   action: ActionControl,
   openapi: OpenApiControl,
 };
+
+/**
+ * Resolves a property editor component from a control type string.
+ * Handles string normalization (e.g. "key-value", "keyValue", "key_value", "style").
+ */
+export function resolveControlRenderer(controlName?: string): ControlRenderer {
+  if (!controlName || typeof controlName !== "string") return TextControl;
+  const trimmed = controlName.trim();
+  if (controlRegistry[trimmed]) return controlRegistry[trimmed];
+
+  const normalized = trimmed.toLowerCase().replace(/[_-]/g, "");
+  switch (normalized) {
+    case "keyvalue":
+    case "style":
+      return KeyValueControl;
+    case "text":
+    case "string":
+    case "class":
+      return TextControl;
+    case "textarea":
+    case "multiline":
+      return TextareaControl;
+    case "number":
+    case "integer":
+    case "int":
+    case "float":
+      return NumberControl;
+    case "select":
+    case "enum":
+      return SelectControl;
+    case "boolean":
+    case "bool":
+      return BooleanControl;
+    case "color":
+      return ColorControl;
+    case "unit":
+      return UnitControl;
+    case "spacing":
+      return SpacingControl;
+    case "object":
+    case "array":
+    case "json":
+      return JsonControl;
+    case "action":
+      return ActionControl;
+    case "openapi":
+      return OpenApiControl;
+    default:
+      return controlRegistry[trimmed.toLowerCase()] ?? controlRegistry[normalized] ?? TextControl;
+  }
+}
 
 function DynamicValueControl({
   propMeta,
@@ -843,7 +1041,7 @@ function DynamicValueControl({
     if (activeMode === "literal" && !isDynamicValue(value)) setLiteralValue(value);
   }, [activeMode, value]);
 
-  const control = controlRegistry[meta.control] ?? TextControl;
+  const control = resolveControlRenderer(meta.control);
   const updateLiteral = (next: JsonValue) => {
     setLiteralValue(next);
     onChange(next);

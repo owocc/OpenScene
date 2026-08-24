@@ -298,7 +298,7 @@ export const REGISTERED_SHORTCUTS: ShortcutItem[] = [
   },
   { id: "edit.copy", category: "Edit", name: "复制", nameEn: "Copy", keys: ["Mod", "C"] },
   { id: "edit.paste", category: "Edit", name: "粘贴", nameEn: "Paste", keys: ["Mod", "V"] },
-  { id: "edit.delete", category: "Edit", name: "删除", nameEn: "Delete", keys: ["Backspace"] },
+  { id: "edit.delete", category: "Edit", name: "删除", nameEn: "Delete", keys: ["Delete"] },
 
   // 10. Transform
   { id: "transform.scale", category: "Transform", name: "缩放", nameEn: "Scale tool", keys: ["K"] },

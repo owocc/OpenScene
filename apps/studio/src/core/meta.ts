@@ -11,6 +11,8 @@ export type EditorControl =
   | "unit"
   | "spacing"
   | "style"
+  | "key-value"
+  | "keyValue"
   | "object"
   | "array"
   | "class"
@@ -110,6 +112,8 @@ const SUPPORTED_EDITOR_CONTROLS = new Set<EditorControl>([
   "unit",
   "spacing",
   "style",
+  "key-value",
+  "keyValue",
   "object",
   "array",
   "class",

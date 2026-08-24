@@ -63,17 +63,19 @@ function editorMeta(value: unknown, property: Record<string, unknown>): EditorMe
           : type === "color" ||
               (typeof property.title === "string" && /color/i.test(property.title))
             ? "color"
-            : type === "array"
-              ? "array"
-              : type === "object"
-                ? "object"
-                : /bool/i.test(type)
-                  ? "boolean"
-                  : /integer/i.test(type)
-                    ? "integer"
-                    : /number/i.test(type)
-                      ? "number"
-                      : "text";
+            : type === "key-value" || type === "keyvalue" || type === "key_value"
+              ? "key-value"
+              : type === "array"
+                ? "array"
+                : type === "object"
+                  ? "object"
+                  : /bool/i.test(type)
+                    ? "boolean"
+                    : /integer/i.test(type)
+                      ? "integer"
+                      : /number/i.test(type)
+                        ? "number"
+                        : "text";
 
   const options = Array.isArray(candidate.options)
     ? candidate.options

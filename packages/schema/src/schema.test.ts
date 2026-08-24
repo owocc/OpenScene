@@ -2,10 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   isInputSchemaBase,
+  isKeyValueSchema,
   isOpenApiSchema,
   isSizeSchema,
   isUnitSchema,
   isWebInputSchema,
+  keyValueSchema,
   openApiMethods,
   openApiSchema,
   sizeFieldKeys,
@@ -81,7 +83,9 @@ describe("schema guards", () => {
   it("recognizes schema objects by their type", () => {
     expect(isUnitSchema(unitSchema())).toBe(true);
     expect(isSizeSchema(sizeSchema())).toBe(true);
+    expect(isKeyValueSchema(keyValueSchema())).toBe(true);
     expect(isWebInputSchema(unitSchema())).toBe(true);
+    expect(isWebInputSchema(keyValueSchema())).toBe(true);
     expect(isWebInputSchema(sizeSchema({ fields: ["minWidth", "minHeight"] }))).toBe(true);
   });
 
@@ -122,5 +126,23 @@ describe("openapi schema", () => {
   it("rejects openapi-shaped objects without a methods array", () => {
     expect(isOpenApiSchema({ type: "openapi" })).toBe(false);
     expect(isOpenApiSchema({ type: "openapi", methods: "get" })).toBe(false);
+  });
+});
+
+describe("key-value schema", () => {
+  it("creates a key-value schema with default control", () => {
+    const schema = keyValueSchema({ title: "Custom styles", keyPlaceholder: "prop" });
+    expect(schema.type).toBe("key-value");
+    expect(schema.control).toBe("key-value");
+    expect(schema.title).toBe("Custom styles");
+    expect(schema.keyPlaceholder).toBe("prop");
+  });
+
+  it("is recognized by key-value and web guards", () => {
+    expect(isKeyValueSchema(keyValueSchema())).toBe(true);
+    expect(isKeyValueSchema({ type: "key-value" })).toBe(true);
+    expect(isKeyValueSchema({ type: "keyValue" })).toBe(true);
+    expect(isKeyValueSchema({ type: "other", control: "key-value" })).toBe(true);
+    expect(isWebInputSchema(keyValueSchema())).toBe(true);
   });
 });

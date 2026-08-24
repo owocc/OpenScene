@@ -4,13 +4,14 @@ import type { ActiveToolMode } from "@/core/editor-state";
 import { useQueryStore } from "@/stores/query-store";
 import { useShortcutsStore } from "@/stores/shortcuts-store";
 
-interface ShortcutsProviderProps {
-  children: ReactNode;
+export interface ShortcutsProviderProps {
+  children?: ReactNode;
   onSave?: () => void;
   onCopyJson?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
   onDeselect?: () => void;
+  onDelete?: () => void;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onZoom100?: () => void;
@@ -30,6 +31,7 @@ export function ShortcutsProvider({
   onUndo,
   onRedo,
   onDeselect,
+  onDelete,
   onZoomIn,
   onZoomOut,
   onZoom100,
@@ -66,7 +68,14 @@ export function ShortcutsProvider({
       // If user is typing in an input/textarea, ignore normal editor shortcuts
       if (isEditing) return;
 
-      // 3. Document operations
+      // 3. Delete / Backspace: Delete currently selected node
+      if (!event.altKey && (event.key === "Delete" || event.key === "Backspace")) {
+        event.preventDefault();
+        onDelete?.();
+        return;
+      }
+
+      // 4. Document operations
       if (modifier && event.key.toLowerCase() === "s") {
         event.preventDefault();
         onSave?.();
@@ -79,7 +88,7 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 4. History Undo / Redo
+      // 5. History Undo / Redo
       if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
         if (event.shiftKey) {
@@ -96,7 +105,7 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 5. Surface Mode Switcher (Cmd+1 Visual, Cmd+2 Document, Cmd+3 Developer)
+      // 6. Surface Mode Switcher (Cmd+1 Visual, Cmd+2 Document, Cmd+3 Developer)
       if (modifier && event.key === "1") {
         event.preventDefault();
         useQueryStore.getState().setSurface("visual");
@@ -113,7 +122,21 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 6. Canvas Zoom (Cmd + +, Cmd + -, Cmd + 0)
+      // 7. View & Sidebar Toggles
+      if (modifier && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        const current = useQueryStore.getState().sidebarCollapsed;
+        useQueryStore.getState().setSidebarCollapsed(!current);
+        return;
+      }
+      if (event.shiftKey && modifier && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        const rotated = useQueryStore.getState().rotated;
+        useQueryStore.getState().setRotated(!rotated);
+        return;
+      }
+
+      // 8. Canvas Zoom (Cmd + +, Cmd + -, Cmd + 0)
       if (modifier && (event.key === "+" || event.key === "=")) {
         event.preventDefault();
         onZoomIn?.();
@@ -130,7 +153,7 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 7. Spacebar Pan Mode
+      // 9. Spacebar Pan Mode
       if (event.code === "Space" && !event.repeat) {
         event.preventDefault();
         const currentTool = useQueryStore.getState().tool;
@@ -139,7 +162,7 @@ export function ShortcutsProvider({
         return;
       }
 
-      // 8. Single Key Tool Switcher
+      // 10. Single Key Tool Switcher
       if (!modifier && !event.altKey && !event.shiftKey) {
         const key = event.key.toLowerCase();
         if (key === "v") {
@@ -187,6 +210,7 @@ export function ShortcutsProvider({
     onUndo,
     onRedo,
     onDeselect,
+    onDelete,
     onZoomIn,
     onZoomOut,
     onZoom100,

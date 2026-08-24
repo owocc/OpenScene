@@ -275,7 +275,10 @@ const viewSchema = z
   .object({
     class: z.string().optional(),
     className: z.string().optional(),
-    style: z.record(z.string(), z.unknown()).optional(),
+    style: z
+      .record(z.string(), z.unknown())
+      .meta({ "x-editor": { control: "key-value" } })
+      .optional(),
   })
   .passthrough();
 const textSchema = z.object({ text: z.string().optional() }).passthrough();

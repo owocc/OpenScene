@@ -17,7 +17,10 @@ const viewProps = z
   .object({
     class: z.string().optional(),
     className: z.string().optional(),
-    style: z.record(z.string(), z.unknown()).optional(),
+    style: z
+      .record(z.string(), z.unknown())
+      .meta({ "x-editor": { control: "key-value" } })
+      .optional(),
   })
   .passthrough();
 const textProps = z.object({ text: z.string().optional() }).passthrough();
