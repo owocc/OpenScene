@@ -1,4 +1,4 @@
-import { APP_TYPE_WEB } from "@openscene/constants";
+import { APP_TYPE_FLUTTER, APP_TYPE_REACT_NATIVE, APP_TYPE_WEB } from "@openscene/constants";
 import { describe, expect, test } from "vite-plus/test";
 import {
   AppCreateSchema,
@@ -52,6 +52,12 @@ describe("app type schema", () => {
     expect(() => AppCreateSchema.parse({ key: "demo", name: "Demo" })).toThrow();
     expect(AppCreateSchema.parse({ key: "demo", name: "Demo", type: APP_TYPE_WEB }).type).toBe(
       APP_TYPE_WEB,
+    );
+    expect(
+      AppCreateSchema.parse({ key: "demo", name: "Demo", type: APP_TYPE_REACT_NATIVE }).type,
+    ).toBe(APP_TYPE_REACT_NATIVE);
+    expect(AppCreateSchema.parse({ key: "demo", name: "Demo", type: APP_TYPE_FLUTTER }).type).toBe(
+      APP_TYPE_FLUTTER,
     );
     expect(() => AppCreateSchema.parse({ key: "demo", name: "Demo", type: "native" })).toThrow();
   });

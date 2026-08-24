@@ -502,6 +502,30 @@ describe("App AI prompts", () => {
     expect(refetch.status).toBe(200);
     expect(await refetch.json()).toEqual(body);
   });
+
+  test("inspects and assembles complete system prompt via prompt-preview endpoint", async () => {
+    const response = await call(
+      "POST",
+      ["ai", "prompt-preview"],
+      {
+        appId: appA.id,
+        promptKey: "default",
+        selectedElement: {
+          nodeId: "button-1",
+          type: "Button",
+          props: { label: "Click me" },
+        },
+      },
+      { "x-openscene-app-key": appA.appKey },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(typeof body.systemPrompt).toBe("string");
+    expect(body.systemPrompt).toContain("TARGETED ELEMENT MODIFICATION RULES");
+    expect(body.systemPrompt).toContain("button-1");
+    expect(body.breakdown).toBeDefined();
+    expect(body.breakdown.selectedElementText).toContain("button-1");
+  });
 });
 
 async function call(

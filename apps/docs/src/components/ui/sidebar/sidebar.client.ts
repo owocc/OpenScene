@@ -34,7 +34,9 @@ function initFilter(root: HTMLElement): (() => void) | null {
   // SidebarFilter is rendered *next to* Sidebar (sibling), so also look in
   // the parent — preserves the existing layout where filter sits above.
   const inputElement =
-    input ?? root.parentElement?.querySelector<HTMLInputElement>("[data-nb-sidebar-filter-input]") ?? null;
+    input ??
+    root.parentElement?.querySelector<HTMLInputElement>("[data-nb-sidebar-filter-input]") ??
+    null;
   if (!inputElement) return null;
 
   function handleInput() {
@@ -98,7 +100,8 @@ function applyFilter(root: HTMLElement, query: string): void {
     if (!text.includes(query)) return;
     group.removeAttribute("data-nb-sidebar-hidden");
     openGroup(group);
-    group.querySelectorAll<HTMLElement>("[data-nb-sidebar-link], [data-nb-sidebar-group]")
+    group
+      .querySelectorAll<HTMLElement>("[data-nb-sidebar-link], [data-nb-sidebar-group]")
       .forEach((child) => child.removeAttribute("data-nb-sidebar-hidden"));
   });
 }
@@ -191,9 +194,7 @@ function initPersistence(root: HTMLElement): (() => void) | null {
     const active = document.activeElement as HTMLElement | null;
     if (
       active &&
-      (active.tagName === "INPUT" ||
-        active.tagName === "TEXTAREA" ||
-        active.isContentEditable)
+      (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)
     ) {
       return;
     }

@@ -47,6 +47,8 @@ import {
   AppPromptCreateSchema,
   AppPromptPatchSchema,
   AppPromptSchema,
+  PromptPreviewRequestSchema,
+  PromptPreviewResponseSchema,
   SystemPromptSchema,
   SystemPromptUpdateSchema,
   AiTestSchema,
@@ -574,6 +576,14 @@ const operations: Operation[] = [
     tag: "AI",
     response: SystemPromptSchema,
     body: SystemPromptUpdateSchema,
+  },
+  {
+    method: "post",
+    path: "/api/v1/ai/prompt-preview",
+    operationId: "previewAppSystemPrompt",
+    tag: "AI",
+    response: PromptPreviewResponseSchema,
+    body: PromptPreviewRequestSchema,
   },
 ] as const;
 

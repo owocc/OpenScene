@@ -16,7 +16,7 @@ import { Astroid, CheckCheck, X } from "lucide-react";
 import type { ElementRect } from "@openscene/protocol";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
-export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
+export const canvasRendererRegistry: Partial<Record<AppType, CanvasRendererAdapter>> = {
   [APP_TYPE_WEB]: {
     appType: APP_TYPE_WEB,
     render: (props) => <WebIframeRenderer {...props} />,

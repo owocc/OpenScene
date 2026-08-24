@@ -25,9 +25,7 @@ function initToc(root: HTMLElement): () => void {
     .map((slug, index) => ({ el: document.getElementById(slug), index }))
     .filter((o): o is { el: HTMLElement; index: number } => o.el !== null);
   if (observed.length === 0) return () => {};
-  const indexOfEl = new Map<HTMLElement, number>(
-    observed.map((o) => [o.el, o.index]),
-  );
+  const indexOfEl = new Map<HTMLElement, number>(observed.map((o) => [o.el, o.index]));
 
   let segments: { start: number; length: number }[] = [];
   let totalLength = 0;
@@ -188,9 +186,7 @@ function initToc(root: HTMLElement): () => void {
   function updateBottom() {
     const scrollEl = document.scrollingElement ?? document.documentElement;
     const maxScroll = scrollEl.scrollHeight - window.innerHeight;
-    const next =
-      maxScroll > BOTTOM_EPSILON &&
-      scrollEl.scrollTop >= maxScroll - BOTTOM_EPSILON;
+    const next = maxScroll > BOTTOM_EPSILON && scrollEl.scrollTop >= maxScroll - BOTTOM_EPSILON;
     if (next !== atBottom) {
       atBottom = next;
       resolve();
@@ -260,7 +256,8 @@ function initToc(root: HTMLElement): () => void {
   nav.addEventListener(
     "click",
     (e) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+        return;
       const link = (e.target as Element).closest<HTMLElement>("[data-nb-toc-link]");
       if (!link) return;
       const i = slugs.indexOf(link.dataset.nbSlug!);

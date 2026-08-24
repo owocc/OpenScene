@@ -24,6 +24,7 @@ import {
   type OpenApiValue,
 } from "@openscene/schema";
 import { cn } from "@/lib/utils";
+import { StyleControl } from "./property-editor/style";
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
 const textareaClassName =
@@ -948,7 +949,7 @@ export const controlRegistry: Record<string, ControlRenderer> = {
   color: ColorControl,
   unit: UnitControl,
   spacing: SpacingControl,
-  style: KeyValueControl,
+  style: StyleControl,
   "key-value": KeyValueControl,
   keyvalue: KeyValueControl,
   keyValue: KeyValueControl,
@@ -970,8 +971,9 @@ export function resolveControlRenderer(controlName?: string): ControlRenderer {
 
   const normalized = trimmed.toLowerCase().replace(/[_-]/g, "");
   switch (normalized) {
-    case "keyvalue":
     case "style":
+      return StyleControl;
+    case "keyvalue":
       return KeyValueControl;
     case "text":
     case "string":

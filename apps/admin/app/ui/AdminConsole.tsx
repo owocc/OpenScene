@@ -15,7 +15,12 @@ import {
   Star,
   Trash,
 } from "@phosphor-icons/react";
-import { APP_TYPE_WEB } from "@openscene/constants";
+import {
+  APP_TYPE_FLUTTER,
+  APP_TYPE_REACT_NATIVE,
+  APP_TYPE_WEB,
+  type AppType,
+} from "@openscene/constants";
 import { AppManifestSchema, type ComponentManifest } from "@openscene/protocol";
 import { useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
@@ -293,6 +298,7 @@ function AppsView() {
       status: "active",
       mode: "push",
     });
+    setOpen(true);
   }
   function submitCreate() {
     create.mutate({
@@ -300,7 +306,7 @@ function AppsView() {
         key: form.key,
         name: form.name,
         description: form.description,
-        type: APP_TYPE_WEB,
+        type: form.type as AppType,
         status: form.status as "active" | "disabled",
         manifest: { mode: form.mode as "remote" | "push" },
       },
@@ -332,12 +338,14 @@ function AppsView() {
           <Table layout="fixed">
             <colgroup>
               <col />
+              <col style={{ width: "120px" }} />
               <col style={{ width: "140px" }} />
               <col style={{ width: "56px" }} />
             </colgroup>
             <Table.Header>
               <Table.Row>
                 <Table.Head>{t("app")}</Table.Head>
+                <Table.Head>Type</Table.Head>
                 <Table.Head>{t("status")}</Table.Head>
                 <Table.Head sticky="right">
                   <span className="sr-only">{t("actions")}</span>
@@ -355,6 +363,9 @@ function AppsView() {
                       {app.name}
                     </a>
                     <div className="text-sm text-kumo-subtle">{app.key}</div>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Badge variant="neutral">{app.type}</Badge>
                   </Table.Cell>
                   <Table.Cell>
                     <StatusBadge status={app.status} />
@@ -467,7 +478,18 @@ function AppsView() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
-            <Input label="Type" value={APP_TYPE_WEB} readOnly />
+            <Select
+              label="Type"
+              value={form.type}
+              items={{
+                [APP_TYPE_WEB]: "Web",
+                [APP_TYPE_REACT_NATIVE]: { label: "React Native (Coming soon)", disabled: true },
+                [APP_TYPE_FLUTTER]: { label: "Flutter (Coming soon)", disabled: true },
+              }}
+              onValueChange={(value) => {
+                if (value === APP_TYPE_WEB) setForm({ ...form, type: value });
+              }}
+            />
             <Input
               label="Description"
               value={form.description}

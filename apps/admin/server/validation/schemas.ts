@@ -534,4 +534,41 @@ export const AiChatResponseSchema = z.object({
   uiActions: z.array(AgentUiActionSchema).optional(),
 });
 
+export const PromptPreviewRequestSchema = z
+  .object({
+    appId: z.string().min(1).max(256).optional().openapi({
+      description: "App ID whose prompt configuration is inspected",
+    }),
+    promptKey: z.string().min(1).max(256).optional().openapi({
+      description: "Optional prompt module key to use. Defaults to the app's default prompt.",
+    }),
+    promptId: z.string().min(1).max(256).optional().openapi({
+      description: "Optional prompt module id to use.",
+    }),
+    selectedElement: SelectedElementContextSchema.optional(),
+    system: z.string().max(8_000).optional().openapi({
+      description: "Optional extra request-level system instructions.",
+    }),
+  })
+  .openapi({ description: "System prompt inspection and preview request" });
+
+export const PromptPreviewBreakdownSchema = z
+  .object({
+    globalPrompt: z.string().optional(),
+    appSystem: z.string().optional(),
+    sections: z.array(z.string()).optional(),
+    componentsText: z.string().optional(),
+    openApiText: z.string().optional(),
+    selectedElementText: z.string().optional(),
+    requestSystem: z.string().optional(),
+  })
+  .openapi({ description: "System prompt assembled breakdown parts" });
+
+export const PromptPreviewResponseSchema = z
+  .object({
+    systemPrompt: z.string().openapi({ description: "Full concatenated system prompt" }),
+    breakdown: PromptPreviewBreakdownSchema.optional(),
+  })
+  .openapi({ description: "Assembled system prompt preview response" });
+
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

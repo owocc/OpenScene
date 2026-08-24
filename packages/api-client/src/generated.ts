@@ -764,6 +764,18 @@ export interface components {
       promptKey?: string;
       /** @description Optional prompt module id to use. */
       promptId?: string;
+      /** @description Target selected element context from the canvas for fine-grained editing */
+      selectedElement?: {
+        nodeId: string;
+        type: string;
+        props?: {
+          [key: string]: unknown;
+        };
+        children?: string[];
+        slots?: {
+          [key: string]: string[];
+        };
+      };
     };
     AiChatResponse: {
       model: string;
@@ -773,6 +785,118 @@ export interface components {
         outputTokens: number;
         totalTokens: number;
       };
+      uiActions?: (
+        | {
+            /** @enum {string} */
+            action: "replace_document";
+            document: {
+              /** @enum {string} */
+              schemaVersion: "1.0.0";
+              pageInfo: {
+                title: string;
+                description: string;
+                keywords: string[];
+                locale: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+              } & {
+                [key: string]: unknown;
+              };
+              globalConfig: {
+                design?: unknown;
+                body?: unknown;
+                variables?: unknown;
+                css?: unknown;
+                i18n?: unknown;
+              } & {
+                [key: string]: unknown;
+              };
+              spec: {
+                root: string | null;
+                elements: {
+                  [key: string]: {
+                    type: string;
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                    visible?: unknown;
+                    on?: {
+                      [key: string]: unknown;
+                    };
+                    repeat?: unknown;
+                    watch?: {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                };
+                state?: {
+                  [key: string]: unknown;
+                };
+              } & {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            };
+            summary?: string;
+          }
+        | {
+            /** @enum {string} */
+            action: "insert_element";
+            elementId?: string;
+            element: {
+              id?: string;
+              type: string;
+              /** @default {} */
+              props: {
+                [key: string]: unknown;
+              };
+              children?: string[];
+              slots?: {
+                [key: string]: string[];
+              };
+            } & {
+              [key: string]: unknown;
+            };
+            target?: {
+              parentId: string;
+              slot?: string;
+              index?: number;
+            };
+            summary?: string;
+          }
+        | {
+            /** @enum {string} */
+            action: "update_element";
+            elementId: string;
+            patch: {
+              type?: string;
+              props?: {
+                [key: string]: unknown;
+              };
+              children?: string[];
+              slots?: {
+                [key: string]: string[];
+              };
+            } & {
+              [key: string]: unknown;
+            };
+            summary?: string;
+          }
+        | {
+            /** @enum {string} */
+            action: "delete_element";
+            elementId: string;
+            summary?: string;
+          }
+      )[];
     };
     AiConfig: {
       id: string;
@@ -828,7 +952,7 @@ export interface components {
       name: string;
       description: string;
       /** @enum {string} */
-      type: "web";
+      type: "web" | "react-native" | "flutter";
       /** @enum {string} */
       status: "active" | "disabled";
       manifest: {
@@ -879,9 +1003,27 @@ export interface components {
       /** @default  */
       description: string;
       /**
-       * @default You are the AI assistant embedded in an OpenScene application.
-       *     Help users accomplish tasks using the components and APIs available to the app.
-       *     Be concise, accurate, and follow the application's conventions.
+       * @default You are OpenScene AI Generative UI engine powered by json-render.
+       *     Generate UI specifications strictly following the json-render Standalone Mode specification.
+       *
+       *     CRITICAL RULES:
+       *     1. Output ONLY JSONL patch lines (RFC 6902 JSON Patch format).
+       *     2. Do NOT output markdown code fences (NO ```json, NO ```spec, NO backticks).
+       *     3. Do NOT output conversational prose, explanations, greetings, or notes.
+       *     4. Each output line MUST be a single, valid, self-contained JSON Patch object.
+       *
+       *     SPECIFICATION FORMAT (RFC 6902 JSON Patch):
+       *     - Set root: {"op":"add","path":"/root","value":"<root_element_id>"}
+       *     - Add/define element: {"op":"add","path":"/elements/<element_id>","value":{"type":"<ComponentType>","props":{...},"children":["<child_id>"]}}
+       *     - Update props: {"op":"replace","path":"/elements/<element_id>/props/<prop_name>","value":<value>}
+       *     - Remove element: {"op":"remove","path":"/elements/<element_id>"}
+       *     - Set/update state: {"op":"add","path":"/state/<key>","value":<value>}
+       *
+       *     EXAMPLE OUTPUT:
+       *     {"op":"add","path":"/root","value":"card-1"}
+       *     {"op":"add","path":"/elements/card-1","value":{"type":"Card","props":{"title":"Dashboard"},"children":["metric-1","btn-1"]}}
+       *     {"op":"add","path":"/elements/metric-1","value":{"type":"Metric","props":{"label":"Revenue","value":"$12,450"}}}
+       *     {"op":"add","path":"/elements/btn-1","value":{"type":"Button","props":{"text":"Refresh"}}}
        */
       system: string;
       /** @default [] */
@@ -901,9 +1043,27 @@ export interface components {
       /** @default  */
       description: string;
       /**
-       * @default You are the AI assistant embedded in an OpenScene application.
-       *     Help users accomplish tasks using the components and APIs available to the app.
-       *     Be concise, accurate, and follow the application's conventions.
+       * @default You are OpenScene AI Generative UI engine powered by json-render.
+       *     Generate UI specifications strictly following the json-render Standalone Mode specification.
+       *
+       *     CRITICAL RULES:
+       *     1. Output ONLY JSONL patch lines (RFC 6902 JSON Patch format).
+       *     2. Do NOT output markdown code fences (NO ```json, NO ```spec, NO backticks).
+       *     3. Do NOT output conversational prose, explanations, greetings, or notes.
+       *     4. Each output line MUST be a single, valid, self-contained JSON Patch object.
+       *
+       *     SPECIFICATION FORMAT (RFC 6902 JSON Patch):
+       *     - Set root: {"op":"add","path":"/root","value":"<root_element_id>"}
+       *     - Add/define element: {"op":"add","path":"/elements/<element_id>","value":{"type":"<ComponentType>","props":{...},"children":["<child_id>"]}}
+       *     - Update props: {"op":"replace","path":"/elements/<element_id>/props/<prop_name>","value":<value>}
+       *     - Remove element: {"op":"remove","path":"/elements/<element_id>"}
+       *     - Set/update state: {"op":"add","path":"/state/<key>","value":<value>}
+       *
+       *     EXAMPLE OUTPUT:
+       *     {"op":"add","path":"/root","value":"card-1"}
+       *     {"op":"add","path":"/elements/card-1","value":{"type":"Card","props":{"title":"Dashboard"},"children":["metric-1","btn-1"]}}
+       *     {"op":"add","path":"/elements/metric-1","value":{"type":"Metric","props":{"label":"Revenue","value":"$12,450"}}}
+       *     {"op":"add","path":"/elements/btn-1","value":{"type":"Button","props":{"text":"Refresh"}}}
        */
       system: string;
       /** @default [] */
@@ -1224,6 +1384,18 @@ export interface operations {
           promptKey?: string;
           /** @description Optional prompt module id to use. */
           promptId?: string;
+          /** @description Target selected element context from the canvas for fine-grained editing */
+          selectedElement?: {
+            nodeId: string;
+            type: string;
+            props?: {
+              [key: string]: unknown;
+            };
+            children?: string[];
+            slots?: {
+              [key: string]: string[];
+            };
+          };
         };
       };
     };
@@ -1242,6 +1414,118 @@ export interface operations {
               outputTokens: number;
               totalTokens: number;
             };
+            uiActions?: (
+              | {
+                  /** @enum {string} */
+                  action: "replace_document";
+                  document: {
+                    /** @enum {string} */
+                    schemaVersion: "1.0.0";
+                    pageInfo: {
+                      title: string;
+                      description: string;
+                      keywords: string[];
+                      locale: string;
+                      metadata: {
+                        [key: string]: unknown;
+                      };
+                    } & {
+                      [key: string]: unknown;
+                    };
+                    globalConfig: {
+                      design?: unknown;
+                      body?: unknown;
+                      variables?: unknown;
+                      css?: unknown;
+                      i18n?: unknown;
+                    } & {
+                      [key: string]: unknown;
+                    };
+                    spec: {
+                      root: string | null;
+                      elements: {
+                        [key: string]: {
+                          type: string;
+                          props: {
+                            [key: string]: unknown;
+                          };
+                          children?: string[];
+                          slots?: {
+                            [key: string]: string[];
+                          };
+                          visible?: unknown;
+                          on?: {
+                            [key: string]: unknown;
+                          };
+                          repeat?: unknown;
+                          watch?: {
+                            [key: string]: unknown;
+                          };
+                        } & {
+                          [key: string]: unknown;
+                        };
+                      };
+                      state?: {
+                        [key: string]: unknown;
+                      };
+                    } & {
+                      [key: string]: unknown;
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  summary?: string;
+                }
+              | {
+                  /** @enum {string} */
+                  action: "insert_element";
+                  elementId?: string;
+                  element: {
+                    id?: string;
+                    type: string;
+                    /** @default {} */
+                    props: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  target?: {
+                    parentId: string;
+                    slot?: string;
+                    index?: number;
+                  };
+                  summary?: string;
+                }
+              | {
+                  /** @enum {string} */
+                  action: "update_element";
+                  elementId: string;
+                  patch: {
+                    type?: string;
+                    props?: {
+                      [key: string]: unknown;
+                    };
+                    children?: string[];
+                    slots?: {
+                      [key: string]: string[];
+                    };
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  summary?: string;
+                }
+              | {
+                  /** @enum {string} */
+                  action: "delete_element";
+                  elementId: string;
+                  summary?: string;
+                }
+            )[];
           };
         };
       };
@@ -2146,7 +2430,7 @@ export interface operations {
               name: string;
               description: string;
               /** @enum {string} */
-              type: "web";
+              type: "web" | "react-native" | "flutter";
               /** @enum {string} */
               status: "active" | "disabled";
               manifest: {
@@ -2302,7 +2586,7 @@ export interface operations {
           key: string;
           name: string;
           /** @enum {string} */
-          type: "web";
+          type: "web" | "react-native" | "flutter";
           /** @default  */
           description?: string;
           /**
@@ -2342,7 +2626,7 @@ export interface operations {
             name: string;
             description: string;
             /** @enum {string} */
-            type: "web";
+            type: "web" | "react-native" | "flutter";
             /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
@@ -2506,7 +2790,7 @@ export interface operations {
             name: string;
             description: string;
             /** @enum {string} */
-            type: "web";
+            type: "web" | "react-native" | "flutter";
             /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
@@ -2834,7 +3118,7 @@ export interface operations {
             name: string;
             description: string;
             /** @enum {string} */
-            type: "web";
+            type: "web" | "react-native" | "flutter";
             /** @enum {string} */
             status: "active" | "disabled";
             manifest: {
@@ -10013,9 +10297,27 @@ export interface operations {
           /** @default  */
           description?: string;
           /**
-           * @default You are the AI assistant embedded in an OpenScene application.
-           *     Help users accomplish tasks using the components and APIs available to the app.
-           *     Be concise, accurate, and follow the application's conventions.
+           * @default You are OpenScene AI Generative UI engine powered by json-render.
+           *     Generate UI specifications strictly following the json-render Standalone Mode specification.
+           *
+           *     CRITICAL RULES:
+           *     1. Output ONLY JSONL patch lines (RFC 6902 JSON Patch format).
+           *     2. Do NOT output markdown code fences (NO ```json, NO ```spec, NO backticks).
+           *     3. Do NOT output conversational prose, explanations, greetings, or notes.
+           *     4. Each output line MUST be a single, valid, self-contained JSON Patch object.
+           *
+           *     SPECIFICATION FORMAT (RFC 6902 JSON Patch):
+           *     - Set root: {"op":"add","path":"/root","value":"<root_element_id>"}
+           *     - Add/define element: {"op":"add","path":"/elements/<element_id>","value":{"type":"<ComponentType>","props":{...},"children":["<child_id>"]}}
+           *     - Update props: {"op":"replace","path":"/elements/<element_id>/props/<prop_name>","value":<value>}
+           *     - Remove element: {"op":"remove","path":"/elements/<element_id>"}
+           *     - Set/update state: {"op":"add","path":"/state/<key>","value":<value>}
+           *
+           *     EXAMPLE OUTPUT:
+           *     {"op":"add","path":"/root","value":"card-1"}
+           *     {"op":"add","path":"/elements/card-1","value":{"type":"Card","props":{"title":"Dashboard"},"children":["metric-1","btn-1"]}}
+           *     {"op":"add","path":"/elements/metric-1","value":{"type":"Metric","props":{"label":"Revenue","value":"$12,450"}}}
+           *     {"op":"add","path":"/elements/btn-1","value":{"type":"Button","props":{"text":"Refresh"}}}
            */
           system?: string;
           /** @default [] */
@@ -10479,9 +10781,27 @@ export interface operations {
           /** @default  */
           description?: string;
           /**
-           * @default You are the AI assistant embedded in an OpenScene application.
-           *     Help users accomplish tasks using the components and APIs available to the app.
-           *     Be concise, accurate, and follow the application's conventions.
+           * @default You are OpenScene AI Generative UI engine powered by json-render.
+           *     Generate UI specifications strictly following the json-render Standalone Mode specification.
+           *
+           *     CRITICAL RULES:
+           *     1. Output ONLY JSONL patch lines (RFC 6902 JSON Patch format).
+           *     2. Do NOT output markdown code fences (NO ```json, NO ```spec, NO backticks).
+           *     3. Do NOT output conversational prose, explanations, greetings, or notes.
+           *     4. Each output line MUST be a single, valid, self-contained JSON Patch object.
+           *
+           *     SPECIFICATION FORMAT (RFC 6902 JSON Patch):
+           *     - Set root: {"op":"add","path":"/root","value":"<root_element_id>"}
+           *     - Add/define element: {"op":"add","path":"/elements/<element_id>","value":{"type":"<ComponentType>","props":{...},"children":["<child_id>"]}}
+           *     - Update props: {"op":"replace","path":"/elements/<element_id>/props/<prop_name>","value":<value>}
+           *     - Remove element: {"op":"remove","path":"/elements/<element_id>"}
+           *     - Set/update state: {"op":"add","path":"/state/<key>","value":<value>}
+           *
+           *     EXAMPLE OUTPUT:
+           *     {"op":"add","path":"/root","value":"card-1"}
+           *     {"op":"add","path":"/elements/card-1","value":{"type":"Card","props":{"title":"Dashboard"},"children":["metric-1","btn-1"]}}
+           *     {"op":"add","path":"/elements/metric-1","value":{"type":"Metric","props":{"label":"Revenue","value":"$12,450"}}}
+           *     {"op":"add","path":"/elements/btn-1","value":{"type":"Button","props":{"text":"Refresh"}}}
            */
           system?: string;
           /** @default [] */
@@ -12756,7 +13076,7 @@ export interface operations {
               key: string;
               name: string;
               /** @enum {string} */
-              type: "web";
+              type: "web" | "react-native" | "flutter";
             };
             resource: {
               id: string;
@@ -12831,7 +13151,7 @@ export interface operations {
                   app: {
                     key: string;
                     /** @enum {string} */
-                    type: "web";
+                    type: "web" | "react-native" | "flutter";
                     version?: string;
                   } & {
                     [key: string]: unknown;
@@ -12891,6 +13211,9 @@ export interface operations {
             /** Format: uri */
             returnUrl: string;
             prompts?: {
+              [key: string]: unknown;
+            }[];
+            chatSessions?: {
               [key: string]: unknown;
             }[];
           };

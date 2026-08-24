@@ -25,6 +25,8 @@ import {
   AiTestSchema,
   DEFAULT_APP_SYSTEM_PROMPT,
   DEFAULT_GLOBAL_SYSTEM_PROMPT,
+  PromptPreviewRequestSchema,
+  PromptPreviewResponseSchema,
   SystemPromptSchema,
   SystemPromptUpdateSchema,
 } from "../validation/schemas";
@@ -33,7 +35,7 @@ const GLOBAL_ID = "global";
 
 export type AiConfigInput = z.infer<typeof AiConfigUpdateSchema>;
 export type AiChatInput = z.infer<typeof AiChatRequestSchema>;
-
+export type PromptPreviewInput = z.infer<typeof PromptPreviewRequestSchema>;
 function recordToPublic(row: typeof aiConfig.$inferSelect) {
   return AiConfigSchema.parse({
     id: row.id,
@@ -396,6 +398,148 @@ export async function buildAppSystemPrompt(
   }
 
   return parts.join("\n\n").trim();
+}
+
+/**
+ * Inspect and assemble the complete system prompt and its breakdown parts for dev/debugging.
+ */
+export async function previewAppSystemPrompt(
+  db: AppDatabase,
+  appId: string,
+  options?: PromptPreviewInput,
+) {
+  const opts = options ?? {};
+  const breakdown: {
+    globalPrompt?: string;
+    appSystem?: string;
+    sections?: string[];
+    componentsText?: string;
+    openApiText?: string;
+    selectedElementText?: string;
+    requestSystem?: string;
+  } = {};
+
+  const parts: string[] = [];
+
+  // 1. Global Deployment System Prompt
+  const globalPrompt = await getSystemPrompt(db);
+  if (globalPrompt.enabled && globalPrompt.prompt.trim()) {
+    const text = globalPrompt.prompt.trim();
+    parts.push(text);
+    breakdown.globalPrompt = text;
+  }
+
+  // 2. Resolve App-specific prompt profile
+  let row: typeof appPrompts.$inferSelect | undefined;
+  if (opts.promptId) {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.id, opts.promptId)))
+      .get();
+  } else if (opts.promptKey) {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.key, opts.promptKey)))
+      .get();
+  } else {
+    row = await db
+      .select()
+      .from(appPrompts)
+      .where(and(eq(appPrompts.appId, appId), eq(appPrompts.isDefault, true)))
+      .get();
+    if (!row) {
+      row = await db.select().from(appPrompts).where(eq(appPrompts.appId, appId)).limit(1).get();
+    }
+  }
+
+  const appPromptEnabled = row?.enabled ?? true;
+  if (appPromptEnabled) {
+    let system = (row?.system ?? DEFAULT_APP_SYSTEM_PROMPT).trim();
+    if (system.includes("replace_document")) {
+      system = DEFAULT_APP_SYSTEM_PROMPT.trim();
+    }
+    const sections = row ? parsePromptArray(row.sections) : [];
+    const injectedComponents = row ? parsePromptArray(row.injectedComponents) : [];
+    const injectedOpenApiDocIds = row ? parsePromptArray(row.injectedOpenApiDocIds) : [];
+
+    if (system) {
+      parts.push(system);
+      breakdown.appSystem = system;
+    }
+    const validSections: string[] = [];
+    for (const section of sections) {
+      if (section.trim()) {
+        parts.push(section.trim());
+        validSections.push(section.trim());
+      }
+    }
+    if (validSections.length > 0) {
+      breakdown.sections = validSections;
+    }
+
+    if (injectedComponents.length > 0) {
+      const componentsText = await resolveComponentsText(db, appId, injectedComponents);
+      if (componentsText) {
+        parts.push(componentsText);
+        breakdown.componentsText = componentsText;
+      }
+    }
+    if (injectedOpenApiDocIds.length > 0) {
+      const openApiText = await resolveOpenApiText(db, appId, injectedOpenApiDocIds);
+      if (openApiText) {
+        parts.push(openApiText);
+        breakdown.openApiText = openApiText;
+      }
+    }
+  }
+
+  // 3. Targeted Selected Element Context
+  if (opts.selectedElement && opts.selectedElement.nodeId) {
+    const elSpec = {
+      nodeId: opts.selectedElement.nodeId,
+      type: opts.selectedElement.type,
+      props: opts.selectedElement.props || {},
+      children: opts.selectedElement.children || [],
+      slots: opts.selectedElement.slots || {},
+    };
+    const elText = [
+      `## TARGETED ELEMENT MODIFICATION RULES (CRITICAL):`,
+      `The user currently has selected the element "${opts.selectedElement.nodeId}" (type: "${opts.selectedElement.type}") on the canvas.`,
+      `Selected Element Spec:`,
+      JSON.stringify(elSpec, null, 2),
+      "",
+      `STRICT INSTRUCTIONS FOR TARGETED EDITING:`,
+      `1. DO NOT output a full page or recreate the whole document.`,
+      `2. DO NOT output "schemaVersion", "pageInfo", "globalConfig", or document JSON wrappers.`,
+      `3. You MUST use the EXACT target element ID "${opts.selectedElement.nodeId}" in every patch path:`,
+      `   - Update a prop: {"op":"replace","path":"/elements/${opts.selectedElement.nodeId}/props/<propKey>","value":<value>}`,
+      `   - Replace props: {"op":"replace","path":"/elements/${opts.selectedElement.nodeId}/props","value":{...}}`,
+      `   - Update style: {"op":"add","path":"/elements/${opts.selectedElement.nodeId}/props/style","value":{...}}`,
+      `   - Insert a child element:`,
+      `     {"op":"add","path":"/elements/<childId>","value":{"type":"<Component>","props":{...},"children":[]}}`,
+      `     {"op":"add","path":"/elements/${opts.selectedElement.nodeId}/children/-","value":"<childId>"}`,
+      `   - Remove this element: {"op":"remove","path":"/elements/${opts.selectedElement.nodeId}"}`,
+      `4. DO NOT invent another element ID. You MUST operate on "/elements/${opts.selectedElement.nodeId}/...".`,
+    ].join("\n");
+
+    parts.push(elText);
+    breakdown.selectedElementText = elText;
+  }
+
+  // 4. Caller-supplied request instruction
+  if (opts.system?.trim()) {
+    const reqText = opts.system.trim();
+    parts.push(reqText);
+    breakdown.requestSystem = reqText;
+  }
+
+  const systemPrompt = parts.join("\n\n").trim();
+  return PromptPreviewResponseSchema.parse({
+    systemPrompt,
+    breakdown,
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 import { isSizeSchema, type SizeSchema } from "./size.js";
 import { isUnitSchema, type UnitSchema } from "./unit.js";
 import { isKeyValueSchema, type KeyValueSchema } from "./keyValue.js";
+import { isStyleSchema, type StyleSchema } from "./style.js";
 import { isOpenApiSchema, type OpenApiSchema } from "../openapi.js";
 /**
  * Web board: input schemas for web-platform properties.
@@ -12,13 +13,18 @@ import { isOpenApiSchema, type OpenApiSchema } from "../openapi.js";
 export * from "./unit.js";
 export * from "./size.js";
 export * from "./keyValue.js";
+export * from "./style.js";
 export * from "../openapi.js";
 /** Every input schema defined by the web board. */
-export type WebInputSchema = UnitSchema | SizeSchema | KeyValueSchema | OpenApiSchema;
+export type WebInputSchema = UnitSchema | SizeSchema | KeyValueSchema | StyleSchema | OpenApiSchema;
 
 /** Narrowing guard for any web-board input schema. */
 export function isWebInputSchema(value: unknown): value is WebInputSchema {
   return (
-    isUnitSchema(value) || isSizeSchema(value) || isKeyValueSchema(value) || isOpenApiSchema(value)
+    isUnitSchema(value) ||
+    isSizeSchema(value) ||
+    isKeyValueSchema(value) ||
+    isStyleSchema(value) ||
+    isOpenApiSchema(value)
   );
 }

@@ -16,6 +16,7 @@ import {
   MousePointerClick,
   Plus,
   RotateCcw,
+  Terminal,
   Trash2,
   X,
 } from "lucide-react";
@@ -31,6 +32,8 @@ import { MarkdownContent } from "./markdown-content";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { useStudioStore } from "@/stores/studio-store";
 import { useAgentChatStore } from "@/stores/agent-chat-store";
+import { useQueryStore } from "@/stores/query-store";
+import { PromptInspectorDialog } from "./prompt-inspector-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Attachment as PromptAttachment,
@@ -302,6 +305,13 @@ export function AgentsPanel({
   const [renameTitle, setRenameTitle] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showContractInfo, setShowContractInfo] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const surface = useQueryStore((s) => s.surface);
+  const serverUrl = useQueryStore((s) => s.serverUrl);
+  const studioSessionId = useQueryStore((s) => s.sessionId);
+  const token = useQueryStore((s) => s.token);
+  const isDevMode = surface === "developer" || import.meta.env.DEV;
+
   const [attachSelectedElement, setAttachSelectedElement] = useState(true);
   const handleSelectElement = (nodeId: string | null) => {
     if (onSelectNode) {
@@ -320,6 +330,16 @@ export function AgentsPanel({
       setAttachSelectedElement(true);
     }
   }, [selectedId]);
+  const selectedElementPayload = useMemo(() => {
+    if (!selectedElement || !selectedId) return undefined;
+    return {
+      nodeId: selectedId,
+      type: selectedElement.type,
+      props: selectedElement.props || {},
+      children: selectedElement.children || [],
+      slots: selectedElement.slots || {},
+    };
+  }, [selectedElement, selectedId]);
 
   const [expandedJsonMap, setExpandedJsonMap] = useState<Record<string, boolean>>({});
 
@@ -511,8 +531,19 @@ export function AgentsPanel({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Header Actions: Switch to Sessions List, New Chat, Clear */}
+              {/* Header Actions: Switch to Sessions List, New Chat, Clear, Dev Inspector */}
               <div className="flex items-center gap-1">
+                {isDevMode && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                    title={LL.panels.agents.openInspector()}
+                    onClick={() => setInspectorOpen(true)}
+                  >
+                    <Terminal className="size-3.5" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1137,6 +1168,20 @@ export function AgentsPanel({
           </div>
         </>
       )}
+      {/* Prompt & Debug Context Inspector Modal */}
+      <PromptInspectorDialog
+        open={inspectorOpen}
+        onOpenChange={setInspectorOpen}
+        appId={bootstrap?.app.id || "local-test-app"}
+        activeSession={activeSession}
+        selectedPrompt={selectedPrompt}
+        selectedId={selectedId}
+        selectedElementPayload={selectedElementPayload}
+        attachSelectedElement={attachSelectedElement}
+        serverUrl={serverUrl}
+        sessionId={studioSessionId}
+        token={token}
+      />
     </div>
   );
 }

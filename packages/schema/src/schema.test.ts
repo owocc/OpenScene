@@ -5,6 +5,7 @@ import {
   isKeyValueSchema,
   isOpenApiSchema,
   isSizeSchema,
+  isStyleSchema,
   isUnitSchema,
   isWebInputSchema,
   keyValueSchema,
@@ -13,6 +14,7 @@ import {
   sizeFieldKeys,
   sizeFieldPresets,
   sizeSchema,
+  styleSchema,
   unitSchema,
   webUnits,
   type SizeValue,
@@ -84,11 +86,12 @@ describe("schema guards", () => {
     expect(isUnitSchema(unitSchema())).toBe(true);
     expect(isSizeSchema(sizeSchema())).toBe(true);
     expect(isKeyValueSchema(keyValueSchema())).toBe(true);
+    expect(isStyleSchema(styleSchema())).toBe(true);
     expect(isWebInputSchema(unitSchema())).toBe(true);
     expect(isWebInputSchema(keyValueSchema())).toBe(true);
+    expect(isWebInputSchema(styleSchema())).toBe(true);
     expect(isWebInputSchema(sizeSchema({ fields: ["minWidth", "minHeight"] }))).toBe(true);
   });
-
   it("rejects non-schemas and unknown types", () => {
     expect(isInputSchemaBase(null)).toBe(false);
     expect(isInputSchemaBase("size")).toBe(false);
@@ -144,5 +147,22 @@ describe("key-value schema", () => {
     expect(isKeyValueSchema({ type: "keyValue" })).toBe(true);
     expect(isKeyValueSchema({ type: "other", control: "key-value" })).toBe(true);
     expect(isWebInputSchema(keyValueSchema())).toBe(true);
+  });
+});
+
+describe("style schema", () => {
+  it("creates a style schema with default control", () => {
+    const schema = styleSchema({ title: "Styles", keyPlaceholder: "cssProperty" });
+    expect(schema.type).toBe("style");
+    expect(schema.control).toBe("style");
+    expect(schema.title).toBe("Styles");
+    expect(schema.keyPlaceholder).toBe("cssProperty");
+  });
+
+  it("is recognized by style and web guards", () => {
+    expect(isStyleSchema(styleSchema())).toBe(true);
+    expect(isStyleSchema({ type: "style" })).toBe(true);
+    expect(isStyleSchema({ type: "other", control: "style" })).toBe(true);
+    expect(isWebInputSchema(styleSchema())).toBe(true);
   });
 });

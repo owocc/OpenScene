@@ -58,24 +58,26 @@ function editorMeta(value: unknown, property: Record<string, unknown>): EditorMe
       ? candidate.control
       : typeof legacy.control === "string"
         ? legacy.control
-        : enumValues.length > 0 || Array.isArray(candidate.options) || type === "enum"
-          ? "select"
-          : type === "color" ||
-              (typeof property.title === "string" && /color/i.test(property.title))
-            ? "color"
-            : type === "key-value" || type === "keyvalue" || type === "key_value"
-              ? "key-value"
-              : type === "array"
-                ? "array"
-                : type === "object"
-                  ? "object"
-                  : /bool/i.test(type)
-                    ? "boolean"
-                    : /integer/i.test(type)
-                      ? "integer"
-                      : /number/i.test(type)
-                        ? "number"
-                        : "text";
+        : candidate.type === "style" || type === "style"
+          ? "style"
+          : enumValues.length > 0 || Array.isArray(candidate.options) || type === "enum"
+            ? "select"
+            : type === "color" ||
+                (typeof property.title === "string" && /color/i.test(property.title))
+              ? "color"
+              : type === "key-value" || type === "keyvalue" || type === "key_value"
+                ? "key-value"
+                : type === "array"
+                  ? "array"
+                  : type === "object"
+                    ? "object"
+                    : /bool/i.test(type)
+                      ? "boolean"
+                      : /integer/i.test(type)
+                        ? "integer"
+                        : /number/i.test(type)
+                          ? "number"
+                          : "text";
 
   const options = Array.isArray(candidate.options)
     ? candidate.options

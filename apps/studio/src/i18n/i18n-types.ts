@@ -264,6 +264,108 @@ type RootTranslation = {
        * 契​约​诊​断​信​息
        */
       diagnostics: string;
+      /**
+       * 提​示​词​与​上​下​文​调​试
+       */
+      promptInspector: string;
+      /**
+       * 查​看​后​端​组​装​的​完​整​系​统​提​示​词​、​用​户​会​话​历​史​与​实​时​上​下​文​。
+       */
+      promptInspectorDesc: string;
+      /**
+       * 全​部​消​息​ ​(​时​间​线​)
+       */
+      allTimelineTab: string;
+      /**
+       * 完​整​系​统​提​示​词
+       */
+      systemPromptTab: string;
+      /**
+       * 基​础​提​示​词
+       */
+      basePromptTab: string;
+      /**
+       * 注​入​组​件
+       */
+      injectedComponentsTab: string;
+      /**
+       * 用​户​与​上​下​文
+       */
+      userContextTab: string;
+      /**
+       * 请​求​数​据​包
+       */
+      rawPayloadTab: string;
+      /**
+       * M​D​ ​文​档​模​式
+       */
+      viewModeMarkdown: string;
+      /**
+       * 原​始​代​码
+       */
+      viewModeRaw: string;
+      /**
+       * 提​示​词​拆​解
+       */
+      breakdown: string;
+      /**
+       * 全​局​底​层​提​示​词
+       */
+      globalPrompt: string;
+      /**
+       * 应​用​基​础​提​示​词
+       */
+      appSystem: string;
+      /**
+       * 目​标​元​素​上​下​文
+       */
+      selectedElementContext: string;
+      /**
+       * 注​入​组​件​清​单
+       */
+      injectedComponents: string;
+      /**
+       * 注​入​ ​O​p​e​n​A​P​I​ ​接​口
+       */
+      injectedOpenApi: string;
+      /**
+       * 当​前​提​示​词​配​置​未​注​入​物​料​组​件
+       */
+      noInjectedComponents: string;
+      /**
+       * 当​前​提​示​词​配​置​未​注​入​ ​O​p​e​n​A​P​I​ ​接​口
+       */
+      noInjectedOpenApi: string;
+      /**
+       * 获​取​最​新​提​示​词
+       */
+      fetchPrompt: string;
+      /**
+       * 正​在​获​取​提​示​词​.​.​.
+       */
+      fetchingPrompt: string;
+      /**
+       * 复​制​提​示​词
+       */
+      copyPrompt: string;
+      /**
+       * {​c​o​u​n​t​}​ ​字​符
+       * @param {unknown} count
+       */
+      charsCount: RequiredParams<"count">;
+      /**
+       * 约​ ​{​c​o​u​n​t​}​ ​t​o​k​e​n​s
+       * @param {unknown} count
+       */
+      estimatedTokens: RequiredParams<"count">;
+      /**
+       * 开​发​者​调​试
+       */
+      devModeOnly: string;
+      /**
+       * 查​看​提​示​词​与​调​试​信​息
+       */
+      openInspector: string;
     };
     tools: {
       /**
@@ -894,6 +996,106 @@ export type TranslationFunctions = {
        * 契约诊断信息
        */
       diagnostics: () => LocalizedString;
+      /**
+       * 提示词与上下文调试
+       */
+      promptInspector: () => LocalizedString;
+      /**
+       * 查看后端组装的完整系统提示词、用户会话历史与实时上下文。
+       */
+      promptInspectorDesc: () => LocalizedString;
+      /**
+       * 全部消息 (时间线)
+       */
+      allTimelineTab: () => LocalizedString;
+      /**
+       * 完整系统提示词
+       */
+      systemPromptTab: () => LocalizedString;
+      /**
+       * 基础提示词
+       */
+      basePromptTab: () => LocalizedString;
+      /**
+       * 注入组件
+       */
+      injectedComponentsTab: () => LocalizedString;
+      /**
+       * 用户与上下文
+       */
+      userContextTab: () => LocalizedString;
+      /**
+       * 请求数据包
+       */
+      rawPayloadTab: () => LocalizedString;
+      /**
+       * MD 文档模式
+       */
+      viewModeMarkdown: () => LocalizedString;
+      /**
+       * 原始代码
+       */
+      viewModeRaw: () => LocalizedString;
+      /**
+       * 提示词拆解
+       */
+      breakdown: () => LocalizedString;
+      /**
+       * 全局底层提示词
+       */
+      globalPrompt: () => LocalizedString;
+      /**
+       * 应用基础提示词
+       */
+      appSystem: () => LocalizedString;
+      /**
+       * 目标元素上下文
+       */
+      selectedElementContext: () => LocalizedString;
+      /**
+       * 注入组件清单
+       */
+      injectedComponents: () => LocalizedString;
+      /**
+       * 注入 OpenAPI 接口
+       */
+      injectedOpenApi: () => LocalizedString;
+      /**
+       * 当前提示词配置未注入物料组件
+       */
+      noInjectedComponents: () => LocalizedString;
+      /**
+       * 当前提示词配置未注入 OpenAPI 接口
+       */
+      noInjectedOpenApi: () => LocalizedString;
+      /**
+       * 获取最新提示词
+       */
+      fetchPrompt: () => LocalizedString;
+      /**
+       * 正在获取提示词...
+       */
+      fetchingPrompt: () => LocalizedString;
+      /**
+       * 复制提示词
+       */
+      copyPrompt: () => LocalizedString;
+      /**
+       * {count} 字符
+       */
+      charsCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 约 {count} tokens
+       */
+      estimatedTokens: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 开发者调试
+       */
+      devModeOnly: () => LocalizedString;
+      /**
+       * 查看提示词与调试信息
+       */
+      openInspector: () => LocalizedString;
     };
     tools: {
       /**

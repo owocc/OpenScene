@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { resolveControlRenderer, controlRegistry } from "./property-editor";
-
+import {
+  searchCssProperties,
+  getCssValueSuggestions,
+  isColorProperty,
+  getAllWebCssProperties,
+  COMMON_CSS_PROPERTIES,
+  loadMdnData,
+  camelToKebab,
+} from "./property-editor/style/web/properties";
 describe("StyleControl & KV mode", () => {
   function objectToStyleEntries(obj: unknown): Array<{ id: string; key: string; value: string }> {
     if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
@@ -85,6 +93,50 @@ describe("StyleControl & KV mode", () => {
     expect(onChange).toHaveBeenLastCalledWith({
       padding: "16px",
     });
+  });
+
+  it("supports searching CSS properties from full list", async () => {
+    expect(COMMON_CSS_PROPERTIES.length).toBeGreaterThan(50);
+    await loadMdnData();
+    expect(getAllWebCssProperties().length).toBeGreaterThan(100);
+    const bgMatches = searchCssProperties("background");
+    expect(bgMatches).toContain("background-color");
+    expect(bgMatches).toContain("background");
+    const flexMatches = searchCssProperties("flexDirection");
+    expect(flexMatches).toContain("flex-direction");
+  });
+  it("provides value suggestions for common enum properties", () => {
+    const displayValues = getCssValueSuggestions("display");
+    expect(displayValues).toContain("flex");
+    expect(displayValues).toContain("grid");
+    expect(displayValues).toContain("block");
+    expect(displayValues).toContain("none");
+
+    const flexDirValues = getCssValueSuggestions("flexDirection");
+    expect(flexDirValues).toContain("row");
+    expect(flexDirValues).toContain("column");
+
+    const positionValues = getCssValueSuggestions("position");
+    expect(positionValues).toContain("relative");
+    expect(positionValues).toContain("absolute");
+    expect(positionValues).toContain("fixed");
+  });
+
+  it("identifies color properties correctly", () => {
+    expect(isColorProperty("color")).toBe(true);
+    expect(isColorProperty("backgroundColor")).toBe(true);
+    expect(isColorProperty("background-color")).toBe(true);
+    expect(isColorProperty("borderColor")).toBe(true);
+    expect(isColorProperty("display")).toBe(false);
+    expect(isColorProperty("width")).toBe(false);
+  });
+
+  it("converts camelCase to kebab-case correctly", () => {
+    expect(camelToKebab("backgroundColor")).toBe("background-color");
+    expect(camelToKebab("fontSize")).toBe("font-size");
+    expect(camelToKebab("borderTopLeftRadius")).toBe("border-top-left-radius");
+    expect(camelToKebab("display")).toBe("display");
+    expect(camelToKebab("background-color")).toBe("background-color");
   });
 });
 

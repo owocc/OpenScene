@@ -136,9 +136,7 @@ Color changes on hover must be immediate. Transitions on fast interactions make 
 **Avoid**
 
 ```tsx
-<button className="transition-colors duration-300 hover:bg-kumo-tint">
-  ...
-</button>
+<button className="transition-colors duration-300 hover:bg-kumo-tint">...</button>
 ```
 
 ### `shadow-borders` Never use borders with drop shadows
@@ -218,8 +216,7 @@ Monospaced text should have a slightly smaller font size (~0.9em) when mixed wit
 
 ```tsx
 <Text size="lg">
-  Edit <span className="font-mono text-[0.9em]">wrangler.toml</span> to
-  continue.
+  Edit <span className="font-mono text-[0.9em]">wrangler.toml</span> to continue.
 </Text>
 ```
 

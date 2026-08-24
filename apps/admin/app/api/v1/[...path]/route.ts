@@ -83,6 +83,7 @@ import {
   chatWithAi,
   getAiConfig,
   getSystemPrompt,
+  previewAppSystemPrompt,
   testAiConfig,
   upsertAiConfig,
   upsertSystemPrompt,
@@ -93,6 +94,7 @@ import {
   AppManifestSchema,
   AppPromptCreateSchema,
   AppPromptPatchSchema,
+  PromptPreviewRequestSchema,
   SystemPromptUpdateSchema,
   UiSessionCreateSchema,
   UiSessionSchema,
@@ -229,6 +231,18 @@ async function handleRequest(
       if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
       const appId = authContext.appId!;
       return json(await listAppPrompts(db, appId), 200, { "cache-control": "no-store" });
+    }
+    if (
+      path[0] === "studio-sessions" &&
+      path[2] === "prompt-preview" &&
+      (method === "POST" || method === "GET")
+    ) {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const appId = authContext.appId!;
+      const input =
+        method === "POST" ? await parseBody(request, PromptPreviewRequestSchema.optional()) : {};
+      return json(await previewAppSystemPrompt(db, appId, input ?? {}));
     }
     if (path[0] === "studio-sessions" && path[2] === "chat" && method === "POST") {
       const authContext = await authenticate(request, db, "session");
@@ -411,6 +425,15 @@ async function aiRoutes(
     const appId = authContext.appId ?? input.appId;
     assertAppContext(authContext, appId);
     return await chatWithAi(db, { ...input, appId });
+  }
+  if (path[1] === "prompt-preview" && method === "POST") {
+    const authContext = await authenticate(request, db, "client");
+    const input = await parseBody(request, PromptPreviewRequestSchema);
+    const appId = authContext.appId ?? input.appId;
+    if (!appId)
+      throw validation("appId is required", [{ path: "appId", message: "appId is required" }]);
+    assertAppContext(authContext, appId);
+    return json(await previewAppSystemPrompt(db, appId, input));
   }
   throw notFound();
 }

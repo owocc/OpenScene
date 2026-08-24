@@ -277,7 +277,7 @@ const viewSchema = z
     className: z.string().optional(),
     style: z
       .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "key-value" } })
+      .meta({ "x-editor": { control: "style", type: "style" } })
       .optional(),
   })
   .passthrough();
@@ -288,7 +288,7 @@ const textSchema = z
     className: z.string().optional(),
     style: z
       .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "key-value" } })
+      .meta({ "x-editor": { control: "style", type: "style" } })
       .optional(),
   })
   .passthrough();
@@ -302,11 +302,10 @@ const buttonSchema = z
     className: z.string().optional(),
     style: z
       .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "key-value" } })
+      .meta({ "x-editor": { control: "style", type: "style" } })
       .optional(),
   })
   .passthrough();
-
 export const baseSolidComponents: Record<string, OpenSceneSolidComponentDefinition> = {
   View: {
     type: "View",
