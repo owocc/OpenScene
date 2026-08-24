@@ -66,15 +66,12 @@ interface ActionsPanelProps {
 
 export function ActionsPanel({
   document: docProp,
-  selectedId,
   onSelectNode,
   bootstrap: bootstrapProp,
 }: ActionsPanelProps) {
   const { LL } = useI18n();
   const storeDocument = useStudioStore((s) => s.document);
   const storeBootstrap = useStudioStore((s) => s.bootstrap);
-  const updateElement = useStudioStore((s) => s.updateElement);
-  const showNotice = useStudioStore((s) => s.showNotice);
 
   const document = docProp ?? storeDocument;
   const bootstrap = bootstrapProp ?? storeBootstrap;
@@ -95,16 +92,8 @@ export function ActionsPanel({
   const [formJsonText, setFormJsonText] = useState("");
   const [formKeyError, setFormKeyError] = useState<string | null>(null);
 
-  // Custom user actions stored in document or local state
-  const [customActions, setCustomActions] = useState<ActionItem[]>([
-    {
-      key: "toggleVisibility",
-      title: "切换显示状态",
-      description: "一键切换绑定的布尔状态变量显示与隐藏",
-      type: "setState",
-      params: { isVisible: "__toggle__" },
-    },
-  ]);
+  // Custom user actions stored in session (starts clean and empty)
+  const [customActions, setCustomActions] = useState<ActionItem[]>([]);
 
   // Extract available state variable keys
   const stateKeys = useMemo(
@@ -303,25 +292,6 @@ export function ActionsPanel({
     setDeletingAction(null);
   };
 
-  const handleBindToSelectedNode = (action: ActionItem) => {
-    if (!selectedId) {
-      showNotice("请先在画布中选中一个组件");
-      return;
-    }
-
-    updateElement(selectedId, (el) => {
-      const on = { ...(el.on as Record<string, unknown> | undefined) };
-      if (action.type === "setState" && action.params) {
-        on.press = { action: "setState", params: action.params };
-      } else {
-        on.press = { action: action.key };
-      }
-      return { ...el, on } as typeof el;
-    });
-
-    showNotice(`已将动作 "${action.title}" 绑定至选中的组件 (#${selectedId})`);
-  };
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -455,12 +425,6 @@ export function ActionsPanel({
                           <MoreVertical className="size-3.5" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40 text-xs">
-                          {selectedId && (
-                            <DropdownMenuItem onClick={() => handleBindToSelectedNode(action)}>
-                              <Zap className="size-3.5 mr-2 text-amber-500" />
-                              <span>绑定到选中组件</span>
-                            </DropdownMenuItem>
-                          )}
                           {!isBuiltIn && (
                             <DropdownMenuItem onClick={() => openEditDialog(action)}>
                               <Edit2 className="size-3.5 mr-2" />
@@ -499,23 +463,6 @@ export function ActionsPanel({
                       </p>
                     )}
                   </div>
-
-                  {/* Quick Bind Button */}
-                  {selectedId && (
-                    <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center justify-between">
-                      <span className="text-[10px] text-muted-foreground">选中: #{selectedId}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        className="h-5 px-1.5 text-[10px] text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer gap-1"
-                        onClick={() => handleBindToSelectedNode(action)}
-                      >
-                        <Zap className="size-2.5" />
-                        <span>绑定事件 (on.press)</span>
-                      </Button>
-                    </div>
-                  )}
                 </div>
               );
             })
