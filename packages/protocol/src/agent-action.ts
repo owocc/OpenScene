@@ -149,16 +149,51 @@ export function applyAgentUiActionsToDocument(
     }
 
     if (action.action === "update_element") {
-      const element = doc.spec.elements[action.elementId];
-      if (element) {
-        if (action.patch.type) element.type = action.patch.type;
-        if (action.patch.props) {
-          element.props = { ...element.props, ...(action.patch.props as Record<string, unknown>) };
+      let element = doc.spec.elements[action.elementId];
+      if (!element) {
+        // 1. Fuzzy match by normalized ID (e.g. "button-1" matches "btn-1" or "button_1")
+        const normActionId = action.elementId.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const matchedKey = Object.keys(doc.spec.elements).find((k) => {
+          const normK = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+          return (
+            normK === normActionId || normK.includes(normActionId) || normActionId.includes(normK)
+          );
+        });
+        if (matchedKey) {
+          element = doc.spec.elements[matchedKey];
         }
-        if (action.patch.children) element.children = [...action.patch.children];
-        if (action.patch.slots) {
-          element.slots = { ...element.slots, ...action.patch.slots };
+      }
+
+      if (!element) {
+        // 2. If element still not found, create it attached to root to prevent silent loss
+        element = {
+          type: action.patch.type || "View",
+          props: {},
+          children: [],
+        };
+        doc.spec.elements[action.elementId] = element;
+        if (!doc.spec.root) {
+          doc.spec.root = action.elementId;
+        } else {
+          const rootElement = doc.spec.elements[doc.spec.root];
+          if (rootElement && !rootElement.children?.includes(action.elementId)) {
+            rootElement.children = rootElement.children || [];
+            rootElement.children.push(action.elementId);
+          }
         }
+      }
+
+      if (action.patch.type) element.type = action.patch.type;
+      if (action.patch.props) {
+        element.props = element.props || {};
+        deepMergeProps(
+          element.props as Record<string, unknown>,
+          action.patch.props as Record<string, unknown>,
+        );
+      }
+      if (action.patch.children) element.children = [...action.patch.children];
+      if (action.patch.slots) {
+        element.slots = { ...element.slots, ...action.patch.slots };
       }
       continue;
     }
@@ -182,6 +217,14 @@ export function applyAgentUiActionsToDocument(
       continue;
     }
   }
+  // Ensure valid root pointer
+  if (!doc.spec.root || !doc.spec.elements[doc.spec.root]) {
+    const elementKeys = Object.keys(doc.spec.elements);
+    if (elementKeys.length > 0) {
+      doc.spec.root = elementKeys[0];
+    }
+  }
+
   doc.schemaVersion = "1.0.0";
   const valid = SceneDocumentSchema.safeParse(doc);
   return valid.success ? valid.data : (normalizeAiDocument(doc) ?? doc);
@@ -270,7 +313,7 @@ export function extractAgentUiActions(content: string): AgentUiAction[] | null {
   let match;
   while ((match = codeBlockRegex.exec(content)) !== null) {
     const raw = match[1].trim();
-    const actions = tryParseActionPlan(raw);
+    const actions = tryParseActionPlan(raw) || parseJsonlPatchesToActions(raw);
     if (actions) return actions;
   }
 
@@ -283,6 +326,10 @@ export function extractAgentUiActions(content: string): AgentUiAction[] | null {
     const actions = tryParseActionPlan(trimmed);
     if (actions) return actions;
   }
+
+  // 3. Try parsing as JSONL patches (json-render Standalone mode format)
+  const jsonlActions = parseJsonlPatchesToActions(content);
+  if (jsonlActions) return jsonlActions;
 
   return null;
 }
@@ -328,6 +375,14 @@ export function splitContentAndUiActions(content: string): ParsedAgentMessage {
     }
   }
 
+  if (!actions) {
+    const jsonlActions = parseJsonlPatchesToActions(content);
+    if (jsonlActions) {
+      actions = jsonlActions;
+      rawJson = content.trim();
+      cleanedText = "";
+    }
+  }
   const displayText = cleanedText.replace(/\n{3,}/g, "\n\n").trim();
   return { displayText, actions, rawJson };
 }
@@ -447,6 +502,130 @@ function tryParseActionPlan(rawJson: string): AgentUiAction[] | null {
     // ignore parse errors
   }
   return null;
+}
+function deepMergeProps(target: Record<string, unknown>, patch: Record<string, unknown>) {
+  for (const [key, value] of Object.entries(patch)) {
+    if (key.includes(".")) {
+      const parts = key.split(".");
+      let curr: any = target;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!curr[parts[i]] || typeof curr[parts[i]] !== "object") {
+          curr[parts[i]] = {};
+        }
+        curr = curr[parts[i]];
+      }
+      curr[parts[parts.length - 1]] = value;
+    } else if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      target[key] &&
+      typeof target[key] === "object" &&
+      !Array.isArray(target[key])
+    ) {
+      deepMergeProps(target[key] as Record<string, unknown>, value as Record<string, unknown>);
+    } else {
+      target[key] = value;
+    }
+  }
+}
+
+export function parseJsonlPatchesToActions(text: string): AgentUiAction[] | null {
+  if (!text || typeof text !== "string") return null;
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const patches: Array<{ op: string; path: string; value?: unknown }> = [];
+  for (const line of lines) {
+    if (!line.startsWith("{") || !line.endsWith("}")) continue;
+    try {
+      const obj = JSON.parse(line);
+      if (
+        obj &&
+        typeof obj === "object" &&
+        typeof obj.op === "string" &&
+        typeof obj.path === "string"
+      ) {
+        patches.push(obj);
+      }
+    } catch {
+      // skip invalid line
+    }
+  }
+  if (patches.length === 0) return null;
+
+  const actions: AgentUiAction[] = [];
+  for (const patch of patches) {
+    const { op, path, value } = patch;
+    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    const segments = cleanPath.split("/");
+
+    if (segments[0] === "root" || (segments[0] === "spec" && segments[1] === "root")) {
+      if (typeof value === "string") {
+        actions.push({
+          action: "update_element",
+          elementId: value,
+          patch: {},
+        });
+      }
+    } else if (
+      (segments[0] === "elements" && segments.length === 2) ||
+      (segments[0] === "spec" && segments[1] === "elements" && segments.length === 3)
+    ) {
+      const elementId = segments[0] === "elements" ? segments[1] : segments[2];
+      if (op === "remove") {
+        actions.push({ action: "delete_element", elementId });
+      } else if (value && typeof value === "object") {
+        const valObj = value as Record<string, unknown>;
+        if (typeof valObj.type === "string") {
+          actions.push({
+            action: "insert_element",
+            elementId,
+            element: {
+              id: elementId,
+              type: valObj.type,
+              props: (valObj.props as Record<string, unknown>) || {},
+              children: Array.isArray(valObj.children) ? (valObj.children as string[]) : [],
+              slots:
+                typeof valObj.slots === "object" && valObj.slots !== null
+                  ? (valObj.slots as Record<string, string[]>)
+                  : {},
+            },
+          });
+        } else {
+          actions.push({
+            action: "update_element",
+            elementId,
+            patch: valObj,
+          });
+        }
+      }
+    } else if (
+      (segments[0] === "elements" && segments[2] === "props") ||
+      (segments[0] === "spec" && segments[1] === "elements" && segments[3] === "props")
+    ) {
+      const isSpecPrefix = segments[0] === "spec";
+      const elementId = isSpecPrefix ? segments[2] : segments[1];
+      const propSegments = isSpecPrefix ? segments.slice(4) : segments.slice(3);
+
+      if (propSegments.length === 0) {
+        actions.push({
+          action: "update_element",
+          elementId,
+          patch: { props: value as Record<string, unknown> },
+        });
+      } else {
+        const propKey = propSegments.join(".");
+        actions.push({
+          action: "update_element",
+          elementId,
+          patch: { props: { [propKey]: value } },
+        });
+      }
+    }
+  }
+  return actions.length > 0 ? actions : null;
 }
 
 type ActionTarget = z.infer<typeof ActionTargetSchema>;

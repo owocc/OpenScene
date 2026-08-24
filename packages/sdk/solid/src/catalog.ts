@@ -281,12 +281,29 @@ const viewSchema = z
       .optional(),
   })
   .passthrough();
-const textSchema = z.object({ text: z.string().optional() }).passthrough();
+const textSchema = z
+  .object({
+    text: z.string().optional(),
+    class: z.string().optional(),
+    className: z.string().optional(),
+    style: z
+      .record(z.string(), z.unknown())
+      .meta({ "x-editor": { control: "key-value" } })
+      .optional(),
+  })
+  .passthrough();
 const buttonSchema = z
   .object({
     label: z.string().optional(),
+    text: z.string().optional(),
     disabled: z.boolean().optional(),
-    type: z.enum(["button", "submit", "reset"]).optional(),
+    type: z.string().optional(),
+    class: z.string().optional(),
+    className: z.string().optional(),
+    style: z
+      .record(z.string(), z.unknown())
+      .meta({ "x-editor": { control: "key-value" } })
+      .optional(),
   })
   .passthrough();
 

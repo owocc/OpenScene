@@ -51,6 +51,29 @@ describe("Studio editor state", () => {
     expect(replaced.selectedNodeIds).toEqual([]);
     expect(replaced.selectedNodeId).toBeNull();
   });
+  it("records history on document replacement so AI applications can be undone", () => {
+    const state = createEditorState(emptyDocument, 0);
+    const replacement = {
+      ...emptyDocument,
+      spec: {
+        ...emptyDocument.spec,
+        elements: { btn: { type: "Button", props: { text: "AI Generated" } } },
+        root: "btn",
+      },
+    };
+    const replaced = editorReducer(state, { type: "document.replace", document: replacement });
+    expect(replaced.past.length).toBe(1);
+    expect(replaced.document.spec.root).toBe("btn");
+
+    // Undo should restore initial empty document
+    const undone = editorReducer(replaced, { type: "history.undo" });
+    expect(undone.document.spec.root).toBeNull();
+    expect(undone.future.length).toBe(1);
+
+    // Redo should restore the replaced document
+    const redone = editorReducer(undone, { type: "history.redo" });
+    expect(redone.document.spec.root).toBe("btn");
+  });
 
   it("makes the first added node the root and clears it again on delete", () => {
     const state = createEditorState(emptyDocument, 0);

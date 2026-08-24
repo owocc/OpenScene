@@ -170,13 +170,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
     case "document.replace":
       return {
-        ...state,
-        document: action.document,
-        ...selectedForDocument(action.document, state.selectedNodeIds, state.selectedNodeId),
-        locale: action.document.pageInfo.locale || "en-US",
-        past: [],
-        future: [],
-        revision: state.revision + 1,
+        ...commit(state, action.document),
+        locale: action.document.pageInfo?.locale || state.locale || "en-US",
       };
     case "locale.switch":
       return {

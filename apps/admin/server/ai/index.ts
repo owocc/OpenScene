@@ -338,7 +338,10 @@ export async function buildAppSystemPrompt(
 
   const appPromptEnabled = row?.enabled ?? true;
   if (appPromptEnabled) {
-    const system = (row?.system ?? DEFAULT_APP_SYSTEM_PROMPT).trim();
+    let system = (row?.system ?? DEFAULT_APP_SYSTEM_PROMPT).trim();
+    if (system.includes("replace_document")) {
+      system = DEFAULT_APP_SYSTEM_PROMPT.trim();
+    }
     const sections = row ? parsePromptArray(row.sections) : [];
     const injectedComponents = row ? parsePromptArray(row.injectedComponents) : [];
     const injectedOpenApiDocIds = row ? parsePromptArray(row.injectedOpenApiDocIds) : [];
@@ -365,7 +368,25 @@ export async function buildAppSystemPrompt(
       slots: opts.selectedElement.slots || {},
     };
     parts.push(
-      `## Targeted Selected Element Context\nThe user currently has selected the following element on the canvas for targeted modification:\nTarget Node ID: "${opts.selectedElement.nodeId}"\nType: "${opts.selectedElement.type}"\nElement Spec:\n${JSON.stringify(elSpec, null, 2)}\n\nWhen the user asks to edit, update, modify, insert into, or delete, prioritize targeted actions (such as update_element with elementId: "${opts.selectedElement.nodeId}", or insert_element with target.parentId: "${opts.selectedElement.nodeId}") for this element.`,
+      [
+        `## TARGETED ELEMENT MODIFICATION RULES (CRITICAL):`,
+        `The user currently has selected the element "${opts.selectedElement.nodeId}" (type: "${opts.selectedElement.type}") on the canvas.`,
+        `Selected Element Spec:`,
+        JSON.stringify(elSpec, null, 2),
+        "",
+        `STRICT INSTRUCTIONS FOR TARGETED EDITING:`,
+        `1. DO NOT output a full page or recreate the whole document.`,
+        `2. DO NOT output "schemaVersion", "pageInfo", "globalConfig", or document JSON wrappers.`,
+        `3. You MUST use the EXACT target element ID "${opts.selectedElement.nodeId}" in every patch path:`,
+        `   - Update a prop: {"op":"replace","path":"/elements/${opts.selectedElement.nodeId}/props/<propKey>","value":<value>}`,
+        `   - Replace props: {"op":"replace","path":"/elements/${opts.selectedElement.nodeId}/props","value":{...}}`,
+        `   - Update style: {"op":"add","path":"/elements/${opts.selectedElement.nodeId}/props/style","value":{...}}`,
+        `   - Insert a child element:`,
+        `     {"op":"add","path":"/elements/<childId>","value":{"type":"<Component>","props":{...},"children":[]}}`,
+        `     {"op":"add","path":"/elements/${opts.selectedElement.nodeId}/children/-","value":"<childId>"}`,
+        `   - Remove this element: {"op":"remove","path":"/elements/${opts.selectedElement.nodeId}"}`,
+        `4. DO NOT invent another element ID. You MUST operate on "/elements/${opts.selectedElement.nodeId}/...".`,
+      ].join("\n"),
     );
   }
 

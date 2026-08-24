@@ -3,9 +3,12 @@
 import {
   ArrowLeft,
   ArrowRight,
+  CaretDown,
+  CaretRight,
   ClipboardText,
   Copy,
   DotsThree,
+  Lock,
   PencilSimple,
   Power,
   Plus,
@@ -80,13 +83,27 @@ function getManifestRevisions(data: unknown): ManifestRevision[] {
   );
 }
 
-function ComponentMetadata({ title, value }: { title: string; value: unknown }) {
+function ComponentMetadata({
+  title,
+  value,
+  className = "",
+  maxHeight = "max-h-72",
+}: {
+  title: string;
+  value: unknown;
+  className?: string;
+  maxHeight?: string;
+}) {
   return (
-    <Surface className="grid gap-3 p-4">
+    <Surface className={`grid gap-3 p-4 ${className}`}>
       <Text variant="heading" as="h2">
         {title}
       </Text>
-      <Code code={JSON.stringify(value ?? {}, null, 2)} lang="jsonc" />
+      <div
+        className={`overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3 ${maxHeight}`}
+      >
+        <Code code={JSON.stringify(value ?? {}, null, 2)} lang="jsonc" />
+      </div>
     </Surface>
   );
 }
@@ -142,8 +159,9 @@ export function AdminConsole() {
   if (pathname === "/locales") return <LocalesView />;
   if (pathname === "/assets") return <AssetsView />;
   if (pathname === "/openapi-docs") return <OpenApiDocsView />;
-  if (pathname === "/manifest") return <ManifestView />;
+  if (pathname === "/manifest" || pathname === "/meta") return <MetaView />;
   if (pathname === "/components") return <ComponentsView />;
+  if (pathname.startsWith("/components/")) return <ComponentDetailView />;
   if (pathname === "/settings") return <SettingsView />;
   if (pathname === "/prompts" || pathname === "/prompt") return <PromptsListView />;
   if (pathname.startsWith("/prompts/") || pathname.startsWith("/prompt/"))
@@ -615,14 +633,48 @@ function OverviewView() {
     <>
       <PageHeader title={app.name} description={app.description}>
         <StatusBadge status={app.status} />
+        <LinkButton href={context.href("/meta")}>{t("meta")}</LinkButton>
         <LinkButton href={context.href("/settings")}>{t("settings")}</LinkButton>
       </PageHeader>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric label={t("status")} value={app.status === "active" ? t("active") : t("disabled")} />
-        <Metric label="Manifest" value={manifestQuery.data ? "Ready" : "Unavailable"} />
+        <a href={context.href("/meta")} className="transition hover:opacity-80">
+          <Metric label="Manifest (Meta)" value={manifestQuery.data ? "Ready" : "Unavailable"} />
+        </a>
         <Metric label={t("pages")} value={String(pagesQuery.data?.items.length ?? 0)} />
         <Metric label={t("assets")} value={String(assetsQuery.data?.length ?? 0)} />
       </div>
+      <LayerCard className="mt-4">
+        <div className="flex items-center justify-between">
+          <LayerCard.Secondary>Meta & Manifest</LayerCard.Secondary>
+          <LinkButton size="sm" href={context.href("/meta")}>
+            {t("meta")}
+          </LinkButton>
+        </div>
+        <LayerCard.Primary className="gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusBadge status={manifestQuery.data ? "active" : "disabled"} />
+            <Text variant="secondary">
+              {manifestQuery.data
+                ? "Manifest is published and active."
+                : "No active build manifest."}
+            </Text>
+            {app.manifest?.activeRevisionId && (
+              <span className="font-mono text-xs text-kumo-subtle">
+                rev: {app.manifest.activeRevisionId.slice(0, 16)}…
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <LinkButton size="sm" variant="secondary" href={context.href("/meta")}>
+              查看 Meta 原始信息与 JSON
+            </LinkButton>
+            <LinkButton size="sm" variant="secondary" href={context.href("/components")}>
+              {t("components")}
+            </LinkButton>
+          </div>
+        </LayerCard.Primary>
+      </LayerCard>
       <LayerCard className="mt-4">
         <LayerCard.Secondary>Health</LayerCard.Secondary>
         <LayerCard.Primary className="gap-3">
@@ -750,6 +802,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       templateId: "",
       versionId: "",
     });
+    setDialog(true);
   }
   function openEdit(resource: Resource) {
     setEditing(resource);
@@ -763,6 +816,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       templateId: "",
       versionId: "",
     });
+    setDialog(true);
   }
   function submit() {
     const body = {
@@ -2279,10 +2333,58 @@ function AssetsView() {
   );
 }
 
+function JsonModalDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  data,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  data: unknown;
+}) {
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const jsonString = useMemo(() => JSON.stringify(data ?? {}, null, 2), [data]);
+
+  const copyToClipboard = () => {
+    void navigator.clipboard?.writeText(jsonString);
+    toast.add({ title: t("copied") });
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog size="xl" className="max-h-[85vh] max-w-4xl overflow-y-auto px-8 py-6">
+        <div className="flex items-center justify-between pb-2">
+          <div>
+            <Dialog.Title>{title}</Dialog.Title>
+            {description ? <Dialog.Description>{description}</Dialog.Description> : null}
+          </div>
+          <Button size="sm" variant="secondary" onClick={copyToClipboard}>
+            <Copy size={14} className="mr-1 inline" />
+            {t("copyJson")}
+          </Button>
+        </div>
+        <div className="my-3 max-h-[55vh] overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
+          <Code code={jsonString} lang="jsonc" />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
+        </div>
+      </Dialog>
+    </Dialog.Root>
+  );
+}
+
 function ComponentsView() {
   const context = useAdminContext();
   const { t } = useI18n();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
   const query = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -2297,18 +2399,47 @@ function ComponentsView() {
     typeof query.data.revision.createdAt === "string"
       ? query.data.revision.createdAt
       : null;
+
+  const categoryCounts = useMemo(() => {
+    if (!manifest) return {};
+    const counts: Record<string, number> = {};
+    for (const component of Object.values(manifest.components)) {
+      const category = component.category?.trim() || "uncategorized";
+      counts[category] = (counts[category] || 0) + 1;
+    }
+    return counts;
+  }, [manifest]);
+
+  const categoryItems = useMemo(() => {
+    const total = manifest ? Object.keys(manifest.components).length : 0;
+    const items: Record<string, string> = {
+      all: `${t("allCategories")} (${total})`,
+    };
+    for (const [category, count] of Object.entries(categoryCounts).sort((a, b) =>
+      a[0].localeCompare(b[0]),
+    )) {
+      const label = category === "uncategorized" ? t("uncategorized") : category;
+      items[category] = `${label} (${count})`;
+    }
+    return items;
+  }, [categoryCounts, manifest, t]);
+
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const components = manifest
     ? Object.entries(manifest.components)
         .map(([key, component]) => ({ key, component }))
         .sort((left, right) => (left.key < right.key ? -1 : left.key > right.key ? 1 : 0))
-        .filter(({ key, component }) =>
-          [key, component.title, component.category ?? ""].some((value) =>
+        .filter(({ key, component }) => {
+          const category = component.category?.trim() || "uncategorized";
+          if (categoryFilter !== "all" && category !== categoryFilter) {
+            return false;
+          }
+          if (!normalizedSearch) return true;
+          return [key, component.title, component.category ?? ""].some((value) =>
             value.toLocaleLowerCase().includes(normalizedSearch),
-          ),
-        )
+          );
+        })
     : [];
-
   if (query.isLoading) return <LoadingState />;
   if (query.error) return <ErrorState error={query.error} />;
 
@@ -2326,13 +2457,24 @@ function ComponentsView() {
         />
       ) : (
         <>
-          <Input
-            aria-label="Search components"
-            placeholder={t("search")}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="mb-4 w-full sm:max-w-sm"
-          />
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Input
+              aria-label="Search components"
+              placeholder={t("search")}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full sm:max-w-xs"
+            />
+            <Select
+              aria-label={t("categories")}
+              value={categoryFilter}
+              items={categoryItems}
+              onValueChange={(value) => {
+                if (typeof value === "string") setCategoryFilter(value);
+              }}
+              className="w-full sm:w-60"
+            />
+          </div>
           {components.length === 0 ? (
             <Empty title={t("noResults")} description={t("noResultsDescription")} />
           ) : (
@@ -2344,30 +2486,36 @@ function ComponentsView() {
                     <Table.Head>Category</Table.Head>
                     <Table.Head>Props</Table.Head>
                     <Table.Head>Manifest revision</Table.Head>
-                    <Table.Head sticky="right">
-                      <span className="sr-only">{t("details")}</span>
-                    </Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {components.map(({ key, component }) => (
-                    <Table.Row key={key}>
+                    <Table.Row
+                      key={key}
+                      className="cursor-pointer transition hover:bg-kumo-hover"
+                      onClick={() =>
+                        context.router.push(context.href(`/components/${encodeURIComponent(key)}`))
+                      }
+                    >
                       <Table.Cell>
-                        <span className="font-medium">{component.title}</span>
-                        <span className="font-mono text-kumo-subtle">{key}</span>
+                        <a
+                          className="inline-block w-fit font-medium text-kumo-link hover:underline"
+                          href={context.href(`/components/${encodeURIComponent(key)}`)}
+                          title={component.description || component.title}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            context.router.push(
+                              context.href(`/components/${encodeURIComponent(key)}`),
+                            );
+                          }}
+                        >
+                          {component.title}
+                        </a>
                       </Table.Cell>
                       <Table.Cell>{component.category ?? "—"}</Table.Cell>
                       <Table.Cell>{componentPropCount(component)}</Table.Cell>
                       <Table.Cell>
                         {revision ? new Date(revision).toLocaleString() : "—"}
-                      </Table.Cell>
-                      <Table.Cell sticky="right" className="text-right">
-                        <LinkButton
-                          size="sm"
-                          href={context.href(`/components/${encodeURIComponent(key)}`)}
-                        >
-                          {t("details")}
-                        </LinkButton>
                       </Table.Cell>
                     </Table.Row>
                   ))}
@@ -2385,6 +2533,7 @@ function ComponentDetailView() {
   const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
+  const [rawJsonOpen, setRawJsonOpen] = useState(false);
   const componentKey = decodeURIComponent(pathname.slice("/components/".length));
   const query = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
     params: { path: { appId: context.appId ?? "" } },
@@ -2422,7 +2571,7 @@ function ComponentDetailView() {
   return (
     <>
       <PageHeader title={component.title} description={component.description}>
-        <LinkButton href={context.href("/components")}>{t("components")}</LinkButton>
+        <Button onClick={() => setRawJsonOpen(true)}>{t("viewComponentJson")}</Button>
       </PageHeader>
       <Surface className="mb-4 grid gap-3 p-4 sm:grid-cols-3">
         <div>
@@ -2439,7 +2588,12 @@ function ComponentDetailView() {
         </div>
       </Surface>
       <div className="grid gap-4 lg:grid-cols-2">
-        <ComponentMetadata title="Props schema" value={component.props} />
+        <ComponentMetadata
+          title="Props schema"
+          value={component.props}
+          className="col-span-full"
+          maxHeight="max-h-96"
+        />
         <ComponentMetadata title="Editor metadata" value={component.editor} />
         <ComponentMetadata title="Dynamic metadata" value={component["dynamic"]} />
         <ComponentMetadata title="Events" value={component.events} />
@@ -2450,15 +2604,26 @@ function ComponentDetailView() {
         />
         <ComponentMetadata title="Capabilities" value={component.capabilities} />
       </div>
+
+      <JsonModalDialog
+        open={rawJsonOpen}
+        onOpenChange={setRawJsonOpen}
+        title={`${component.title} (${componentKey})`}
+        description="Raw component metadata JSON."
+        data={component}
+      />
     </>
   );
 }
 
-function ManifestView() {
+function MetaView() {
   const context = useAdminContext();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const toast = useKumoToastManager();
+  const [selectedComponentKey, setSelectedComponentKey] = useState<string>("");
+  const [componentSearch, setComponentSearch] = useState<string>("");
+
   const app = api.useQuery("get", "/api/v1/apps/{appId}", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -2469,6 +2634,8 @@ function ManifestView() {
     params: { path: { appId: context.appId ?? "" } },
   });
   const manifestRevisions = getManifestRevisions(revisions.data);
+  const activeManifest = getActiveManifest(manifest.data);
+
   const sync = api.useMutation("post", "/api/v1/apps/{appId}/manifest/sync", {
     onSuccess: () => {
       toast.add({ title: t("updated") });
@@ -2483,32 +2650,248 @@ function ManifestView() {
   });
   const [json, setJson] = useState("");
   const [appKey, setAppKey] = useState("");
-  const value = useMemo(() => JSON.stringify(manifest.data ?? {}, null, 2), [manifest.data]);
+
+  const appJson = useMemo(() => JSON.stringify(app.data ?? {}, null, 2), [app.data]);
+  const manifestJson = useMemo(() => JSON.stringify(manifest.data ?? {}, null, 2), [manifest.data]);
+
+  const components = activeManifest?.components ?? {};
+  const componentKeys = Object.keys(components).sort();
+  const filteredComponentKeys = useMemo(() => {
+    const q = componentSearch.trim().toLowerCase();
+    if (!q) return componentKeys;
+    return componentKeys.filter(
+      (k) =>
+        k.toLowerCase().includes(q) ||
+        components[k]?.title?.toLowerCase().includes(q) ||
+        components[k]?.category?.toLowerCase().includes(q),
+    );
+  }, [componentKeys, components, componentSearch]);
+
+  const activeComponentKey =
+    (selectedComponentKey && components[selectedComponentKey] ? selectedComponentKey : null) ??
+    filteredComponentKeys[0] ??
+    componentKeys[0] ??
+    "";
+  const selectedComponentData = activeComponentKey ? components[activeComponentKey] : null;
+  const selectedComponentJson = useMemo(
+    () => (selectedComponentData ? JSON.stringify(selectedComponentData, null, 2) : "{}"),
+    [selectedComponentData],
+  );
+
+  const copyAppJson = () => {
+    void navigator.clipboard?.writeText(appJson);
+    toast.add({ title: t("copied") });
+  };
+  const copyManifestJson = () => {
+    void navigator.clipboard?.writeText(manifestJson);
+    toast.add({ title: t("copied") });
+  };
+  const copyComponentJson = () => {
+    void navigator.clipboard?.writeText(selectedComponentJson);
+    toast.add({ title: t("copied") });
+  };
+
+  if (app.isLoading || manifest.isLoading) return <LoadingState />;
+  if (app.error) return <ErrorState error={app.error} />;
+
   return (
     <>
       <PageHeader
-        title={t("manifest")}
-        description="Inspect revisions and synchronize the configured manifest."
+        title={t("meta")}
+        description="Inspect raw App configuration, active build manifest, and raw component definitions."
       >
-        {app.data?.manifest.mode === "remote" ? (
-          <Button
-            variant="primary"
-            onClick={() => sync.mutate({ params: { path: { appId: context.appId ?? "" } } })}
-          >
-            {t("refresh")}
+        <div className="flex items-center gap-2">
+          {app.data?.manifest.mode === "remote" ? (
+            <Button
+              variant="primary"
+              onClick={() => sync.mutate({ params: { path: { appId: context.appId ?? "" } } })}
+            >
+              {t("refresh")}
+            </Button>
+          ) : null}
+          <Button variant="secondary" onClick={copyManifestJson}>
+            <Copy size={14} className="mr-1 inline" />
+            {t("copyJson")}
           </Button>
-        ) : null}
+        </div>
       </PageHeader>
-      <div className="grid gap-4 lg:grid-cols-2">
+
+      {/* 1. App 原始信息 (App Raw Information) */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
         <Surface className="grid gap-3 p-4">
-          <Text variant="heading" as="h2">
-            Current manifest
-          </Text>
-          <Code code={value} lang="jsonc" />
+          <div className="flex items-center justify-between">
+            <Text variant="heading" as="h2">
+              App 基础信息
+            </Text>
+            {app.data?.status && (
+              <Badge variant={app.data.status === "active" ? "green" : "red"}>
+                {app.data.status}
+              </Badge>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <Text variant="secondary">App ID</Text>
+              <span className="font-mono">{app.data?.id ?? "—"}</span>
+            </div>
+            <div>
+              <Text variant="secondary">App Key</Text>
+              <span className="font-mono">{app.data?.key ?? "—"}</span>
+            </div>
+            <div>
+              <Text variant="secondary">Type</Text>
+              <Text>{app.data?.type ?? "—"}</Text>
+            </div>
+            <div>
+              <Text variant="secondary">Manifest Mode</Text>
+              <Text>{app.data?.manifest?.mode ?? "push"}</Text>
+            </div>
+            <div>
+              <Text variant="secondary">Active Revision ID</Text>
+              <span className="font-mono">{app.data?.manifest?.activeRevisionId ?? "—"}</span>
+            </div>
+            <div>
+              <Text variant="secondary">Updated At</Text>
+              <Text>
+                {app.data?.updatedAt ? new Date(app.data.updatedAt).toLocaleString() : "—"}
+              </Text>
+            </div>
+          </div>
         </Surface>
+
+        <Surface className="grid gap-3 p-4">
+          <div className="flex items-center justify-between">
+            <Text variant="heading" as="h2">
+              App 原始 JSON
+            </Text>
+            <Button size="sm" variant="secondary" onClick={copyAppJson}>
+              <Copy size={14} className="mr-1 inline" />
+              {t("copyJson")}
+            </Button>
+          </div>
+          <div className="max-h-56 overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
+            <Code code={appJson} lang="jsonc" />
+          </div>
+        </Surface>
+      </div>
+
+      {/* 2. 组件原始 JSON (Components Raw JSON) */}
+      <Surface className="mb-6 grid gap-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kumo-line pb-3">
+          <div>
+            <Text variant="heading" as="h2">
+              组件原始 JSON (Component Definitions)
+            </Text>
+            <Text variant="secondary">当前 Manifest 包含 {componentKeys.length} 个注册组件</Text>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder={t("search")}
+              value={componentSearch}
+              onChange={(e) => setComponentSearch(e.target.value)}
+              className="w-48 sm:w-64"
+            />
+            {selectedComponentData && (
+              <Button size="sm" variant="secondary" onClick={copyComponentJson}>
+                <Copy size={14} className="mr-1 inline" />
+                {t("copyJson")}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {componentKeys.length === 0 ? (
+          <Empty
+            icon={<ClipboardText size={32} />}
+            title="暂无组件元信息"
+            description="当前 App 尚未推送或同步组件 Manifest。"
+          />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+            {/* Component Picker List */}
+            <div className="max-h-[460px] overflow-y-auto rounded-lg border border-kumo-line p-1">
+              {filteredComponentKeys.length === 0 ? (
+                <div className="p-3 text-center text-xs text-kumo-subtle">{t("noResults")}</div>
+              ) : (
+                filteredComponentKeys.map((key) => {
+                  const comp = components[key];
+                  const isSelected = key === activeComponentKey;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedComponentKey(key)}
+                      className={`flex w-full flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left transition ${
+                        isSelected
+                          ? "bg-kumo-tint text-kumo-high font-medium"
+                          : "hover:bg-kumo-canvas text-kumo-default"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{comp?.title || key}</span>
+                      <span className="font-mono text-[10px] text-kumo-subtle">{key}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Component Raw JSON Viewer */}
+            <div>
+              {selectedComponentData ? (
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div>
+                      <span className="mr-2 text-sm font-semibold">
+                        {selectedComponentData.title}
+                      </span>
+                      <span className="font-mono text-kumo-subtle">({activeComponentKey})</span>
+                      {selectedComponentData.category && (
+                        <Badge className="ml-2" variant="neutral">
+                          {selectedComponentData.category}
+                        </Badge>
+                      )}
+                    </div>
+                    <LinkButton
+                      size="sm"
+                      href={context.href(`/components/${encodeURIComponent(activeComponentKey)}`)}
+                    >
+                      {t("details")}
+                    </LinkButton>
+                  </div>
+                  <div className="max-h-[410px] overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
+                    <Code code={selectedComponentJson} lang="jsonc" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid h-48 place-items-center text-xs text-kumo-subtle">
+                  请选择一个组件查看原始 JSON
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Surface>
+
+      {/* 3. 完整 Manifest JSON & 手动推送 */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <Surface className="grid gap-3 p-4">
+          <div className="flex items-center justify-between">
+            <Text variant="heading" as="h2">
+              完整 Manifest JSON
+            </Text>
+            <Button size="sm" variant="secondary" onClick={copyManifestJson}>
+              <Copy size={14} className="mr-1 inline" />
+              {t("copyJson")}
+            </Button>
+          </div>
+          <div className="max-h-72 overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
+            <Code code={manifestJson} lang="jsonc" />
+          </div>
+        </Surface>
+
         <Surface className="grid gap-4 p-4">
           <Text variant="heading" as="h2">
-            Push manifest
+            推送 Manifest
           </Text>
           <Input
             label="Temporary App Key"
@@ -2519,6 +2902,7 @@ function ManifestView() {
           <Textarea
             label="Manifest JSON"
             value={json}
+            rows={5}
             onChange={(e) => setJson(e.target.value)}
             description="Credentials are not persisted."
           />
@@ -2544,18 +2928,31 @@ function ManifestView() {
           </Button>
         </Surface>
       </div>
-      <Surface className="mt-4 grid gap-3 p-4">
+
+      {/* 4. 修订版本历史 (Revision History) */}
+      <Surface className="grid gap-3 p-4">
         <Text variant="heading" as="h2">
-          Revision history
+          修订版本历史 (Revision history)
         </Text>
-        {manifestRevisions.map((revision) => (
-          <div key={revision.id} className="flex justify-between border-b border-kumo-line py-2">
-            <Text>
-              {revision.source} · {revision.checksum}
-            </Text>
-            <Text variant="secondary">{new Date(revision.createdAt).toLocaleString()}</Text>
-          </div>
-        ))}
+        {manifestRevisions.length === 0 ? (
+          <div className="py-3 text-xs text-kumo-subtle">暂无历史修订版本</div>
+        ) : (
+          manifestRevisions.map((rev) => (
+            <div
+              key={rev.id}
+              className="flex items-center justify-between border-b border-kumo-line py-2 text-xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-kumo-subtle">{rev.checksum.slice(0, 12)}…</span>
+                <Badge variant={rev.source === "sync" ? "blue" : "neutral"}>{rev.source}</Badge>
+                {app.data?.manifest?.activeRevisionId === rev.id && (
+                  <Badge variant="green">Active</Badge>
+                )}
+              </div>
+              <Text variant="secondary">{new Date(rev.createdAt).toLocaleString()}</Text>
+            </div>
+          ))
+        )}
       </Surface>
     </>
   );
@@ -2891,7 +3288,7 @@ function SystemPromptView() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [enabled, setEnabled] = useState(true);
-
+  const [corePromptOpen, setCorePromptOpen] = useState(false);
   const query = api.useQuery("get", "/api/v1/ai/system-prompt");
   const data = query.data;
 
@@ -2957,6 +3354,39 @@ function SystemPromptView() {
         </LayerCard.Primary>
       </LayerCard>
 
+      <LayerCard className="mb-4 max-w-3xl border border-dashed border-zinc-500/30">
+        <LayerCard.Secondary>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{t("systemPromptCoreTitle")}</span>
+            <Badge variant="neutral" className="gap-1">
+              <Lock size={12} />
+              {t("systemPromptCoreBadge")}
+            </Badge>
+          </div>
+        </LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-3">
+          <div className="flex items-center justify-between">
+            <Text variant="secondary">{t("systemPromptCoreDescription")}</Text>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCorePromptOpen((v) => !v)}
+              className="gap-1.5"
+            >
+              {corePromptOpen ? <CaretDown size={14} /> : <CaretRight size={14} />}
+              {corePromptOpen ? t("collapse") : t("expand")}
+            </Button>
+          </div>
+          {corePromptOpen && (
+            <div className="mt-2 rounded bg-zinc-950/80 p-3 border border-zinc-800">
+              <pre className="font-mono text-xs text-zinc-300 whitespace-pre-wrap select-all">
+                {PROMPT_DEFAULT_SYSTEM}
+              </pre>
+            </div>
+          )}
+        </LayerCard.Primary>
+      </LayerCard>
+
       <Dialog.Root open={confirmOpen} onOpenChange={setConfirmOpen}>
         <Dialog size="base" className="px-6 py-6">
           <Dialog.Title>{t("systemPromptConfirmTitle")}</Dialog.Title>
@@ -2978,64 +3408,27 @@ function SystemPromptView() {
 }
 
 const PROMPT_DEFAULT_SYSTEM = [
-  "You are an expert AI assistant that helps users explore data, design interactive UI pages, and build visual applications in OpenScene.",
+  "You are OpenScene AI Generative UI engine powered by json-render.",
+  "Generate UI specifications strictly following the json-render Standalone Mode specification.",
   "",
-  "WORKFLOW:",
-  "1. Analyze user instructions and understand what UI, components, or updates they want to make.",
-  "2. Respond with a brief conversational explanation of what you are doing.",
-  "3. Output the UI modification action plan as a JSON array wrapped in a ```json or ```spec code block.",
+  "CRITICAL RULES:",
+  "1. Output ONLY JSONL patch lines (RFC 6902 JSON Patch format).",
+  "2. Do NOT output markdown code fences (NO ```json, NO ```spec, NO backticks).",
+  "3. Do NOT output conversational prose, explanations, greetings, or notes.",
+  "4. Each output line MUST be a single, valid, self-contained JSON Patch object.",
   "",
-  "UI ACTION PLAN SPECIFICATION:",
-  "Every response that creates or modifies UI must output an array of action items:",
+  "SPECIFICATION FORMAT (RFC 6902 JSON Patch):",
+  '- Set root: {"op":"add","path":"/root","value":"<root_element_id>"}',
+  '- Add element: {"op":"add","path":"/elements/<element_id>","value":{"type":"<ComponentType>","props":{...},"children":["<child_id>"]}}',
+  '- Update props: {"op":"replace","path":"/elements/<element_id>/props/<prop_name>","value":<value>}',
+  '- Remove element: {"op":"remove","path":"/elements/<element_id>"}',
+  '- Set state: {"op":"add","path":"/state/<key>","value":<value>}',
   "",
-  "Case A — Full Canvas Replacement (全量重绘 - single item array):",
-  "```json",
-  "[",
-  "  {",
-  '    "action": "replace_document",',
-  '    "document": {',
-  '      "protocolVersion": "1.0",',
-  '      "pageInfo": { "title": "Page Title" },',
-  '      "globalConfig": { "design": { "width": 390 } },',
-  '      "spec": {',
-  '        "root": "root",',
-  '        "elements": {',
-  '          "root": { "id": "root", "type": "View", "props": {}, "children": ["comp_1"] },',
-  '          "comp_1": { "id": "comp_1", "type": "Text", "props": { "text": "Hello OpenScene" } }',
-  "        }",
-  "      }",
-  "    }",
-  "  }",
-  "]",
-  "```",
-  "",
-  "Case B — Incremental Edits (增量插入、更新、删除):",
-  "```json",
-  "[",
-  "  {",
-  '    "action": "insert_element",',
-  '    "elementId": "btn_1",',
-  '    "element": { "type": "Button", "props": { "text": "Submit" } },',
-  '    "target": { "parentId": "root" }',
-  "  },",
-  "  {",
-  '    "action": "update_element",',
-  '    "elementId": "comp_1",',
-  '    "patch": { "props": { "text": "Updated Text" } }',
-  "  },",
-  "  {",
-  '    "action": "delete_element",',
-  '    "elementId": "old_comp"',
-  "  }",
-  "]",
-  "```",
-  "",
-  "RULES:",
-  "- Use only the components published for this app (see ## Available Components below).",
-  "- For complete redesigns or initial pages, use replace_document.",
-  "- For targeted changes, use insert_element, update_element, or delete_element.",
-  '- State binding: { "$state": "/path" } in props.',
-  '- Actions: "on": { "press": { "action": "setState", "params": { "statePath": "/path", "value": true } } }.',
+  "EXAMPLE OUTPUT:",
+  '{"op":"add","path":"/root","value":"card-1"}',
+  '{"op":"add","path":"/elements/card-1","value":{"type":"Card","props":{"title":"Dashboard"},"children":["metric-1","btn-1"]}}',
+  '{"op":"add","path":"/elements/metric-1","value":{"type":"Metric","props":{"label":"Revenue","value":"$12,450"}}}',
+  '{"op":"add","path":"/elements/btn-1","value":{"type":"Button","props":{"text":"Refresh"}}}',
 ].join("\n");
 
 function PromptsListView() {
