@@ -64,6 +64,7 @@ export interface ServerLocaleOption {
   name: string;
   isDefault?: boolean;
 }
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +87,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useStudioStore } from "@/stores/studio-store";
+import type { StudioBootstrap } from "@/core/studio-bootstrap";
 
 interface VariablesPanelProps {
   locale: string;
@@ -96,6 +98,7 @@ interface VariablesPanelProps {
   onDeleteVariable?: (key: string) => void;
   onRenameVariable?: (oldKey: string, newKey: string) => void;
   onSelectNode?: (nodeId: string | null) => void;
+  bootstrap?: StudioBootstrap | null;
 }
 
 const TYPE_CONFIG: Record<
@@ -137,7 +140,6 @@ const TYPE_CONFIG: Record<
     badgeClass: "bg-muted text-muted-foreground border-border",
   },
 };
-
 export function VariablesPanel({
   locale,
   locales,
@@ -147,6 +149,7 @@ export function VariablesPanel({
   onDeleteVariable: deleteVarProp,
   onRenameVariable: renameVarProp,
   onSelectNode,
+  bootstrap: bootstrapProp,
 }: VariablesPanelProps) {
   const { LL } = useI18n();
   const storeDocument = useStudioStore((s) => s.document);
@@ -154,7 +157,8 @@ export function VariablesPanel({
   const storeDeleteVariable = useStudioStore((s) => s.deleteVariable);
   const storeRenameVariable = useStudioStore((s) => s.renameVariable);
   const showNotice = useStudioStore((s) => s.showNotice);
-  const bootstrap = useStudioStore((s) => s.bootstrap);
+  const storeBootstrap = useStudioStore((s) => s.bootstrap);
+  const bootstrap = bootstrapProp ?? storeBootstrap;
 
   const document = docProp ?? storeDocument;
   const setVariable = setVarProp ?? storeSetVariable;
@@ -171,30 +175,37 @@ export function VariablesPanel({
   const [isLoadingLocales, setIsLoadingLocales] = useState(false);
 
   const fetchServerLocales = useCallback(async () => {
-    const appId = bootstrap?.app?.id;
     const query = useQueryStore.getState();
-    if (!appId || !query.serverUrl || !query.token || appId === "local-test-app") {
+    const appId = bootstrap?.app?.id || query.appId;
+    const serverUrl = query.serverUrl;
+    const token = query.token;
+    if (!appId || !serverUrl || !token || appId === "local-test-app") {
       return;
     }
     setIsLoadingLocales(true);
     try {
       const client = createOpenSceneClient({
-        baseUrl: query.serverUrl.replace(/\/$/, ""),
-        headers: { "x-openscene-session-token": query.token },
+        baseUrl: serverUrl.replace(/\/$/, ""),
+        headers: { "x-openscene-session-token": token },
       });
-      const { data, error } = await client.GET("/api/v1/apps/{appId}/locales", {
+      const { data, error, response } = await client.GET("/api/v1/apps/{appId}/locales", {
         params: { path: { appId } },
       });
-      if (!error && Array.isArray(data)) {
-        setServerLocales(
-          data.map((item) => ({
-            id: item.id,
-            code: item.code,
-            name: item.name,
-            isDefault: item.isDefault,
-          })),
+      if (error || !Array.isArray(data)) {
+        console.warn(
+          "[OpenScene Studio] Failed to fetch server locales:",
+          error || `Status ${response?.status}`,
         );
+        return;
       }
+      setServerLocales(
+        data.map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          isDefault: item.isDefault,
+        })),
+      );
     } catch (err) {
       console.warn("[OpenScene Studio] Failed to fetch server locales:", err);
     } finally {
@@ -811,7 +822,7 @@ export function VariablesPanel({
                         <div className="flex flex-col gap-1">
                           <select
                             className="h-7 w-full font-mono text-xs bg-muted/40 rounded-lg border border-border/60 px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                            value={String(v.value ?? "")}
+                            value={formatDisplayString(v.value)}
                             onChange={(e) => {
                               const nextCode = e.target.value;
                               setVariable("lang", nextCode);

@@ -302,6 +302,7 @@ export function StudioSidebar({
                         onDeleteVariable={onDeleteVariable}
                         onRenameVariable={onRenameVariable}
                         onSelectNode={onSelectNode}
+                        bootstrap={bootstrap}
                       />
                     )}
                   </div>

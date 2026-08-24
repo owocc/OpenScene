@@ -181,18 +181,16 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         locale: action.document.pageInfo?.locale || state.locale || "en-US",
       };
     case "locale.switch": {
-      const hasLangInState = state.document.spec.state && "lang" in state.document.spec.state;
       return {
         ...commit(state, {
           ...state.document,
           pageInfo: { ...state.document.pageInfo, locale: action.locale },
           spec: {
             ...state.document.spec,
-            ...(hasLangInState
-              ? { state: { ...state.document.spec.state, lang: action.locale } }
-              : state.document.spec.state
-                ? { state: state.document.spec.state }
-                : {}),
+            state: {
+              ...state.document.spec.state,
+              lang: action.locale,
+            },
           },
         }),
         locale: action.locale,
