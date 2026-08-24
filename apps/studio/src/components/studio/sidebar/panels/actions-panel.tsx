@@ -82,7 +82,7 @@ export function ActionsPanel({
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
   const [deletingAction, setDeletingAction] = useState<ActionItem | null>(null);
   const [inspectingRefsAction, setInspectingRefsAction] = useState<ActionItem | null>(null);
-
+  const [deletedActionKeys, setDeletedActionKeys] = useState<Set<string>>(new Set());
   // Form states
   const [formKey, setFormKey] = useState("");
   const [formTitle, setFormTitle] = useState("");
@@ -179,8 +179,8 @@ export function ActionsPanel({
       }
     }
 
-    return list;
-  }, [bootstrap?.manifest?.actions, customActions]);
+    return list.filter((item) => !deletedActionKeys.has(item.key));
+  }, [bootstrap?.manifest?.actions, customActions, deletedActionKeys]);
 
   const filteredActions = useMemo(() => {
     if (!searchQuery.trim()) return allActions;
@@ -287,9 +287,9 @@ export function ActionsPanel({
     );
     setEditingAction(null);
   };
-
   const handleDeleteAction = (action: ActionItem) => {
     setCustomActions((prev) => prev.filter((a) => a.key !== action.key));
+    setDeletedActionKeys((prev) => new Set([...prev, action.key]));
 
     // Clean up references in document.spec.elements
     const elements = { ...document.spec.elements };
@@ -468,28 +468,24 @@ export function ActionsPanel({
                           <MoreVertical className="size-3.5" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40 text-xs">
-                          {!isBuiltIn && (
-                            <DropdownMenuItem onClick={() => openEditDialog(action)}>
-                              <Edit2 className="size-3.5 mr-2" />
-                              <span>{LL.panels.actions.editAction()}</span>
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem onClick={() => openEditDialog(action)}>
+                            <Edit2 className="size-3.5 mr-2" />
+                            <span>{LL.panels.actions.editAction()}</span>
+                          </DropdownMenuItem>
                           {refs.length > 0 && (
                             <DropdownMenuItem onClick={() => setInspectingRefsAction(action)}>
                               <Eye className="size-3.5 mr-2" />
                               <span>{LL.panels.actions.referencesTitle()}</span>
                             </DropdownMenuItem>
                           )}
-                          {!isBuiltIn && <DropdownMenuSeparator />}
-                          {!isBuiltIn && (
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeletingAction(action)}
-                            >
-                              <Trash2 className="size-3.5 mr-2" />
-                              <span>{LL.panels.actions.deleteAction()}</span>
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive cursor-pointer"
+                            onClick={() => setDeletingAction(action)}
+                          >
+                            <Trash2 className="size-3.5 mr-2" />
+                            <span>{LL.panels.actions.deleteAction()}</span>
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
