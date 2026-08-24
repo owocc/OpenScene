@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { studioSessions } from "../../../../server/db/schema";
 import {
   assertAppContext,
   assertManagementCsrf,
@@ -48,6 +50,8 @@ import {
   getRelease,
   getResource,
   getVersion,
+  getResourceChatSessions,
+  saveResourceChatSessions,
   listAppOpenApiDocs,
   listAppPrompts,
   listApps,
@@ -97,13 +101,16 @@ import {
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ path: string[] }> };
-type Method = "GET" | "POST" | "PATCH" | "DELETE" | "OPTIONS";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
 
 export async function GET(request: NextRequest, context: Context): Promise<Response> {
   return handle(request, context, "GET");
 }
 export async function POST(request: NextRequest, context: Context): Promise<Response> {
   return handle(request, context, "POST");
+}
+export async function PUT(request: NextRequest, context: Context): Promise<Response> {
+  return handle(request, context, "PUT");
 }
 export async function PATCH(request: NextRequest, context: Context): Promise<Response> {
   return handle(request, context, "PATCH");
@@ -229,6 +236,43 @@ async function handleRequest(
       const input = await parseBody(request, AiChatRequestSchema);
       const appId = authContext.appId ?? input.appId;
       return await chatWithAi(db, { ...input, appId });
+    }
+    if (path[0] === "studio-sessions" && path[2] === "chat-sessions") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const session = await db
+        .select()
+        .from(studioSessions)
+        .where(eq(studioSessions.id, path[1]))
+        .get();
+      if (!session) throw notFound();
+      if (method === "GET") {
+        return json(
+          await getResourceChatSessions(
+            db,
+            session.appId,
+            session.resourceKind,
+            session.resourceId,
+          ),
+          200,
+          { "cache-control": "no-store" },
+        );
+      }
+      if (method === "PUT") {
+        const body = await parseBody(request, z.array(z.record(z.string(), z.unknown())));
+        return json(
+          await saveResourceChatSessions(
+            db,
+            session.appId,
+            session.resourceKind,
+            session.resourceId,
+            body,
+          ),
+          200,
+          { "cache-control": "no-store" },
+        );
+      }
+      throw notFound();
     }
 
     if (path[0] === "ai") return await aiRoutes(request, db, method, path);

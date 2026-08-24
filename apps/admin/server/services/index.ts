@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull, like, ne, or } from "drizzle-orm";
 import type { AppDatabase } from "../db/client";
 import { hashSecret, newId, newSecret, nowIso } from "../db/ids";
 import {
+  aiChatSessions,
   appKeys,
   appOpenApiDocs,
   appPrompts,
@@ -1623,6 +1624,67 @@ export async function createStudioSession(
   };
 }
 
+export async function getResourceChatSessions(
+  db: AppDatabase,
+  appId: string,
+  resourceKind: "page" | "template",
+  resourceId: string,
+): Promise<unknown[]> {
+  const row = await db
+    .select()
+    .from(aiChatSessions)
+    .where(
+      and(
+        eq(aiChatSessions.appId, appId),
+        eq(aiChatSessions.resourceKind, resourceKind),
+        eq(aiChatSessions.resourceId, resourceId),
+      ),
+    )
+    .get();
+
+  if (!row) return [];
+  try {
+    const parsed = JSON.parse(row.json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveResourceChatSessions(
+  db: AppDatabase,
+  appId: string,
+  resourceKind: "page" | "template",
+  resourceId: string,
+  sessions: unknown,
+): Promise<unknown[]> {
+  const timestamp = nowIso();
+  const jsonStr = JSON.stringify(Array.isArray(sessions) ? sessions : []);
+  const id = `asess_${appId}_${resourceKind}_${resourceId}`;
+
+  await db
+    .insert(aiChatSessions)
+    .values({
+      id,
+      appId,
+      resourceKind,
+      resourceId,
+      json: jsonStr,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .onConflictDoUpdate({
+      target: [aiChatSessions.appId, aiChatSessions.resourceKind, aiChatSessions.resourceId],
+      set: {
+        json: jsonStr,
+        updatedAt: timestamp,
+      },
+    })
+    .run();
+
+  return getResourceChatSessions(db, appId, resourceKind, resourceId);
+}
+
 export async function bootstrapStudioSession(db: AppDatabase, sessionId: string): Promise<unknown> {
   const session = await db
     .select()
@@ -1668,6 +1730,12 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
     capabilities: { saveDraft: true, createVersion: true, publish: true, uploadAsset: true },
     returnUrl: session.returnUrl,
     prompts: await listAppPrompts(db, session.appId),
+    chatSessions: await getResourceChatSessions(
+      db,
+      session.appId,
+      session.resourceKind,
+      session.resourceId,
+    ),
   };
 }
 

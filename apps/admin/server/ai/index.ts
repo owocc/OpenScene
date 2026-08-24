@@ -287,7 +287,20 @@ async function resolveOpenApiText(db: AppDatabase, appId: string, ids: string[])
 export async function buildAppSystemPrompt(
   db: AppDatabase,
   appId: string,
-  options?: { promptKey?: string; promptId?: string; requestSystem?: string } | string,
+  options?:
+    | {
+        promptKey?: string;
+        promptId?: string;
+        requestSystem?: string;
+        selectedElement?: {
+          nodeId: string;
+          type: string;
+          props?: Record<string, unknown>;
+          children?: string[];
+          slots?: Record<string, string[]>;
+        };
+      }
+    | string,
 ): Promise<string> {
   const opts = typeof options === "string" ? { requestSystem: options } : (options ?? {});
   const parts: string[] = [];
@@ -342,8 +355,21 @@ export async function buildAppSystemPrompt(
       if (openApiText) parts.push(openApiText);
     }
   }
+  // 3. Targeted Selected Element Context
+  if (opts.selectedElement && opts.selectedElement.nodeId) {
+    const elSpec = {
+      nodeId: opts.selectedElement.nodeId,
+      type: opts.selectedElement.type,
+      props: opts.selectedElement.props || {},
+      children: opts.selectedElement.children || [],
+      slots: opts.selectedElement.slots || {},
+    };
+    parts.push(
+      `## Targeted Selected Element Context\nThe user currently has selected the following element on the canvas for targeted modification:\nTarget Node ID: "${opts.selectedElement.nodeId}"\nType: "${opts.selectedElement.type}"\nElement Spec:\n${JSON.stringify(elSpec, null, 2)}\n\nWhen the user asks to edit, update, modify, insert into, or delete, prioritize targeted actions (such as update_element with elementId: "${opts.selectedElement.nodeId}", or insert_element with target.parentId: "${opts.selectedElement.nodeId}") for this element.`,
+    );
+  }
 
-  // 3. Caller-supplied request instruction
+  // 4. Caller-supplied request instruction
   if (opts.requestSystem?.trim()) {
     parts.push(opts.requestSystem.trim());
   }
@@ -371,6 +397,7 @@ export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<R
   const systemPrompt = await buildAppSystemPrompt(db, input.appId, {
     promptKey: input.promptKey,
     promptId: input.promptId,
+    selectedElement: input.selectedElement,
     requestSystem: input.system,
   });
   const settings = {

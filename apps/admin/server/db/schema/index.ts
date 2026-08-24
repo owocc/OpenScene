@@ -360,6 +360,28 @@ export const systemPrompts = sqliteTable("system_prompts", {
   ...timestamps,
 });
 
+export const aiChatSessions = sqliteTable(
+  "ai_chat_sessions",
+  {
+    id: text("id").primaryKey(),
+    appId: text("app_id")
+      .notNull()
+      .references(() => apps.id, { onDelete: "cascade" }),
+    resourceKind: text("resource_kind", { enum: ["page", "template"] }).notNull(),
+    resourceId: text("resource_id").notNull(),
+    json: text("json").notNull().default("[]"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("ai_chat_sessions_resource_unique").on(
+      table.appId,
+      table.resourceKind,
+      table.resourceId,
+    ),
+    index("ai_chat_sessions_app_idx").on(table.appId),
+  ],
+);
+
 export const schema = {
   apps,
   previewProfiles,
@@ -378,6 +400,7 @@ export const schema = {
   aiConfig,
   appPrompts,
   systemPrompts,
+  aiChatSessions,
 };
 
 export type AppRow = typeof apps.$inferSelect;
@@ -394,3 +417,4 @@ export type StudioSessionRow = typeof studioSessions.$inferSelect;
 
 export type AiConfigRow = typeof aiConfig.$inferSelect;
 export type SystemPromptRow = typeof systemPrompts.$inferSelect;
+export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;

@@ -85,6 +85,13 @@
       "when": 1787555669223,
       "tag": "0011_living_squadron_supreme",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1787562723111,
+      "tag": "0012_little_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }

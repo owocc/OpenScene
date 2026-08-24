@@ -61,4 +61,5 @@ export interface StudioCanvasProps {
   onRedo?: () => void;
   onCopyJson?: () => void;
   onSave?: () => void;
+  onApplyDocument?: (document: SceneDocument) => void;
 }

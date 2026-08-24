@@ -2,13 +2,16 @@ import { useMemo } from "react";
 
 import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
 
-import { CanvasArtboard } from "./canvas-artboard";
 import { CanvasSettingsDialog } from "./canvas-settings-dialog";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { CanvasViewport } from "./canvas-viewport";
 import { ShortcutsPanel } from "@/components/studio/shortcuts";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { WebIframeRenderer } from "./renderers/web-iframe-renderer";
+import { useAgentChatStore } from "@/stores/agent-chat-store";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { CheckCheck, Sparkles, X } from "lucide-react";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
 export const canvasRendererRegistry: Record<AppType, CanvasRendererAdapter> = {
@@ -52,7 +55,12 @@ export function StudioCanvas({
   onRedo,
   onCopyJson,
   onSave,
+  onApplyDocument,
 }: StudioCanvasProps) {
+  const aiPreviewDocument = useAgentChatStore((s) => s.aiPreviewDocument);
+  const aiPreviewRevision = useAgentChatStore((s) => s.aiPreviewRevision);
+  const isStreaming = useAgentChatStore((s) => s.isStreaming);
+  const discardAiPreview = useAgentChatStore((s) => s.discardAiPreview);
   const previewIdentity = useMemo(
     () => ({
       appKey: bootstrap.app.key,
@@ -85,6 +93,38 @@ export function StudioCanvas({
   ) : (
     <UnsupportedRenderer appType={bootstrap.app.type} />
   );
+  const aiRendererProps: CanvasRendererProps = useMemo(
+    () => ({
+      url: bootstrap.preview.url,
+      allowedOrigin: bootstrap.preview.allowedOrigin,
+      identity: previewIdentity,
+      appType: bootstrap.app.type,
+      document: aiPreviewDocument || document,
+      revision: aiPreviewRevision,
+      selectedNodeIds: [],
+      primaryNodeId: null,
+      interactionMode: "preview" as const,
+      viewportSize: {
+        width: viewport.currentDeviceWidth ?? 0,
+        height: viewport.currentDeviceHeight ?? 0,
+      },
+      onSelectionChange: () => {},
+      onHoverElement: () => {},
+      onFrameDrop: () => {},
+    }),
+    [
+      bootstrap.preview.url,
+      bootstrap.preview.allowedOrigin,
+      previewIdentity,
+      bootstrap.app.type,
+      aiPreviewDocument,
+      document,
+      aiPreviewRevision,
+      viewport.currentDeviceWidth,
+      viewport.currentDeviceHeight,
+    ],
+  );
+  const aiPreviewElement = adapter && aiPreviewDocument ? adapter.render(aiRendererProps) : null;
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -141,7 +181,86 @@ export function StudioCanvas({
           activeToolMode={activeToolMode}
           onPatch={onPatchViewport}
         >
-          <CanvasArtboard viewport={viewport}>{previewElement}</CanvasArtboard>
+          <div
+            className="flex items-center justify-center gap-12 origin-center transition-transform duration-75"
+            style={{
+              transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
+            }}
+          >
+            {/* 1. Main Canvas Artboard */}
+            <div
+              className="relative transition-all duration-150"
+              style={{
+                width: viewport.isRotated
+                  ? viewport.currentDeviceHeight
+                  : viewport.currentDeviceWidth,
+                height: viewport.isRotated
+                  ? viewport.currentDeviceWidth
+                  : viewport.currentDeviceHeight,
+              }}
+            >
+              <div className="absolute -top-6 left-0 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground select-none">
+                <span>主画布</span>
+                <span className="text-[10px] text-muted-foreground/60">rev {revision}</span>
+              </div>
+              <div className="h-full w-full border border-border bg-background shadow-md overflow-hidden">
+                {previewElement}
+              </div>
+            </div>
+
+            {/* 2. Live AI Replica Canvas Artboard */}
+            {aiPreviewDocument && (
+              <div
+                className="relative flex flex-col transition-all duration-150 ring-4 ring-primary/25 rounded-2xl shadow-2xl overflow-hidden border border-primary/50 bg-background"
+                style={{
+                  width: viewport.isRotated
+                    ? viewport.currentDeviceHeight
+                    : viewport.currentDeviceWidth,
+                  height:
+                    (viewport.isRotated
+                      ? viewport.currentDeviceWidth
+                      : viewport.currentDeviceHeight) + 36,
+                }}
+              >
+                {/* Top AI Banner */}
+                <div className="h-9 shrink-0 flex items-center justify-between bg-primary/95 px-3 py-1 text-primary-foreground backdrop-blur select-none">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Sparkles className="size-3.5 text-amber-300 animate-pulse" />
+                    <span>AI 实时副本画布</span>
+                    {isStreaming && <Spinner className="size-3 text-primary-foreground" />}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-6 gap-1 px-2.5 text-[11px] font-semibold bg-background text-foreground hover:bg-background/90 shadow-sm"
+                      onClick={() => {
+                        if (aiPreviewDocument) {
+                          onApplyDocument?.(aiPreviewDocument);
+                          discardAiPreview();
+                        }
+                      }}
+                    >
+                      <CheckCheck className="size-3.5 text-emerald-600" />
+                      替换为主页面
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-6 text-primary-foreground hover:bg-white/20"
+                      title="关闭实时副本"
+                      onClick={discardAiPreview}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Live AI Iframe Renderer */}
+                <div className="flex-1 w-full overflow-hidden">{aiPreviewElement}</div>
+              </div>
+            )}
+          </div>
         </CanvasViewport>
       )}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center justify-end">

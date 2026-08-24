@@ -40,6 +40,7 @@ export interface StudioBootstrap {
   };
   returnUrl: string;
   prompts?: AppPromptInfo[];
+  chatSessions?: unknown[];
 }
 export type StudioBootstrapState =
   | { status: "loading" }

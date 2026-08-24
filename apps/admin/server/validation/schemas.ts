@@ -210,6 +210,7 @@ export const BootstrapSchema = z.object({
   }),
   returnUrl: z.string().url(),
   prompts: z.array(z.record(z.string(), z.unknown())).optional(),
+  chatSessions: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 export const RuntimeDeliverySchema = RuntimePageDeliverySchema;
 export const UploadIntentResponseSchema = z.object({
@@ -522,6 +523,18 @@ export const AppPromptSchema = z
 
 export const AppPromptUpdateSchema = AppPromptCreateSchema.partial();
 
+export const SelectedElementContextSchema = z
+  .object({
+    nodeId: z.string().min(1),
+    type: z.string().min(1),
+    props: z.record(z.string(), z.unknown()).optional(),
+    children: z.array(z.string()).optional(),
+    slots: z.record(z.string(), z.array(z.string())).optional(),
+  })
+  .openapi({
+    description: "Target selected element context from the canvas for fine-grained editing",
+  });
+
 // Client consumption request. `format` selects the response representation.
 export const AiChatRequestSchema = z
   .object({
@@ -540,6 +553,7 @@ export const AiChatRequestSchema = z
     promptId: z.string().min(1).max(256).optional().openapi({
       description: "Optional prompt module id to use.",
     }),
+    selectedElement: SelectedElementContextSchema.optional(),
   })
   .openapi({ description: "AI chat completion request" });
 

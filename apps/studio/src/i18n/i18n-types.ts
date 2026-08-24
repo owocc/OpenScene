@@ -118,6 +118,23 @@ type RootTranslation = {
        */
       newChat: string;
       /**
+       * 会​话​列​表
+       */
+      sessionsList: string;
+      /**
+       * 重​命​名
+       */
+      rename: string;
+      /**
+       * 输​入​新​会​话​名​称
+       */
+      renameSessionPrompt: string;
+      /**
+       * {​c​o​u​n​t​}​ ​条​消​息
+       * @param {unknown} count
+       */
+      messagesCount: RequiredParams<"count">;
+      /**
        * 暂​无​对​话​会​话
        */
       noSessions: string;
@@ -161,6 +178,18 @@ type RootTranslation = {
        * 删​除​会​话
        */
       deleteSession: string;
+      /**
+       * 携​带​选​中​元​素
+       */
+      attachElementContext: string;
+      /**
+       * 已​选​中
+       */
+      selectedElement: string;
+      /**
+       * 已​附​加​目​标​元​素​上​下​文
+       */
+      targetedPromptTip: string;
       /**
        * 清​空​消​息
        */
@@ -722,6 +751,22 @@ export type TranslationFunctions = {
        */
       newChat: () => LocalizedString;
       /**
+       * 会话列表
+       */
+      sessionsList: () => LocalizedString;
+      /**
+       * 重命名
+       */
+      rename: () => LocalizedString;
+      /**
+       * 输入新会话名称
+       */
+      renameSessionPrompt: () => LocalizedString;
+      /**
+       * {count} 条消息
+       */
+      messagesCount: (arg: { count: unknown }) => LocalizedString;
+      /**
        * 暂无对话会话
        */
       noSessions: () => LocalizedString;
@@ -765,6 +810,18 @@ export type TranslationFunctions = {
        * 删除会话
        */
       deleteSession: () => LocalizedString;
+      /**
+       * 携带选中元素
+       */
+      attachElementContext: () => LocalizedString;
+      /**
+       * 已选中
+       */
+      selectedElement: () => LocalizedString;
+      /**
+       * 已附加目标元素上下文
+       */
+      targetedPromptTip: () => LocalizedString;
       /**
        * 清空消息
        */

@@ -231,7 +231,7 @@ function safeEqual(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 function bearerToken(request: NextRequest): string | undefined {
   const value = request.headers.get("authorization");

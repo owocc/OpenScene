@@ -427,12 +427,16 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
   const undo = () => dispatch({ type: "history.undo" });
   const redo = () => dispatch({ type: "history.redo" });
 
+  const handleApplyDocument = (newDoc: SceneDocument) => {
+    dispatch({ type: "document.replace", document: newDoc });
+    showNotice(`✨ ${LL.panels.agents.appliedToCanvasSuccess()}`);
+  };
+
   const handleApplyAgentActions = (actions: AgentUiAction[]) => {
     const nextDoc = applyAgentUiActionsToDocument(document, actions);
     dispatch({ type: "document.replace", document: nextDoc });
     showNotice(`✨ ${LL.panels.agents.appliedToCanvasSuccess()}`);
   };
-
   return (
     <ShortcutsProvider
       onSave={saveDocument}
@@ -495,6 +499,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           components={components}
           onAddComponent={addComponent}
           onSave={() => void saveDocument()}
+          onApplyDocument={handleApplyDocument}
         />
 
         {/* 2. Floating UI Layer: StudioSidebar (Hidden in text/document mode) */}

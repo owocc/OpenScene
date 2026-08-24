@@ -274,7 +274,6 @@ export function StudioSidebar({
                         onAddComponent={onAddComponent}
                       />
                     )}
-
                     {activeTab === "agents" && (
                       <AgentsPanel
                         appKey={bootstrap.app.key}
@@ -283,6 +282,8 @@ export function StudioSidebar({
                         valid={valid}
                         revision={revision}
                         diagnostics={diagnostics}
+                        document={document}
+                        selectedId={selectedId}
                         onApplyAgentActions={onApplyAgentActions}
                       />
                     )}
