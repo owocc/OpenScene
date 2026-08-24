@@ -40,10 +40,10 @@ export interface PrimitiveProps {
 function useResolvedProps(rawProps: Record<string, unknown>): Record<string, unknown> {
   try {
     const context = useOpenScene();
-    const state =
-      context.snapshot().runtimeStore?.getSnapshot() ??
-      (context.snapshot().document?.spec.state as Record<string, unknown> | undefined) ??
-      {};
+    const doc = context.snapshot().document;
+    const docState = (doc?.spec?.state as Record<string, unknown> | undefined) ?? {};
+    const storeState = context.snapshot().runtimeStore?.getSnapshot() ?? {};
+    const state = { ...docState, ...storeState };
     return evaluateDynamicValue(rawProps, state) as Record<string, unknown>;
   } catch {
     return rawProps;

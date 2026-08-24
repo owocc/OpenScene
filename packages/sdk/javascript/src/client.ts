@@ -363,10 +363,23 @@ export class OpenSceneController implements OpenSceneClient {
       ...document.spec.state,
       __scene: { pageInfo: document.pageInfo, globalConfig: document.globalConfig },
     };
+    const store = this.state.runtimeStore ?? createStateStore(runtimeState);
+    const currentSnapshot = store.getSnapshot();
+    const updates: Record<string, unknown> = {};
+    for (const key of Object.keys(currentSnapshot)) {
+      if (!(key in runtimeState)) {
+        updates[`/${key}`] = undefined;
+      }
+    }
+    for (const [key, value] of Object.entries(runtimeState)) {
+      updates[`/${key}`] = value;
+    }
+    store.update(updates);
+
     this.setState({
       status: "ready",
       document: frozen,
-      runtimeStore: createStateStore(runtimeState),
+      runtimeStore: store,
       revision,
       error: null,
       selectedElementIds: [],
