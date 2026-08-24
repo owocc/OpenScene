@@ -656,7 +656,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           </ResizablePanelGroup>
         )}
         {notice && (
-          <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-foreground px-3 py-1.5 text-[11px] text-background shadow-lg">
+          <div className="pointer-events-none fixed top-5 left-1/2 z-50 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-border/80 bg-foreground px-3.5 py-1.5 text-xs font-medium text-background shadow-xl backdrop-blur transition-all duration-150 animate-in fade-in-0 slide-in-from-top-3">
             {notice}
           </div>
         )}

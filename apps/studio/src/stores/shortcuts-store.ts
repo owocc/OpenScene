@@ -49,13 +49,6 @@ export const REGISTERED_SHORTCUTS: ShortcutItem[] = [
     keys: ["Mod", "S"],
   },
   {
-    id: "doc.copyJson",
-    category: "Essential",
-    name: "复制 JSON 快照",
-    nameEn: "Copy JSON snapshot",
-    keys: ["Mod", "C"],
-  },
-  {
     id: "shortcuts.toggle",
     category: "Essential",
     name: "打开/关闭快捷键面板",

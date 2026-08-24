@@ -112,10 +112,7 @@ export function LogoMenu({
                 {LL.menu.saveDocument()}
                 <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onCopyJson}>
-                {LL.menu.copyJson()}
-                <DropdownMenuShortcut>⌘C</DropdownMenuShortcut>
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onCopyJson}>{LL.menu.copyJson()}</DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>

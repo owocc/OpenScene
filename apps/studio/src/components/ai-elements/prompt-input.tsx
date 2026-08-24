@@ -31,13 +31,13 @@ interface PromptInputContextValue {
   addFiles: (newFiles: PromptInputAttachmentFile[]) => void;
   removeFile: (id: string) => void;
   clearFiles: () => void;
-  onSubmit?: (message: PromptInputMessage) => void;
+  submit: () => void;
+  registerSubmit: (fn: () => void) => void;
   status: "ready" | "submitted" | "streaming" | "error";
   setStatus: (status: "ready" | "submitted" | "streaming" | "error") => void;
   onStop?: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 }
-
 const PromptInputContext = React.createContext<PromptInputContextValue | null>(null);
 
 export function usePromptInput() {
@@ -75,6 +75,7 @@ export function PromptInputProvider({
     "ready" | "submitted" | "streaming" | "error"
   >("ready");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const submitHandlerRef = React.useRef<(() => void) | null>(null);
 
   const status = controlledStatus ?? internalStatus;
   const setStatus = React.useCallback((s: "ready" | "submitted" | "streaming" | "error") => {
@@ -93,6 +94,14 @@ export function PromptInputProvider({
     setFiles([]);
   }, []);
 
+  const registerSubmit = React.useCallback((fn: () => void) => {
+    submitHandlerRef.current = fn;
+  }, []);
+
+  const submit = React.useCallback(() => {
+    submitHandlerRef.current?.();
+  }, []);
+
   const value = React.useMemo<PromptInputContextValue>(
     () => ({
       text,
@@ -101,17 +110,29 @@ export function PromptInputProvider({
       addFiles,
       removeFile,
       clearFiles,
+      submit,
+      registerSubmit,
       status,
       setStatus,
       onStop,
       fileInputRef,
     }),
-    [text, files, addFiles, removeFile, clearFiles, status, setStatus, onStop],
+    [
+      text,
+      files,
+      addFiles,
+      removeFile,
+      clearFiles,
+      submit,
+      registerSubmit,
+      status,
+      setStatus,
+      onStop,
+    ],
   );
 
   return <PromptInputContext.Provider value={value}>{children}</PromptInputContext.Provider>;
 }
-
 export interface PromptInputProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSubmit"> {
   onSubmit?: (message: PromptInputMessage) => void;
   globalDrop?: boolean;
@@ -128,7 +149,8 @@ export function PromptInput({
   accept = "image/*,.json,.txt,.md,.pdf,.csv",
   ...props
 }: PromptInputProps) {
-  const { text, setText, files, clearFiles, fileInputRef, addFiles } = usePromptInput();
+  const { text, setText, files, clearFiles, fileInputRef, addFiles, registerSubmit } =
+    usePromptInput();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -151,19 +173,26 @@ export function PromptInput({
     e.target.value = "";
   };
 
+  const submitMessage = React.useCallback(() => {
+    const hasText = Boolean(text.trim());
+    const hasFiles = files.length > 0;
+    if (hasText || hasFiles) {
+      onSubmit?.({ text: text.trim(), files });
+      setText("");
+      clearFiles();
+    }
+  }, [text, files, onSubmit, setText, clearFiles]);
+
+  React.useEffect(() => {
+    registerSubmit(submitMessage);
+  }, [registerSubmit, submitMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" && e.shiftKey) {
-      const hasText = Boolean(text.trim());
-      const hasFiles = files.length > 0;
-      if (hasText || hasFiles) {
-        e.preventDefault();
-        onSubmit?.({ text: text.trim(), files });
-        setText("");
-        clearFiles();
-      }
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      submitMessage();
     }
   };
-
   return (
     <div
       className={cn(
@@ -200,7 +229,7 @@ export function PromptInputBody({
 
 export function PromptInputTextarea({
   className,
-  placeholder = "Ask something or describe UI changes (Shift+Enter to send)…",
+  placeholder = "Ask something or describe UI changes (⌘+Enter to send)…",
   ...props
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const { text, setText } = usePromptInput();
@@ -342,19 +371,29 @@ export function PromptInputActionAddScreenshot({ onSelect }: { onSelect?: () => 
     </DropdownMenuItem>
   );
 }
-
 export function PromptInputSubmit({
   status: propStatus,
   className,
   disabled,
+  onClick,
   ...props
 }: React.ComponentProps<typeof Button> & {
   status?: "ready" | "submitted" | "streaming" | "error";
 }) {
-  const { status: ctxStatus, text, files, onStop } = usePromptInput();
+  const { status: ctxStatus, text, files, onStop, submit } = usePromptInput();
   const currentStatus = propStatus ?? ctxStatus;
   const isStreaming = currentStatus === "streaming" || currentStatus === "submitted";
   const hasContent = Boolean(text.trim()) || files.length > 0;
+
+  const handleClick: React.ComponentProps<typeof Button>["onClick"] = (e) => {
+    onClick?.(e);
+    if (e?.defaultPrevented) return;
+    if (isStreaming) {
+      onStop?.();
+    } else {
+      submit();
+    }
+  };
 
   if (isStreaming) {
     return (
@@ -363,7 +402,7 @@ export function PromptInputSubmit({
         size="icon-xs"
         type="button"
         className={cn("rounded-lg shadow-xs", className)}
-        onClick={onStop}
+        onClick={handleClick}
         title="Stop generation"
         {...props}
       >
@@ -376,10 +415,11 @@ export function PromptInputSubmit({
     <Button
       variant="default"
       size="icon-xs"
-      type="submit"
+      type="button"
       disabled={disabled ?? !hasContent}
       className={cn("rounded-lg shadow-xs", className)}
-      title="Send message"
+      onClick={handleClick}
+      title="Send message (⌘+Enter / Ctrl+Enter)"
       {...props}
     >
       <ArrowUp className="size-3.5" />

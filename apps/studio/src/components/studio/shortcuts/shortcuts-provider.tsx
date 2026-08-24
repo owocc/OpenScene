@@ -82,12 +82,6 @@ export function ShortcutsProvider({
         return;
       }
 
-      if (modifier && event.key.toLowerCase() === "c") {
-        event.preventDefault();
-        onCopyJson?.();
-        return;
-      }
-
       // 5. History Undo / Redo
       if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
