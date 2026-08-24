@@ -72,6 +72,7 @@ export function ActionsPanel({
   const { LL } = useI18n();
   const storeDocument = useStudioStore((s) => s.document);
   const storeBootstrap = useStudioStore((s) => s.bootstrap);
+  const showNotice = useStudioStore((s) => s.showNotice);
 
   const document = docProp ?? storeDocument;
   const bootstrap = bootstrapProp ?? storeBootstrap;
@@ -289,9 +290,51 @@ export function ActionsPanel({
 
   const handleDeleteAction = (action: ActionItem) => {
     setCustomActions((prev) => prev.filter((a) => a.key !== action.key));
-    setDeletingAction(null);
-  };
 
+    // Clean up references in document.spec.elements
+    const elements = { ...document.spec.elements };
+    let hasChanges = false;
+    for (const [elementId, element] of Object.entries(elements)) {
+      const onMap = element.on as Record<string, unknown> | undefined;
+      if (!onMap || !isRecord(onMap)) continue;
+
+      let changedThis = false;
+      const nextOn = { ...onMap };
+      for (const [eventName, rawAction] of Object.entries(onMap)) {
+        const matches =
+          rawAction === action.key ||
+          (isRecord(rawAction) &&
+            (rawAction.action === action.key || rawAction.name === action.key));
+        if (matches) {
+          delete nextOn[eventName];
+          changedThis = true;
+          hasChanges = true;
+        }
+      }
+      if (changedThis) {
+        elements[elementId] = {
+          ...element,
+          on: Object.keys(nextOn).length > 0 ? (nextOn as never) : undefined,
+        };
+      }
+    }
+
+    if (hasChanges) {
+      useStudioStore.getState().dispatch({
+        type: "document.replace",
+        document: {
+          ...document,
+          spec: {
+            ...document.spec,
+            elements,
+          },
+        },
+      });
+    }
+
+    setDeletingAction(null);
+    showNotice(`已删除动作 "${action.title}"`);
+  };
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
