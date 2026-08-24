@@ -10,6 +10,7 @@ import { useI18n } from "@/i18n";
 import { useQueryStore, useShortcutsStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { LogoMenu } from "./logo-menu";
+import { ActionsPanel } from "./panels/actions-panel";
 import { AgentsPanel } from "./panels/agents-panel";
 import { PagesPanel } from "./panels/pages-panel";
 import { VariablesPanel } from "./panels/variables-panel";
@@ -88,6 +89,8 @@ export function StudioSidebar({
         return LL.sidebar.agents();
       case "variables":
         return LL.sidebar.variables();
+      case "actions":
+        return LL.sidebar.actions();
     }
   };
 
@@ -99,6 +102,8 @@ export function StudioSidebar({
         return LL.sidebar.agentsTabTooltip();
       case "variables":
         return LL.sidebar.variablesTabTooltip();
+      case "actions":
+        return LL.sidebar.actionsTabTooltip();
     }
   };
 
@@ -301,6 +306,15 @@ export function StudioSidebar({
                         onSetVariable={onSetVariable}
                         onDeleteVariable={onDeleteVariable}
                         onRenameVariable={onRenameVariable}
+                        onSelectNode={onSelectNode}
+                        bootstrap={bootstrap}
+                      />
+                    )}
+
+                    {activeTab === "actions" && (
+                      <ActionsPanel
+                        document={document}
+                        selectedId={selectedId}
                         onSelectNode={onSelectNode}
                         bootstrap={bootstrap}
                       />

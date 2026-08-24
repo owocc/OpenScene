@@ -651,7 +651,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
                           onUpdateOn={(eventName, actionVal) => {
                             updateElement(selectedId, (el) => {
                               const on = {
-                                ...((el.on as Record<string, unknown> | undefined) ?? {}),
+                                ...(el.on as Record<string, unknown> | undefined),
                               };
                               if (actionVal === undefined) {
                                 delete on[eventName];

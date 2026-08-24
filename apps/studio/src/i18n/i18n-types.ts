@@ -60,6 +60,10 @@ type RootTranslation = {
      */
     variables: string;
     /**
+     * 动​作​事​件
+     */
+    actions: string;
+    /**
      * 收​起​面​板
      */
     collapse: string;
@@ -83,6 +87,10 @@ type RootTranslation = {
      * 变​量​与​国​际​化
      */
     variablesTabTooltip: string;
+    /**
+     * 动​作​与​事​件​库
+     */
+    actionsTabTooltip: string;
   };
   panels: {
     pages: {
@@ -384,6 +392,141 @@ type RootTranslation = {
        * 预​览​模​式
        */
       preview: string;
+    };
+    actions: {
+      /**
+       * 动​作​库
+       */
+      title: string;
+      /**
+       * 定​义​和​管​理​可​被​组​件​直​接​绑​定​的​动​作​与​状​态​事​件​处​理​器​。
+       */
+      description: string;
+      /**
+       * 搜​索​动​作​标​识​、​标​题​或​类​型​.​.​.
+       */
+      searchPlaceholder: string;
+      /**
+       * 新​建​动​作
+       */
+      addAction: string;
+      /**
+       * 编​辑​动​作
+       */
+      editAction: string;
+      /**
+       * 删​除​动​作
+       */
+      deleteAction: string;
+      /**
+       * 动​作​标​识​ ​(​K​e​y​)
+       */
+      actionKey: string;
+      /**
+       * 例​如​ ​t​o​g​g​l​e​M​o​d​a​l​,​ ​u​p​d​a​t​e​C​o​u​n​t
+       */
+      actionKeyPlaceholder: string;
+      /**
+       * 动​作​名​称
+       */
+      actionTitle: string;
+      /**
+       * 例​如​ ​切​换​弹​窗​显​示
+       */
+      actionTitlePlaceholder: string;
+      /**
+       * 动​作​描​述
+       */
+      actionDesc: string;
+      /**
+       * 动​作​类​型
+       */
+      actionType: string;
+      /**
+       * 修​改​状​态​ ​(​s​e​t​S​t​a​t​e​)
+       */
+      typeSetState: string;
+      /**
+       * 自​定​义​处​理​器​ ​(​C​u​s​t​o​m​)
+       */
+      typeCustom: string;
+      /**
+       * 目​标​状​态​变​量
+       */
+      targetVariable: string;
+      /**
+       * 目​标​值
+       */
+      targetValue: string;
+      /**
+       * 取​反​切​换​ ​(​!​t​o​g​g​l​e​)
+       */
+      toggleOption: string;
+      /**
+       * 设​为​ ​t​r​u​e
+       */
+      trueOption: string;
+      /**
+       * 设​为​ ​f​a​l​s​e
+       */
+      falseOption: string;
+      /**
+       * 自​定​义​值
+       */
+      customValue: string;
+      /**
+       * {​c​o​u​n​t​}​ ​处​组​件​绑​定
+       * @param {unknown} count
+       */
+      referencesCount: RequiredParams<"count">;
+      /**
+       * 未​被​组​件​绑​定
+       */
+      noReferences: string;
+      /**
+       * 绑​定​该​动​作​的​组​件​与​事​件
+       */
+      referencesTitle: string;
+      /**
+       * 确​认​删​除​动​作
+       */
+      confirmDeleteTitle: string;
+      /**
+       * 确​定​要​删​除​动​作​“​{​n​a​m​e​}​”​吗​？
+       * @param {unknown} name
+       */
+      confirmDelete: RequiredParams<"name">;
+      /**
+       * 动​作​“​{​n​a​m​e​}​”​当​前​正​被​ ​{​c​o​u​n​t​}​ ​处​组​件​事​件​绑​定​，​删​除​可​能​导​致​点​击​交​互​失​效​。​确​定​继​续​吗​？
+       * @param {unknown} count
+       * @param {unknown} name
+       */
+      confirmDeleteWithRefs: RequiredParams<"count" | "name">;
+      /**
+       * 暂​无​动​作​定​义
+       */
+      emptyTitle: string;
+      /**
+       * 创​建​预​设​动​作​或​状​态​更​新​逻​辑​，​让​按​钮​等​组​件​能​够​一​键​直​接​绑​定​。
+       */
+      emptyDesc: string;
+      /**
+       * 系​统​内​置
+       */
+      builtInBadge: string;
+      /**
+       * 自​定​义
+       */
+      customBadge: string;
+      /**
+       * {​c​o​u​n​t​}​ ​个​动​作
+       * @param {unknown} count
+       */
+      actionCount: RequiredParams<"count">;
+      /**
+       * 参​数​配​置​ ​(​J​S​O​N​)
+       */
+      paramsJson: string;
     };
     variables: {
       /**
@@ -1041,6 +1184,10 @@ export type TranslationFunctions = {
      */
     variables: () => LocalizedString;
     /**
+     * 动作事件
+     */
+    actions: () => LocalizedString;
+    /**
      * 收起面板
      */
     collapse: () => LocalizedString;
@@ -1064,6 +1211,10 @@ export type TranslationFunctions = {
      * 变量与国际化
      */
     variablesTabTooltip: () => LocalizedString;
+    /**
+     * 动作与事件库
+     */
+    actionsTabTooltip: () => LocalizedString;
   };
   panels: {
     pages: {
@@ -1359,6 +1510,136 @@ export type TranslationFunctions = {
        * 预览模式
        */
       preview: () => LocalizedString;
+    };
+    actions: {
+      /**
+       * 动作库
+       */
+      title: () => LocalizedString;
+      /**
+       * 定义和管理可被组件直接绑定的动作与状态事件处理器。
+       */
+      description: () => LocalizedString;
+      /**
+       * 搜索动作标识、标题或类型...
+       */
+      searchPlaceholder: () => LocalizedString;
+      /**
+       * 新建动作
+       */
+      addAction: () => LocalizedString;
+      /**
+       * 编辑动作
+       */
+      editAction: () => LocalizedString;
+      /**
+       * 删除动作
+       */
+      deleteAction: () => LocalizedString;
+      /**
+       * 动作标识 (Key)
+       */
+      actionKey: () => LocalizedString;
+      /**
+       * 例如 toggleModal, updateCount
+       */
+      actionKeyPlaceholder: () => LocalizedString;
+      /**
+       * 动作名称
+       */
+      actionTitle: () => LocalizedString;
+      /**
+       * 例如 切换弹窗显示
+       */
+      actionTitlePlaceholder: () => LocalizedString;
+      /**
+       * 动作描述
+       */
+      actionDesc: () => LocalizedString;
+      /**
+       * 动作类型
+       */
+      actionType: () => LocalizedString;
+      /**
+       * 修改状态 (setState)
+       */
+      typeSetState: () => LocalizedString;
+      /**
+       * 自定义处理器 (Custom)
+       */
+      typeCustom: () => LocalizedString;
+      /**
+       * 目标状态变量
+       */
+      targetVariable: () => LocalizedString;
+      /**
+       * 目标值
+       */
+      targetValue: () => LocalizedString;
+      /**
+       * 取反切换 (!toggle)
+       */
+      toggleOption: () => LocalizedString;
+      /**
+       * 设为 true
+       */
+      trueOption: () => LocalizedString;
+      /**
+       * 设为 false
+       */
+      falseOption: () => LocalizedString;
+      /**
+       * 自定义值
+       */
+      customValue: () => LocalizedString;
+      /**
+       * {count} 处组件绑定
+       */
+      referencesCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 未被组件绑定
+       */
+      noReferences: () => LocalizedString;
+      /**
+       * 绑定该动作的组件与事件
+       */
+      referencesTitle: () => LocalizedString;
+      /**
+       * 确认删除动作
+       */
+      confirmDeleteTitle: () => LocalizedString;
+      /**
+       * 确定要删除动作“{name}”吗？
+       */
+      confirmDelete: (arg: { name: unknown }) => LocalizedString;
+      /**
+       * 动作“{name}”当前正被 {count} 处组件事件绑定，删除可能导致点击交互失效。确定继续吗？
+       */
+      confirmDeleteWithRefs: (arg: { count: unknown; name: unknown }) => LocalizedString;
+      /**
+       * 暂无动作定义
+       */
+      emptyTitle: () => LocalizedString;
+      /**
+       * 创建预设动作或状态更新逻辑，让按钮等组件能够一键直接绑定。
+       */
+      emptyDesc: () => LocalizedString;
+      /**
+       * 系统内置
+       */
+      builtInBadge: () => LocalizedString;
+      /**
+       * 自定义
+       */
+      customBadge: () => LocalizedString;
+      /**
+       * {count} 个动作
+       */
+      actionCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 参数配置 (JSON)
+       */
+      paramsJson: () => LocalizedString;
     };
     variables: {
       /**

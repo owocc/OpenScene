@@ -3,7 +3,7 @@ import { create } from "zustand";
 import type { ActiveToolMode, Surface } from "@/core/editor-state";
 import { isSidebarTab, type SidebarTab } from "@/components/studio/sidebar/types";
 
-const sidebarTabValues: SidebarTab[] = ["pages", "agents", "variables"];
+const sidebarTabValues: SidebarTab[] = ["pages", "agents", "variables", "actions"];
 import {
   loadAppViewSettings,
   loadPreferences,

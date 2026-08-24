@@ -5,9 +5,9 @@ import {
   FileText,
   Hexagon,
   SquareMousePointer,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
-
 import type { AgentUiAction, SceneDocument } from "@openscene/protocol";
 
 import type { Surface, ViewportState } from "@/core/editor-state";
@@ -15,9 +15,9 @@ import type { AdapterRegistry } from "@/core/registry";
 import type { ComponentMeta } from "@/core/meta";
 import type { StudioBootstrap } from "@/core/studio-bootstrap";
 
-export type SidebarTab = "pages" | "agents" | "variables";
+export type SidebarTab = "pages" | "agents" | "variables" | "actions";
 
-export const sidebarTabIds: SidebarTab[] = ["pages", "agents", "variables"];
+export const sidebarTabIds: SidebarTab[] = ["pages", "agents", "variables", "actions"];
 
 export function isSidebarTab(value: string | null | undefined): value is SidebarTab {
   return value != null && (sidebarTabIds as readonly string[]).includes(value);
@@ -142,8 +142,8 @@ export const navTabs: Array<{
   { id: "pages", label: "Pages", icon: FileText },
   { id: "agents", label: "Agents", icon: Astroid },
   { id: "variables", label: "Variables", icon: Hexagon },
+  { id: "actions", label: "Actions", icon: Zap },
 ];
-
 export const modeTabs: Array<{
   value: Surface;
   label: string;
