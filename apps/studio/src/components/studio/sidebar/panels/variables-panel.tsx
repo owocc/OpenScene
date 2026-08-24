@@ -43,21 +43,39 @@ function formatDisplayString(val: unknown): string {
   if (typeof val === "number" || typeof val === "boolean") return String(val);
   return "";
 }
-
 const KNOWN_LOCALE_NAMES: Record<string, string> = {
+  en: "English",
   "en-US": "English (US)",
+  "en-GB": "English (UK)",
+  ar: "العربية (Arabic)",
+  "ar-SA": "العربية (Saudi Arabia)",
+  "ar-EG": "العربية (Egypt)",
+  zh: "中文",
   "zh-CN": "简体中文",
   "zh-TW": "繁體中文",
+  "zh-HK": "繁體中文 (香港)",
+  ja: "日本語",
   "ja-JP": "日本語",
+  ko: "한국어",
   "ko-KR": "한국어",
+  fr: "Français",
   "fr-FR": "Français",
+  de: "Deutsch",
   "de-DE": "Deutsch",
+  es: "Español",
   "es-ES": "Español",
+  ru: "Русский",
   "ru-RU": "Русский",
+  it: "Italiano",
   "it-IT": "Italiano",
-  "pt-BR": "Português",
+  pt: "Português",
+  "pt-BR": "Português (Brasil)",
+  "pt-PT": "Português (Portugal)",
+  hi: "हिन्दी (Hindi)",
+  vi: "Tiếng Việt",
+  th: "ไทย (Thai)",
+  id: "Bahasa Indonesia",
 };
-
 export interface ServerLocaleOption {
   id?: string;
   code: string;
@@ -198,11 +216,12 @@ export function VariablesPanel({
         );
         return;
       }
+      console.log("[OpenScene Studio] Loaded server locales for app:", { appId, locales: data });
       setServerLocales(
         data.map((item) => ({
           id: item.id,
           code: item.code,
-          name: item.name,
+          name: item.name || KNOWN_LOCALE_NAMES[item.code] || item.code,
           isDefault: item.isDefault,
         })),
       );
@@ -219,28 +238,18 @@ export function VariablesPanel({
 
   const effectiveLocales = useMemo<ServerLocaleOption[]>(() => {
     if (serverLocales.length > 0) {
-      const list: ServerLocaleOption[] = serverLocales.map((l) => ({
+      return serverLocales.map((l) => ({
         id: l.id,
         code: l.code,
         name: l.name || KNOWN_LOCALE_NAMES[l.code] || l.code,
         isDefault: l.isDefault,
       }));
-      for (const code of locales) {
-        if (!list.some((item) => item.code === code)) {
-          list.push({
-            code,
-            name: KNOWN_LOCALE_NAMES[code] || code,
-            isDefault: false,
-          });
-        }
-      }
-      return list;
     }
 
     return locales.map((code) => ({
       code,
       name: KNOWN_LOCALE_NAMES[code] || code,
-      isDefault: code === "en-US",
+      isDefault: code === "en" || code === "en-US",
     }));
   }, [serverLocales, locales]);
 
