@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [isSetupChecked, setIsSetupChecked] = useState(false);
   const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
 
-  const [name, setName] = useState("Administrator");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -212,10 +212,9 @@ export default function LoginPage() {
             <Input
               label="Name"
               type="text"
-              placeholder="Administrator"
+              placeholder="Administrator (or your name)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
             />
             <Input
               label="Email"
@@ -245,7 +244,7 @@ export default function LoginPage() {
               type="submit"
               variant="primary"
               loading={loading}
-              disabled={!name || !email || !password || !confirmPassword}
+              disabled={!email || !password || !confirmPassword}
             >
               {t("createAdminAccount")}
             </Button>
