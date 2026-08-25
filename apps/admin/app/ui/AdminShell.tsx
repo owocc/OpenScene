@@ -17,6 +17,7 @@ import {
   Sparkle,
   SquaresFour,
   Tag,
+  User,
 } from "@phosphor-icons/react";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Input } from "@cloudflare/kumo/components/input";
@@ -44,6 +45,7 @@ const icons = {
   sparkle: Sparkle,
   squares: SquaresFour,
   tag: Tag,
+  user: User,
 } as const;
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -112,12 +114,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   const active =
                     pathname === item.href ||
                     (item.href !== "/apps" && pathname.startsWith(`${item.href}/`));
+                  const isExternal = "target" in item && item.target === "_blank";
                   return (
                     <Sidebar.MenuButton
                       key={item.href}
-                      href={context.href(item.href)}
+                      href={isExternal ? item.href : context.href(item.href)}
                       icon={Icon}
                       active={active}
+                      target={isExternal ? "_blank" : undefined}
+                      rel={isExternal ? "noreferrer noopener" : undefined}
                     >
                       {t(item.key as MessageKey)}
                     </Sidebar.MenuButton>

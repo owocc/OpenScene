@@ -127,6 +127,7 @@ export function AdminConsole() {
   if (pathname === "/apps") return <AppsView />;
   if (pathname === "/system") return <SystemView />;
   if (
+    isAppScopedPath(pathname) &&
     context.appId &&
     appsQuery.data &&
     !appsQuery.data.items.some((app) => app.id === context.appId)
@@ -173,6 +174,7 @@ export function AdminConsole() {
   if (pathname === "/components") return <ComponentsView />;
   if (pathname.startsWith("/components/")) return <ComponentDetailView />;
   if (pathname === "/settings") return <SettingsView />;
+  if (pathname === "/account") return <AccountView />;
   if (pathname === "/prompts" || pathname === "/prompt") return <PromptsListView />;
   if (pathname.startsWith("/prompts/") || pathname.startsWith("/prompt/"))
     return <PromptEditorView />;
@@ -3108,9 +3110,19 @@ function SettingsView() {
   const { t } = useI18n();
   const toast = useKumoToastManager();
   const queryClient = useQueryClient();
-  const query = api.useQuery("get", "/api/v1/apps/{appId}", {
-    params: { path: { appId: context.appId ?? "" } },
-  });
+  const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
+  const hasAppSelected = Boolean(context.appId);
+  const selectedAppExists = Boolean(
+    context.appId && appsQuery.data?.items.some((item) => item.id === context.appId),
+  );
+  const query = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}",
+    {
+      params: { path: { appId: context.appId ?? "" } },
+    },
+    { enabled: hasAppSelected },
+  );
   const update = api.useMutation("patch", "/api/v1/apps/{appId}", {
     onSuccess: () => {
       toast.add({ title: t("updated") });
@@ -3157,11 +3169,7 @@ function SettingsView() {
   }, [app]);
   return (
     <>
-      <PageHeader
-        title={t("settings")}
-        description="Update app configuration and runtime delivery status."
-      />
-      {query.error ? <ErrorState error={query.error} /> : null}
+      <PageHeader title={t("settings")} description={t("settingsDescription")} />
       <LayerCard className="mb-4 max-w-2xl">
         <LayerCard.Secondary>{t("preferences")}</LayerCard.Secondary>
         <LayerCard.Primary className="grid gap-4">
@@ -3173,109 +3181,122 @@ function SettingsView() {
               if (value === "en" || value === "zh-CN") context.setLanguage(value);
             }}
           />
-          <Button
-            onClick={async () => {
-              await fetchClient.DELETE("/api/v1/auth/session");
-              context.router.replace(context.href("/login", { appId: undefined }));
+        </LayerCard.Primary>
+      </LayerCard>
+      {!hasAppSelected || (appsQuery.data && !selectedAppExists) ? (
+        <LayerCard className="max-w-2xl">
+          <LayerCard.Secondary>{t("appSettings")}</LayerCard.Secondary>
+          <LayerCard.Primary className="py-6">
+            <Empty
+              icon={<ClipboardText size={32} />}
+              title={t("chooseApp")}
+              description={t("appSettingsChooseAppDescription")}
+              contents={
+                <Button onClick={() => context.router.push(context.href("/apps"))}>
+                  {t("selectApp")}
+                </Button>
+              }
+            />
+          </LayerCard.Primary>
+        </LayerCard>
+      ) : (
+        <>
+          {query.error ? <ErrorState error={query.error} /> : null}
+          <LayerCard className="max-w-2xl">
+            <LayerCard.Secondary>{t("appSettings")}</LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-4">
+              <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Textarea
+                label="Description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <Input
+                label="Runtime URL"
+                type="url"
+                value={runtimeUrl}
+                onChange={(e) => setRuntimeUrl(e.target.value)}
+              />
+              <Select
+                label={t("status")}
+                value={app?.status ?? "active"}
+                items={{ active: t("active"), disabled: t("disabled") }}
+                onValueChange={(value) => {
+                  if (value === "active" || value === "disabled")
+                    update.mutate({
+                      params: { path: { appId: context.appId ?? "" } },
+                      body: { status: value },
+                    });
+                }}
+              />
+              <Button
+                variant="primary"
+                loading={update.isPending}
+                onClick={() =>
+                  update.mutate({
+                    params: { path: { appId: context.appId ?? "" } },
+                    body: { name, description, runtimePublicBaseUrl: runtimeUrl || undefined },
+                  })
+                }
+              >
+                {t("save")}
+              </Button>
+            </LayerCard.Primary>
+          </LayerCard>
+          <LayerCard className="mt-4 max-w-2xl">
+            <LayerCard.Secondary>{t("appKey")}</LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-4">
+              <Text variant="secondary">{t("rotateAppKeyDescription")}</Text>
+              {rotationError ? <ErrorState error={rotationError} /> : null}
+              <div>
+                <Button
+                  onClick={() => {
+                    setRotationError(null);
+                    setRotationConfirmationAppId(context.appId ?? null);
+                  }}
+                >
+                  {t("rotateAppKey")}
+                </Button>
+              </div>
+            </LayerCard.Primary>
+          </LayerCard>
+          <Dialog.Root
+            role="alertdialog"
+            open={Boolean(rotationConfirmationAppId)}
+            onOpenChange={(value) => {
+              if (!value) setRotationConfirmationAppId(null);
             }}
           >
-            {t("signOut")}
-          </Button>
-        </LayerCard.Primary>
-      </LayerCard>
-      <LayerCard className="max-w-2xl">
-        <LayerCard.Secondary>{t("settings")}</LayerCard.Secondary>
-        <LayerCard.Primary className="grid gap-4">
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Textarea
-            label="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <Input
-            label="Runtime URL"
-            type="url"
-            value={runtimeUrl}
-            onChange={(e) => setRuntimeUrl(e.target.value)}
-          />
-          <Select
-            label={t("status")}
-            value={app?.status ?? "active"}
-            items={{ active: t("active"), disabled: t("disabled") }}
-            onValueChange={(value) => {
-              if (value === "active" || value === "disabled")
-                update.mutate({
-                  params: { path: { appId: context.appId ?? "" } },
-                  body: { status: value },
-                });
+            <Dialog className="px-8 py-6">
+              <Dialog.Title>{t("rotateAppKeyConfirmTitle")}</Dialog.Title>
+              <Dialog.Description>{t("rotateAppKeyConfirmDescription")}</Dialog.Description>
+              <div className="mt-4 flex justify-end gap-2">
+                <Dialog.Close render={<Button disabled={isRotating}>{t("cancel")}</Button>} />
+                <Button variant="destructive" loading={isRotating} onClick={rotateAppKey}>
+                  {t("rotateAppKey")}
+                </Button>
+              </div>
+            </Dialog>
+          </Dialog.Root>
+          <Dialog.Root
+            open={rotatedAppKey !== null}
+            onOpenChange={(value) => {
+              if (!value) setRotatedAppKey(null);
             }}
-          />
-          <Button
-            variant="primary"
-            loading={update.isPending}
-            onClick={() =>
-              update.mutate({
-                params: { path: { appId: context.appId ?? "" } },
-                body: { name, description, runtimePublicBaseUrl: runtimeUrl || undefined },
-              })
-            }
           >
-            {t("save")}
-          </Button>
-        </LayerCard.Primary>
-      </LayerCard>
-      <LayerCard className="mt-4 max-w-2xl">
-        <LayerCard.Secondary>{t("appKey")}</LayerCard.Secondary>
-        <LayerCard.Primary className="grid gap-4">
-          <Text variant="secondary">{t("rotateAppKeyDescription")}</Text>
-          {rotationError ? <ErrorState error={rotationError} /> : null}
-          <div>
-            <Button
-              onClick={() => {
-                setRotationError(null);
-                setRotationConfirmationAppId(context.appId ?? null);
-              }}
-            >
-              {t("rotateAppKey")}
-            </Button>
-          </div>
-        </LayerCard.Primary>
-      </LayerCard>
-      <Dialog.Root
-        role="alertdialog"
-        open={Boolean(rotationConfirmationAppId)}
-        onOpenChange={(value) => {
-          if (!value) setRotationConfirmationAppId(null);
-        }}
-      >
-        <Dialog className="px-8 py-6">
-          <Dialog.Title>{t("rotateAppKeyConfirmTitle")}</Dialog.Title>
-          <Dialog.Description>{t("rotateAppKeyConfirmDescription")}</Dialog.Description>
-          <div className="mt-4 flex justify-end gap-2">
-            <Dialog.Close render={<Button disabled={isRotating}>{t("cancel")}</Button>} />
-            <Button variant="destructive" loading={isRotating} onClick={rotateAppKey}>
-              {t("rotateAppKey")}
-            </Button>
-          </div>
-        </Dialog>
-      </Dialog.Root>
-      <Dialog.Root
-        open={rotatedAppKey !== null}
-        onOpenChange={(value) => {
-          if (!value) setRotatedAppKey(null);
-        }}
-      >
-        <Dialog size="lg" className="px-8 py-6">
-          <Dialog.Title>{t("appKeyRotated")}</Dialog.Title>
-          <Dialog.Description>{t("appKeyRotatedDescription")}</Dialog.Description>
-          <div className="grid gap-3 py-4">
-            {rotatedAppKey ? <Credential label={t("appKey")} value={rotatedAppKey} /> : null}
-          </div>
-          <div className="flex justify-end">
-            <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
-          </div>
-        </Dialog>
-      </Dialog.Root>
+            <Dialog size="lg" className="px-8 py-6">
+              <Dialog.Title>{t("appKeyRotated")}</Dialog.Title>
+              <Dialog.Description>{t("appKeyRotatedDescription")}</Dialog.Description>
+              <div className="grid gap-3 py-4">
+                {rotatedAppKey ? <Credential label={t("appKey")} value={rotatedAppKey} /> : null}
+              </div>
+              <div className="flex justify-end">
+                <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
+              </div>
+            </Dialog>
+          </Dialog.Root>
+        </>
+      )}
     </>
   );
 }
@@ -4270,6 +4291,58 @@ function SystemView() {
   );
 }
 
+function AccountView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const sessionQuery = api.useQuery("get", "/api/v1/auth/session");
+  const session = sessionQuery.data;
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    try {
+      await fetchClient.DELETE("/api/v1/auth/session");
+      context.router.replace(context.href("/login", { appId: undefined }));
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title={t("account")} description={t("accountDescription")} />
+      {sessionQuery.error ? <ErrorState error={sessionQuery.error} /> : null}
+      <LayerCard className="max-w-2xl">
+        <LayerCard.Secondary>{t("account")}</LayerCard.Secondary>
+        <LayerCard.Primary className="grid gap-4">
+          <div className="grid gap-2">
+            <Text variant="secondary">{t("status")}</Text>
+            <div>
+              <StatusBadge status={session?.authenticated ? "active" : "disabled"} />
+            </div>
+          </div>
+          {session?.mode ? (
+            <div className="grid gap-1">
+              <Text variant="secondary">{t("authMode")}</Text>
+              <Text>{session.mode}</Text>
+            </div>
+          ) : null}
+          {session?.expiresAt ? (
+            <div className="grid gap-1">
+              <Text variant="secondary">Expires</Text>
+              <Text>{new Date(session.expiresAt).toLocaleString()}</Text>
+            </div>
+          ) : null}
+          <div>
+            <Button variant="destructive" loading={isSigningOut} onClick={handleSignOut}>
+              {t("signOut")}
+            </Button>
+          </div>
+        </LayerCard.Primary>
+      </LayerCard>
+    </>
+  );
+}
 function NotFoundView() {
   const { t } = useI18n();
   return <Empty title={t("notFound")} description={t("noResultsDescription")} />;

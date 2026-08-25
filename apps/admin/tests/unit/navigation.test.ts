@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vite-plus/test";
 import { messages } from "../../app/ui/i18n";
-import { buildHref, navigationGroups, parseLanguage, parseMode } from "../../app/ui/navigation";
+import {
+  buildHref,
+  isAppScopedPath,
+  navigationGroups,
+  parseLanguage,
+  parseMode,
+} from "../../app/ui/navigation";
 
 describe("admin navigation context", () => {
   test("defaults invalid modes and languages safely", () => {
@@ -30,6 +36,46 @@ describe("admin navigation context", () => {
       href: "/components",
       key: "components",
       icon: "cubes",
+    });
+  });
+
+  test("identifies non-app-scoped and app-scoped paths correctly", () => {
+    expect(isAppScopedPath("/settings")).toBe(false);
+    expect(isAppScopedPath("/account")).toBe(false);
+    expect(isAppScopedPath("/apps")).toBe(false);
+    expect(isAppScopedPath("/system")).toBe(false);
+    expect(isAppScopedPath("/login")).toBe(false);
+    expect(isAppScopedPath("/ai")).toBe(false);
+    expect(isAppScopedPath("/system-prompt")).toBe(false);
+    expect(isAppScopedPath("/reference")).toBe(false);
+    expect(isAppScopedPath("/overview")).toBe(true);
+    expect(isAppScopedPath("/pages")).toBe(true);
+    expect(isAppScopedPath("/templates")).toBe(true);
+    expect(isAppScopedPath("/components")).toBe(true);
+    expect(isAppScopedPath("/meta")).toBe(true);
+  });
+
+  test("includes Settings and Account navigation in System group", () => {
+    const systemGroup = navigationGroups.find((group) => group.label === "System");
+    expect(systemGroup?.items).toContainEqual({
+      href: "/settings",
+      key: "settings",
+      icon: "sliders",
+    });
+    expect(systemGroup?.items).toContainEqual({
+      href: "/account",
+      key: "account",
+      icon: "user",
+    });
+  });
+
+  test("includes API reference navigation in Developer group with _blank target", () => {
+    const developerGroup = navigationGroups.find((group) => group.label === "Developer");
+    expect(developerGroup?.items).toContainEqual({
+      href: "/reference",
+      key: "apiReference",
+      icon: "book",
+      target: "_blank",
     });
   });
 });

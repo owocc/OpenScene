@@ -31,20 +31,23 @@ export function isAppScopedPath(pathname: string): boolean {
     pathname !== "/system" &&
     pathname !== "/login" &&
     pathname !== "/ai" &&
-    pathname !== "/system-prompt"
+    pathname !== "/system-prompt" &&
+    pathname !== "/settings" &&
+    pathname !== "/account" &&
+    pathname !== "/reference"
   );
 }
 
 export const navigationGroups = [
   {
-    label: "Deployment",
+    label: "System",
     items: [
       { href: "/apps", key: "apps", icon: "squares" },
       { href: "/system", key: "system", icon: "gear" },
-      { href: "/reference", key: "apiReference", icon: "book" },
-
       { href: "/ai", key: "ai", icon: "sparkle" },
       { href: "/system-prompt", key: "systemPrompt", icon: "shieldWarning" },
+      { href: "/settings", key: "settings", icon: "sliders" },
+      { href: "/account", key: "account", icon: "user" },
     ],
   },
   {
@@ -60,7 +63,10 @@ export const navigationGroups = [
       { href: "/locales", key: "locales", icon: "globe" },
       { href: "/openapi-docs", key: "openapiDocs", icon: "code" },
       { href: "/prompts", key: "prompts", icon: "chatText" },
-      { href: "/settings", key: "settings", icon: "sliders" },
     ],
+  },
+  {
+    label: "Developer",
+    items: [{ href: "/reference", key: "apiReference", icon: "book", target: "_blank" }],
   },
 ] as const;
