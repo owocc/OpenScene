@@ -137,13 +137,7 @@
       "name": "react-vite",
       "version": "0.0.0",
       "dependencies": {
-        "@json-render/core": "^0.20.0",
-        "@json-render/react": "^0.20.0",
-        "@openscene/constants": "workspace:*",
-        "@openscene/javascript": "workspace:*",
-        "@openscene/protocol": "workspace:*",
         "@openscene/react": "workspace:*",
-        "@openscene/schema": "workspace:*",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "zod": "^4.3.6",
@@ -227,6 +221,7 @@
       "dependencies": {
         "@json-render/core": "^0.20.0",
         "@openscene/protocol": "workspace:*",
+        "undici": "^7.0.0",
         "zod": "^4.0.0",
       },
       "devDependencies": {
@@ -245,6 +240,7 @@
         "@openscene/constants": "workspace:*",
         "@openscene/javascript": "workspace:*",
         "@openscene/protocol": "workspace:*",
+        "@openscene/schema": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "catalog:",

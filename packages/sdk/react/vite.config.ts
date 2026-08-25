@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: lazyPlugins(() => [react()]),
   pack: {
-    entry: ["src/index.tsx", "src/server.ts"],
+    entry: ["src/index.tsx", "src/server.ts", "src/vite.ts"],
     dts: {
       tsgo: true,
     },

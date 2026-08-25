@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { APP_TYPE_WEB } from "@openscene/constants";
-import { defineAppManifest } from "@openscene/javascript";
-import { openApiMethods, type OpenApiValue } from "@openscene/schema";
 import {
+  APP_TYPE_WEB,
+  defineAppManifest,
+  openApiMethods,
+  type OpenApiValue,
   baseReactComponents,
   defineOpenSceneReactAction,
   defineOpenSceneReactApp,
@@ -252,7 +253,7 @@ function buildOpenApiRequest(value: OpenApiValue | undefined): OpenApiRequest | 
       : "";
   let path = value.path;
   const pathParams = value.params?.path ?? {};
-  path = path.replace(/\{([^}]+)\}/g, (_, name: string) =>
+  path = path.replace(/\{([^}]+)\}/g, (_: string, name: string) =>
     encodeURIComponent(pathParams[name] ?? ""),
   );
   const searchParams = new URLSearchParams();

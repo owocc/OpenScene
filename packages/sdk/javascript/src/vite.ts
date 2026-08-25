@@ -74,6 +74,23 @@ async function responseError(response: Response): Promise<Error> {
   return new Error(`OpenScene manifest push failed (HTTP ${response.status})${detail}`);
 }
 
+async function getFetchDispatcher(): Promise<unknown> {
+  const proxy =
+    process.env.https_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.http_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.all_proxy ||
+    process.env.ALL_PROXY;
+  if (!proxy) return undefined;
+  try {
+    const { ProxyAgent } = await import("undici");
+    return new ProxyAgent(proxy);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Pushes a build manifest once after a successful Vite build. The app key is
  * sent only as a request header and is never injected into generated assets.
@@ -100,6 +117,7 @@ export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions)
       if (!adminUrl || !appId || !appKey) throw configurationError();
       const parsedManifest = AppManifestSchema.parse(manifest);
 
+      const dispatcher = await getFetchDispatcher();
       let response: Response;
       try {
         response = await fetch(
@@ -112,11 +130,24 @@ export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions)
               "x-openscene-app-key": appKey,
             },
             body: JSON.stringify(parsedManifest),
-          },
+            ...(dispatcher ? { dispatcher } : {}),
+          } as RequestInit,
         );
-      } catch {
+      } catch (error) {
+        const cause = (error as { cause?: unknown })?.cause;
+        const causeMessage =
+          cause instanceof Error
+            ? cause.message
+            : typeof cause === "string"
+              ? cause
+              : cause && typeof cause === "object" && "message" in cause
+                ? String((cause as { message: unknown }).message)
+                : "";
+        const baseMessage = error instanceof Error ? error.message : String(error);
+        const detail = causeMessage ? `${baseMessage} (${causeMessage})` : baseMessage;
+        const target = `${adminUrl.replace(/\/+$/u, "")}/api/v1/apps/${encodeURIComponent(appId)}/manifest/push`;
         throw new Error(
-          "OpenScene manifest push failed because the Admin server could not be reached",
+          `OpenScene manifest push failed because the Admin server could not be reached at ${target}: ${detail}`,
         );
       }
       if (!response.ok) throw await responseError(response);

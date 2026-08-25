@@ -1,5 +1,4 @@
-import type { OpenSceneClient } from "@openscene/javascript";
-import { OpenSceneProvider, OpenSceneRenderer } from "@openscene/react";
+import { OpenSceneProvider, OpenSceneRenderer, type OpenSceneClient } from "@openscene/react";
 import type { ReactApp } from "./openscene.tsx";
 import "./App.css";
 

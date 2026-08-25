@@ -11,9 +11,15 @@
   "types": "./src/index.tsx",
   "exports": {
     ".": {
+      "types": "./src/index.tsx",
       "node": "./src/server.ts",
       "import": "./src/index.tsx",
       "default": "./src/index.tsx"
+    },
+    "./vite": {
+      "types": "./src/vite.ts",
+      "import": "./src/vite.ts",
+      "default": "./src/vite.ts"
     },
     "./package.json": "./package.json"
   },
@@ -32,7 +38,8 @@
     "@json-render/react": "^0.20.0",
     "@openscene/constants": "workspace:*",
     "@openscene/javascript": "workspace:*",
-    "@openscene/protocol": "workspace:*"
+    "@openscene/protocol": "workspace:*",
+    "@openscene/schema": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

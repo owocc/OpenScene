@@ -24,3 +24,55 @@ export { useOpenSceneNode, View, Text, Button } from "./node.tsx";
 export type { OpenSceneNodeContextValue, PrimitiveProps } from "./node.tsx";
 export { useBoundProp, useStateValue, useAction } from "@json-render/react";
 export { schema } from "@json-render/react/schema";
+
+export {
+  installOpenScene,
+  OpenSceneController,
+  createIndexedDbDraftStore,
+  defineAppManifest,
+  defineComponentManifest,
+  directives,
+  openSceneDirectives,
+  pageDirective,
+  translationDirective,
+} from "@openscene/javascript";
+export type {
+  DeepReadonly,
+  DirectiveDefinition,
+  OpenSceneClient,
+  OpenSceneClientOptions,
+  OpenSceneClientState,
+  OpenSceneInteractionMode,
+  OpenSceneStatus,
+  SelectionReport,
+} from "@openscene/javascript";
+
+export {
+  APP_TYPE_WEB,
+  APP_TYPE_REACT_NATIVE,
+  APP_TYPE_FLUTTER,
+  APP_TYPES,
+  COMPONENT_DRAG_MIME,
+} from "@openscene/constants";
+export type { AppType } from "@openscene/constants";
+
+export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene/schema";
+
+export {
+  SCENE_DOCUMENT_SCHEMA_VERSION,
+  SceneDocumentSchema,
+  createEmptySceneDocument,
+  AppManifestSchema,
+  ComponentManifestSchema,
+  RuntimePageDeliverySchema,
+} from "@openscene/protocol";
+export type {
+  AppManifest,
+  ComponentManifest,
+  RuntimePageDelivery,
+  SceneDocument,
+  SceneGlobalConfig,
+  ScenePageInfo,
+  Spec,
+  UIElement,
+} from "@openscene/protocol";
