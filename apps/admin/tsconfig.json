@@ -19,7 +19,12 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@openscene/constants": ["../../packages/constants/src/index.ts"],
+      "@openscene/protocol": ["../../packages/protocol/src/index.ts"],
+      "@openscene/schema": ["../../packages/schema/src/index.ts"],
+      "@openscene/api-client": ["../../packages/api-client/src/index.ts"],
+      "@openscene/api-client/*": ["../../packages/api-client/src/*"]
     }
   },
   "include": [
