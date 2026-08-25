@@ -70,6 +70,9 @@ function hasMigrationJournal(folder: string): boolean {
 }
 
 function normalizeDatabaseUrl(url: string): string {
+  if (url.startsWith("turso:")) {
+    return `libsql:${url.slice("turso:".length)}`;
+  }
   if (!url.startsWith("file:")) return url;
   const filePath = url.slice("file:".length);
   if (!filePath || filePath === ":memory:") return url;
