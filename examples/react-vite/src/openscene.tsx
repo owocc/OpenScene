@@ -4,83 +4,40 @@ import {
   defineAppManifest,
   openApiMethods,
   type OpenApiValue,
-  baseReactComponents,
   defineOpenSceneReactAction,
   defineOpenSceneReactApp,
   defineOpenSceneReactComponent,
+  defineOpenApiRequestAction,
+  buildOpenApiRequest,
+  executeOpenApiRequest,
   type OpenSceneReactApp,
   useOpenSceneNode,
-  View,
 } from "@openscene-ai/react";
 import { z } from "zod";
 
-const baseViewProps = {
-  class: z.string().optional(),
-  className: z.string().optional(),
-  style: z
-    .record(z.string(), z.unknown())
-    .meta({ "x-editor": { control: "style", type: "style" } })
-    .optional(),
-};
+const styleField = z
+  .record(z.string(), z.unknown())
+  .meta({ "x-editor": { control: "style", type: "style" } })
+  .optional();
 
-const viewProps = z.object(baseViewProps).passthrough();
-const textProps = z
-  .object({
-    text: z.string().optional(),
-    ...baseViewProps,
-  })
-  .passthrough();
-const buttonProps = z
-  .object({
-    label: z.string().optional(),
-    text: z.string().optional(),
-    disabled: z.boolean().optional(),
-    type: z.enum(["button", "submit", "reset"]).optional(),
-    ...baseViewProps,
-  })
-  .passthrough();
 const imageProps = z
   .object({
     src: z.string().optional(),
     alt: z.string().optional(),
     fit: z.enum(["cover", "contain", "fill", "none", "scale-down"]).optional(),
     loading: z.enum(["eager", "lazy"]).optional(),
-    ...baseViewProps,
+    class: z.string().optional(),
+    className: z.string().optional(),
+    style: styleField,
   })
   .passthrough();
-
-const baseComponents = [
-  {
-    ...baseReactComponents.View,
-    schema: viewProps,
-    title: "View",
-    description: "A layout container.",
-    category: "layout",
-    children: true,
-  },
-  {
-    ...baseReactComponents.Text,
-    schema: textProps,
-    title: "Text",
-    description: "Text content.",
-    category: "content",
-    children: true,
-  },
-  {
-    ...baseReactComponents.Button,
-    schema: buttonProps,
-    title: "Button",
-    description: "An interactive button.",
-    category: "interactive",
-    events: { press: { title: "Press" } },
-    children: true,
-  },
-];
 
 const calloutProps = z
   .object({
     tone: z.enum(["info", "success", "warning"]).optional(),
-    ...baseViewProps,
+    class: z.string().optional(),
+    className: z.string().optional(),
+    style: styleField,
   })
   .passthrough();
 
@@ -88,7 +45,9 @@ const statusCardProps = z
   .object({
     label: z.string().optional(),
     status: z.enum(["idle", "active", "complete"]).optional(),
-    ...baseViewProps,
+    class: z.string().optional(),
+    className: z.string().optional(),
+    style: styleField,
   })
   .passthrough();
 
@@ -176,30 +135,29 @@ const Image = defineOpenSceneReactComponent({
   },
 });
 
-/** A composition example: use the shared View primitive as the component root. */
+/** A composition example: a styled container. */
 const Callout = defineOpenSceneReactComponent({
   type: "Callout",
   schema: calloutProps,
   title: "Callout",
-  description: "A styled container composed from the OpenScene View primitive.",
+  description: "A styled container with tone variants.",
   category: "layout",
   tags: ["example", "composition"],
   editor: { fields: ["tone"] },
   children: true,
   render: (renderProps) => {
+    const node = useOpenSceneNode();
     const elementProps = getComponentProps<z.infer<typeof calloutProps>>(renderProps);
     const tone = typeof elementProps.tone === "string" ? elementProps.tone : "info";
+    const style = (elementProps.style as React.CSSProperties) ?? {};
     return (
-      <View
-        props={{
-          ...elementProps,
-          className: `react-vite-callout react-vite-callout-${tone}`,
-        }}
-        emit={renderProps.emit}
-        on={renderProps.on}
+      <div
+        {...node.nodeAttrs}
+        className={`react-vite-callout react-vite-callout-${tone}`}
+        style={style}
       >
         {renderProps.children}
-      </View>
+      </div>
     );
   },
 });
@@ -231,59 +189,6 @@ const StatusCard = defineOpenSceneReactComponent({
     );
   },
 });
-
-type OpenApiRequest = {
-  url: string;
-  method: string;
-  body?: string;
-  headers: Record<string, string>;
-};
-
-function buildOpenApiRequest(value: OpenApiValue | undefined): OpenApiRequest | null {
-  if (!value || !value.json || typeof value.json !== "object" || !value.path || !value.method) {
-    return null;
-  }
-  const rawServers = value.json.servers;
-  const serverList = Array.isArray(rawServers)
-    ? (rawServers as unknown as Array<{ url?: unknown }>)
-    : [];
-  const base =
-    typeof serverList[0]?.url === "string" && serverList[0].url
-      ? serverList[0].url.replace(/\/$/, "")
-      : "";
-  let path = value.path;
-  const pathParams = value.params?.path ?? {};
-  path = path.replace(/\{([^}]+)\}/g, (_: string, name: string) =>
-    encodeURIComponent(pathParams[name] ?? ""),
-  );
-  const searchParams = new URLSearchParams();
-  const query = value.params?.query ?? {};
-  for (const [key, item] of Object.entries(query)) {
-    searchParams.set(key, typeof item === "string" ? item : JSON.stringify(item));
-  }
-  const queryString = searchParams.toString();
-  const url = `${base}${path}${queryString ? `?${queryString}` : ""}`;
-  const headers: Record<string, string> = { accept: "application/json" };
-  const method = value.method.toUpperCase();
-  let body: string | undefined;
-  if (method !== "GET" && method !== "HEAD" && value.params?.body !== undefined) {
-    body = JSON.stringify(value.params.body);
-    headers["content-type"] = "application/json";
-  }
-  return { url, method, headers, body };
-}
-
-async function executeOpenApiRequest(request: OpenApiRequest): Promise<unknown> {
-  const response = await fetch(request.url, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body,
-  });
-  if (!response.ok) {
-    throw new Error(`${request.method} ${request.url} -> ${response.status}`);
-  }
-  return response.json();
-}
 
 const setNotice = defineOpenSceneReactAction({
   key: "reactViteSetNotice",
@@ -346,18 +251,23 @@ const OpenApiProvider = defineOpenSceneReactComponent({
   tags: ["openapi", "data"],
   children: true,
   render: (renderProps) => {
-    const value = (renderProps as unknown as { props?: Record<string, unknown> }).props?.openapi as
-      | OpenApiValue
-      | undefined;
+    const elementProps = getComponentProps<z.infer<typeof openApiProviderProps>>(renderProps);
+    const value = elementProps.openapi as OpenApiValue | undefined;
     return <OpenApiProviderRenderer value={value}>{renderProps.children}</OpenApiProviderRenderer>;
   },
+});
+
+const openApiRequest = defineOpenApiRequestAction({
+  key: "openApiRequest",
+  title: "OpenAPI Request",
+  description: "Execute an OpenAPI endpoint and store the response in state.",
 });
 
 export function createReactApp(appKey: string): OpenSceneReactApp {
   return defineOpenSceneReactApp({
     app: { key: appKey, type: APP_TYPE_WEB },
-    components: [...baseComponents, Image, Callout, StatusCard, OpenApiProvider],
-    actions: [setNotice],
+    components: [Image, Callout, StatusCard, OpenApiProvider],
+    actions: [setNotice, openApiRequest],
   });
 }
 
@@ -368,13 +278,4 @@ export function createManifest(appKey: string) {
   return defineAppManifest(createReactApp(appKey).manifest);
 }
 
-export {
-  baseReactComponents,
-  Image,
-  imageProps,
-  baseViewProps,
-  Callout,
-  StatusCard,
-  OpenApiProvider,
-  setNotice,
-};
+export { Image, imageProps, Callout, StatusCard, OpenApiProvider, setNotice };

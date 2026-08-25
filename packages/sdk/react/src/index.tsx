@@ -9,6 +9,9 @@ export {
   baseReactActions,
   baseComponents,
   baseActions,
+  buildOpenApiRequest,
+  executeOpenApiRequest,
+  defineOpenApiRequestAction,
 } from "./catalog.ts";
 export type {
   DefineOpenSceneReactAppOptions,

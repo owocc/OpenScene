@@ -13,6 +13,7 @@ import {
   applyAgentUiActionsToDocument,
   SceneDocumentSchema,
   type AgentUiAction,
+  type AppManifest,
   type SceneDocument,
 } from "@openscene-ai/protocol";
 import type { JsonValue } from "@/core/document";
@@ -27,6 +28,7 @@ import {
   type StudioBootstrap,
   type StudioBootstrapState,
 } from "@/core/studio-bootstrap";
+import { LOCAL_TEST_SESSION_ID } from "@/core/local-test-session";
 import { cn } from "@/lib/utils";
 
 function nextElementId(document: SceneDocument, type: string) {
@@ -100,9 +102,20 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
     useStudioStore.getState().init(bootstrap);
   }, [bootstrap]);
 
+  // Dev-mode only: manifest pushed by the local renderer via DEV_MANIFEST.
+  // Only accepted for the local-test session; production sessions ignore it.
+  const isLocalSession = bootstrap.session.id === LOCAL_TEST_SESSION_ID;
+  const [devManifest, setDevManifest] = useState<AppManifest | null>(null);
+  const effectiveManifest = (isLocalSession ? devManifest : null) ?? bootstrap.manifest;
+
+  const handleDevManifest = useMemo(
+    () => (isLocalSession ? (manifest: AppManifest) => setDevManifest(manifest) : undefined),
+    [isLocalSession],
+  );
+
   const adapterMeta = useMemo(
-    () => materialManifestToAdapterMeta(bootstrap.manifest),
-    [bootstrap.manifest],
+    () => materialManifestToAdapterMeta(effectiveManifest),
+    [effectiveManifest],
   );
   const registry = useMemo(() => new AdapterRegistry().register(adapterMeta), [adapterMeta]);
   const [editor, dispatch] = useReducer(editorReducer, bootstrap.draft.document, (document) => {
@@ -504,6 +517,7 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           onAddComponent={addComponent}
           onSave={() => void saveDocument()}
           onApplyDocument={handleApplyDocument}
+          onDevManifest={handleDevManifest}
         />
 
         {/* 2. Floating UI Layer: StudioSidebar (Hidden in text/document mode) */}

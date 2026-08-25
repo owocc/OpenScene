@@ -1,5 +1,5 @@
 import type { AppType } from "@openscene-ai/constants";
-import type { ElementRect, SceneDocument } from "@openscene-ai/protocol";
+import type { AppManifest, ElementRect, SceneDocument } from "@openscene-ai/protocol";
 import type { ReactNode } from "react";
 
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";
@@ -37,6 +37,9 @@ export interface CanvasRendererProps {
   /** A component card was dropped anywhere over the preview frame. */
   onFrameDrop?: () => void;
   onError?: (message: string) => void;
+  /** Dev-mode only: called when the renderer pushes a local manifest via
+   *  DEV_MANIFEST. Ignored in production sessions. */
+  onDevManifest?: (manifest: AppManifest) => void;
 }
 
 export interface CanvasRendererAdapter {
@@ -76,4 +79,6 @@ export interface StudioCanvasProps {
   onCopyJson?: () => void;
   onSave?: () => void;
   onApplyDocument?: (document: SceneDocument) => void;
+  /** Dev-mode only: surfaces DEV_MANIFEST from the renderer up to the editor. */
+  onDevManifest?: (manifest: AppManifest) => void;
 }

@@ -17,7 +17,7 @@ import type { ComponentMeta, EditorMeta, PropMeta } from "@/core/meta";
 import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
 import { useStudioStore } from "@/stores/studio-store";
-import { DynamicModeDropdown, DynamicValueInput, VariableCombobox } from "./dynamic-value-input";
+import { DynamicModeDropdown, DynamicValueInput } from "./dynamic-value-input";
 import { StyleControl } from "./property-editor/style";
 import { Button } from "@/components/ui/button";
 import { AssetPickerDialog } from "./asset-picker-dialog";
@@ -1266,30 +1266,28 @@ export function PropertyEditor({
 }: PropertyEditorProps) {
   const { LL } = useI18n();
   const statePaths = useMemo(() => getEditableStatePaths(state), [state]);
-  const stateKeys = useMemo(
-    () => Object.keys(state ?? {}).filter((k) => k !== "i18n" && k !== "__scene"),
-    [state],
-  );
   const storeBootstrap = useStudioStore((s) => s.bootstrap);
   const availableActionOptions = useMemo<
-    Array<{ key: string; title: string; description?: string }>
+    Array<{
+      key: string;
+      title: string;
+      description?: string;
+      paramsSchema?: Record<string, unknown>;
+    }>
   >(() => {
-    const list: Array<{ key: string; title: string; description?: string }> = [
-      { key: "setState", title: "修改状态 (setState)", description: "更新或切换状态变量" },
-    ];
     const manifestActions = storeBootstrap?.manifest?.actions;
-    if (manifestActions && isRecord(manifestActions)) {
-      for (const [k, meta] of Object.entries(manifestActions)) {
-        if (k === "setState") continue;
-        const itemMeta = isRecord(meta) ? meta : {};
-        list.push({
-          key: k,
-          title: typeof itemMeta.title === "string" ? itemMeta.title : k,
-          description: typeof itemMeta.description === "string" ? itemMeta.description : undefined,
-        });
-      }
-    }
-    return list;
+    if (!manifestActions || !isRecord(manifestActions)) return [];
+    return Object.entries(manifestActions).map(([k, meta]) => {
+      const itemMeta = isRecord(meta) ? meta : {};
+      return {
+        key: k,
+        title: typeof itemMeta.title === "string" ? itemMeta.title : k,
+        description: typeof itemMeta.description === "string" ? itemMeta.description : undefined,
+        paramsSchema: isRecord(itemMeta.params)
+          ? (itemMeta.params as Record<string, unknown>)
+          : undefined,
+      };
+    });
   }, [storeBootstrap?.manifest?.actions]);
   // Available events on this component
   const eventsMap = useMemo(() => {
@@ -1393,16 +1391,19 @@ export function PropertyEditor({
                 ? { action: rawAction }
                 : undefined;
             const actionKey = actionBinding
-              ? (actionBinding.action as string) || (actionBinding.name as string) || "setState"
+              ? (actionBinding.action as string) || (actionBinding.name as string) || undefined
               : undefined;
             const params = isRecord(actionBinding?.params)
               ? (actionBinding.params as Record<string, unknown>)
               : undefined;
-            const targetVarKey = params
-              ? Object.keys(params)[0] || stateKeys[0] || "isVisible"
-              : stateKeys[0] || "isVisible";
-            const targetVal = params ? params[targetVarKey] : "__toggle__";
-            const selectedActionOption = availableActionOptions.find((a) => a.key === actionKey);
+            const selectedAction = availableActionOptions.find((a) => a.key === actionKey);
+            // Extract param field names from the action's params JSON Schema properties.
+            const paramFields: string[] = selectedAction?.paramsSchema
+              ? (() => {
+                  const props = selectedAction.paramsSchema.properties;
+                  return isRecord(props) ? Object.keys(props) : [];
+                })()
+              : [];
 
             return (
               <div
@@ -1416,24 +1417,13 @@ export function PropertyEditor({
 
                 {actionKey ? (
                   <div className="flex flex-col gap-2">
+                    {/* Action selector row */}
                     <div className="flex items-center justify-between gap-2">
-                      {/* Action Selector */}
                       <div className="flex-1 min-w-0">
                         <select
                           className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                           value={actionKey}
-                          onChange={(e) => {
-                            const nextKey = e.target.value;
-                            if (nextKey === "setState") {
-                              const defaultVar = stateKeys[0] || "isVisible";
-                              onUpdateOn?.(name, {
-                                action: "setState",
-                                params: { [defaultVar]: "__toggle__" },
-                              });
-                            } else {
-                              onUpdateOn?.(name, { action: nextKey });
-                            }
-                          }}
+                          onChange={(e) => onUpdateOn?.(name, { action: e.target.value })}
                         >
                           {availableActionOptions.map((opt) => (
                             <option key={opt.key} value={opt.key}>
@@ -1442,7 +1432,6 @@ export function PropertyEditor({
                           ))}
                         </select>
                       </div>
-
                       <Button
                         type="button"
                         variant="ghost"
@@ -1456,111 +1445,72 @@ export function PropertyEditor({
                       </Button>
                     </div>
 
-                    {/* If action is setState: show state variable picker and value toggle */}
-                    {actionKey === "setState" ? (
-                      <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/60 p-2">
-                        <div className="grid gap-1">
-                          <label className="text-[10px] text-muted-foreground">
-                            {LL.properties.selectVariable()}
-                          </label>
-                          <VariableCombobox
-                            value={targetVarKey ? `/${targetVarKey}` : ""}
-                            statePaths={statePaths}
-                            placeholder={LL.properties.selectVariable()}
-                            onChange={(newPath) => {
-                              const newKey = newPath.replace(/^\/+/, "");
-                              onUpdateOn?.(name, {
-                                action: "setState",
-                                params: { [newKey]: "__toggle__" },
-                              });
-                            }}
-                          />
-                        </div>
-
-                        <div className="grid gap-1">
-                          <label className="text-[10px] text-muted-foreground">
-                            {LL.properties.targetValue()}
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              type="button"
-                              variant={
-                                targetVal === "__toggle__" || targetVal === "!current"
-                                  ? "default"
-                                  : "outline"
-                              }
-                              size="xs"
-                              className="h-6 text-[10px] cursor-pointer"
-                              onClick={() =>
-                                onUpdateOn?.(name, {
-                                  action: "setState",
-                                  params: { [targetVarKey]: "__toggle__" },
-                                })
-                              }
-                            >
-                              {LL.properties.toggleBoolean()}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={targetVal === true ? "default" : "outline"}
-                              size="xs"
-                              className="h-6 text-[10px] cursor-pointer"
-                              onClick={() =>
-                                onUpdateOn?.(name, {
-                                  action: "setState",
-                                  params: { [targetVarKey]: true },
-                                })
-                              }
-                            >
-                              true
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={targetVal === false ? "default" : "outline"}
-                              size="xs"
-                              className="h-6 text-[10px] cursor-pointer"
-                              onClick={() =>
-                                onUpdateOn?.(name, {
-                                  action: "setState",
-                                  params: { [targetVarKey]: false },
-                                })
-                              }
-                            >
-                              false
-                            </Button>
-                          </div>
-                        </div>
+                    {/* Generic params editor: one row per schema field */}
+                    {paramFields.length > 0 && (
+                      <div className="flex flex-col gap-1.5 rounded-lg border border-border/50 bg-background/60 p-2">
+                        {paramFields.map((field) => {
+                          const fieldVal = params?.[field];
+                          const displayVal =
+                            typeof fieldVal === "string" || typeof fieldVal === "number"
+                              ? String(fieldVal)
+                              : fieldVal === true
+                                ? "true"
+                                : fieldVal === false
+                                  ? "false"
+                                  : "";
+                          return (
+                            <div key={field} className="grid gap-0.5">
+                              <label className="text-[10px] font-medium text-muted-foreground">
+                                {field}
+                              </label>
+                              <input
+                                className={inputClassName}
+                                value={displayVal}
+                                placeholder={field}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const coerced: unknown =
+                                    raw === "true"
+                                      ? true
+                                      : raw === "false"
+                                        ? false
+                                        : raw === "" || isNaN(Number(raw))
+                                          ? raw
+                                          : Number(raw);
+                                  onUpdateOn?.(name, {
+                                    action: actionKey,
+                                    params: { ...params, [field]: coerced },
+                                  });
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      selectedActionOption?.description && (
-                        <p className="text-[10px] leading-relaxed text-muted-foreground px-1">
-                          {selectedActionOption.description}
-                        </p>
-                      )
+                    )}
+
+                    {/* Description when no schema fields exist */}
+                    {paramFields.length === 0 && selectedAction?.description && (
+                      <p className="text-[10px] leading-relaxed text-muted-foreground px-1">
+                        {selectedAction.description}
+                      </p>
                     )}
                   </div>
-                ) : (
+                ) : availableActionOptions.length > 0 ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="xs"
                     className="h-7 w-full gap-1 text-xs border-dashed text-muted-foreground hover:text-foreground cursor-pointer"
-                    onClick={() => {
-                      const firstAction = availableActionOptions[0]?.key || "setState";
-                      if (firstAction === "setState") {
-                        const defaultVar = stateKeys[0] || "isVisible";
-                        onUpdateOn?.(name, {
-                          action: "setState",
-                          params: { [defaultVar]: "__toggle__" },
-                        });
-                      } else {
-                        onUpdateOn?.(name, { action: firstAction });
-                      }
-                    }}
+                    onClick={() => onUpdateOn?.(name, { action: availableActionOptions[0].key })}
                   >
                     <Plus className="size-3" />
                     <span>{LL.properties.bindAction()}</span>
                   </Button>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground px-0.5">
+                    No actions registered. Define actions in your app manifest.
+                  </p>
                 )}
               </div>
             );

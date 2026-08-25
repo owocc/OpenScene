@@ -1,14 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Code2,
   Edit2,
   ExternalLink,
   Eye,
   MoreVertical,
   Plus,
   Search,
-  Settings2,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -18,7 +16,6 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { isRecord } from "@/core/document";
 import { Button } from "@/components/ui/button";
-import { VariableCombobox } from "@/components/studio/variable-combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +42,6 @@ export interface ActionItem {
   key: string;
   title: string;
   description?: string;
-  type: "setState" | "custom";
   isBuiltIn?: boolean;
   params?: Record<string, unknown>;
 }
@@ -88,20 +84,11 @@ export function ActionsPanel({
   const [formKey, setFormKey] = useState("");
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");
-  const [formType, setFormType] = useState<"setState" | "custom">("setState");
-  const [formTargetVar, setFormTargetVar] = useState("");
-  const [formTargetVal, setFormTargetVal] = useState<unknown>("__toggle__");
   const [formJsonText, setFormJsonText] = useState("");
   const [formKeyError, setFormKeyError] = useState<string | null>(null);
 
   // Custom user actions stored in session (starts clean and empty)
   const [customActions, setCustomActions] = useState<ActionItem[]>([]);
-
-  // Extract available state variable keys
-  const stateKeys = useMemo(
-    () => Object.keys(document.spec.state ?? {}).filter((k) => k !== "i18n" && k !== "__scene"),
-    [document.spec.state],
-  );
 
   // Scan all element event bindings across the document
   const referencesMap = useMemo(() => {
@@ -147,33 +134,23 @@ export function ActionsPanel({
 
   // Combined action list
   const allActions = useMemo<ActionItem[]>(() => {
-    const list: ActionItem[] = [
-      {
-        key: "setState",
-        title: "修改状态 (Set State)",
-        description: "内置状态修改动作，支持按变量赋值或取反切换 (!toggle)",
-        type: "setState",
-        isBuiltIn: true,
-      },
-    ];
+    const list: ActionItem[] = [];
 
-    // Manifest actions
+    // Manifest actions (source of truth — defined in the renderer)
     const manifestActions = bootstrap?.manifest?.actions;
     if (manifestActions && isRecord(manifestActions)) {
       for (const [key, actionMeta] of Object.entries(manifestActions)) {
-        if (key === "setState") continue;
         const meta = isRecord(actionMeta) ? actionMeta : {};
         list.push({
           key,
           title: typeof meta.title === "string" ? meta.title : key,
           description: typeof meta.description === "string" ? meta.description : undefined,
-          type: "custom",
           isBuiltIn: true,
         });
       }
     }
 
-    // Custom actions
+    // Session-local custom actions
     for (const ca of customActions) {
       if (!list.some((item) => item.key === ca.key)) {
         list.push(ca);
@@ -198,9 +175,6 @@ export function ActionsPanel({
     setFormKey("");
     setFormTitle("");
     setFormDesc("");
-    setFormType("setState");
-    setFormTargetVar(stateKeys[0] || "isVisible");
-    setFormTargetVal("__toggle__");
     setFormJsonText("");
     setFormKeyError(null);
     setIsAddOpen(true);
@@ -211,17 +185,7 @@ export function ActionsPanel({
     setFormKey(action.key);
     setFormTitle(action.title);
     setFormDesc(action.description ?? "");
-    setFormType(action.type);
-    if (action.params) {
-      const firstKey = Object.keys(action.params)[0] || "";
-      setFormTargetVar(firstKey);
-      setFormTargetVal(action.params[firstKey]);
-      setFormJsonText(JSON.stringify(action.params, null, 2));
-    } else {
-      setFormTargetVar(stateKeys[0] || "");
-      setFormTargetVal("__toggle__");
-      setFormJsonText("");
-    }
+    setFormJsonText(action.params ? JSON.stringify(action.params, null, 2) : "");
     setFormKeyError(null);
   };
 
@@ -235,44 +199,36 @@ export function ActionsPanel({
       setFormKeyError(LL.panels.variables.duplicateKey());
       return;
     }
-
     let params: Record<string, unknown> | undefined;
-    if (formType === "setState") {
-      params = { [formTargetVar || "isVisible"]: formTargetVal };
-    } else if (formJsonText.trim()) {
+    if (formJsonText.trim()) {
       try {
-        params = JSON.parse(formJsonText);
+        params = JSON.parse(formJsonText) as Record<string, unknown>;
       } catch {
-        // invalid JSON
+        // invalid JSON — save without params
       }
     }
-
-    const newItem: ActionItem = {
-      key: trimmedKey,
-      title: formTitle.trim() || trimmedKey,
-      description: formDesc.trim() || undefined,
-      type: formType,
-      params,
-    };
-
-    setCustomActions((prev) => [...prev, newItem]);
+    setCustomActions((prev) => [
+      ...prev,
+      {
+        key: trimmedKey,
+        title: formTitle.trim() || trimmedKey,
+        description: formDesc.trim() || undefined,
+        params,
+      },
+    ]);
     setIsAddOpen(false);
   };
 
   const handleSaveEdit = () => {
     if (!editingAction) return;
-
     let params: Record<string, unknown> | undefined;
-    if (formType === "setState") {
-      params = { [formTargetVar || "isVisible"]: formTargetVal };
-    } else if (formJsonText.trim()) {
+    if (formJsonText.trim()) {
       try {
-        params = JSON.parse(formJsonText);
+        params = JSON.parse(formJsonText) as Record<string, unknown>;
       } catch {
-        // ignore
+        // ignore invalid JSON
       }
     }
-
     setCustomActions((prev) =>
       prev.map((a) =>
         a.key === editingAction.key
@@ -280,7 +236,6 @@ export function ActionsPanel({
               ...a,
               title: formTitle.trim() || a.key,
               description: formDesc.trim() || undefined,
-              type: formType,
               params,
             }
           : a,
@@ -566,101 +521,19 @@ export function ActionsPanel({
             </div>
 
             <div className="grid gap-1.5">
-              <label className="text-xs font-medium text-foreground">
-                {LL.panels.actions.actionType()}
+              <label className="text-[11px] font-medium text-foreground">
+                {LL.panels.actions.paramsJson()}
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition-all",
-                    formType === "setState"
-                      ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
-                      : "border-border/60 bg-card hover:bg-muted/60 text-muted-foreground",
-                  )}
-                  onClick={() => setFormType("setState")}
-                >
-                  <Settings2 className="size-3.5" />
-                  <span>{LL.panels.actions.typeSetState()}</span>
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-lg border p-2 text-xs font-medium transition-all",
-                    formType === "custom"
-                      ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
-                      : "border-border/60 bg-card hover:bg-muted/60 text-muted-foreground",
-                  )}
-                  onClick={() => setFormType("custom")}
-                >
-                  <Code2 className="size-3.5" />
-                  <span>{LL.panels.actions.typeCustom()}</span>
-                </button>
-              </div>
+              <Textarea
+                value={formJsonText}
+                onChange={(e) => setFormJsonText(e.target.value)}
+                placeholder={"{\n  \n}"}
+                className="font-mono text-xs leading-relaxed"
+              />
+              <p className="text-[10px] leading-4 text-muted-foreground">
+                Optional default params passed to the action handler.
+              </p>
             </div>
-
-            {formType === "setState" ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                <div className="grid gap-1">
-                  <label className="text-[11px] font-medium text-foreground">
-                    {LL.panels.actions.targetVariable()}
-                  </label>
-                  <VariableCombobox
-                    value={formTargetVar ? `/${formTargetVar}` : ""}
-                    placeholder={LL.panels.actions.targetVariable()}
-                    onChange={(newPath) => setFormTargetVar(newPath.replace(/^\/+/, ""))}
-                    buttonClassName="h-8"
-                  />
-                </div>
-
-                <div className="grid gap-1">
-                  <label className="text-[11px] font-medium text-foreground">
-                    {LL.panels.actions.targetValue()}
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant={formTargetVal === "__toggle__" ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal("__toggle__")}
-                    >
-                      {LL.panels.actions.toggleOption()}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formTargetVal === true ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal(true)}
-                    >
-                      {LL.panels.actions.trueOption()}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formTargetVal === false ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal(false)}
-                    >
-                      {LL.panels.actions.falseOption()}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="grid gap-1">
-                <label className="text-[11px] font-medium text-foreground">
-                  {LL.panels.actions.paramsJson()}
-                </label>
-                <Textarea
-                  value={formJsonText}
-                  onChange={(e) => setFormJsonText(e.target.value)}
-                  placeholder="{\n  \n}"
-                  className="font-mono text-xs leading-relaxed"
-                />
-              </div>
-            )}
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
@@ -712,56 +585,17 @@ export function ActionsPanel({
               />
             </div>
 
-            {formType === "setState" && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                <div className="grid gap-1">
-                  <label className="text-[11px] font-medium text-foreground">
-                    {LL.panels.actions.targetVariable()}
-                  </label>
-                  <VariableCombobox
-                    value={formTargetVar ? `/${formTargetVar}` : ""}
-                    placeholder={LL.panels.actions.targetVariable()}
-                    onChange={(newPath) => setFormTargetVar(newPath.replace(/^\/+/, ""))}
-                    buttonClassName="h-8"
-                  />
-                </div>
-
-                <div className="grid gap-1">
-                  <label className="text-[11px] font-medium text-foreground">
-                    {LL.panels.actions.targetValue()}
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant={formTargetVal === "__toggle__" ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal("__toggle__")}
-                    >
-                      {LL.panels.actions.toggleOption()}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formTargetVal === true ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal(true)}
-                    >
-                      {LL.panels.actions.trueOption()}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={formTargetVal === false ? "default" : "outline"}
-                      size="xs"
-                      className="h-6 text-[10px]"
-                      onClick={() => setFormTargetVal(false)}
-                    >
-                      {LL.panels.actions.falseOption()}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="grid gap-1.5">
+              <label className="text-[11px] font-medium text-foreground">
+                {LL.panels.actions.paramsJson()}
+              </label>
+              <Textarea
+                value={formJsonText}
+                onChange={(e) => setFormJsonText(e.target.value)}
+                placeholder={"{\n  \n}"}
+                className="font-mono text-xs leading-relaxed"
+              />
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

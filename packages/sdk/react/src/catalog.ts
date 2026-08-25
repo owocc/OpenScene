@@ -2,6 +2,8 @@ import { defineCatalog, type Catalog } from "@json-render/core";
 import { schema } from "@json-render/react/schema";
 import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
 import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import { evaluateDynamicValue } from "@openscene-ai/javascript";
+import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import { z } from "zod";
 import type React from "react";
 import type { ComponentRenderProps } from "@json-render/react";
@@ -25,14 +27,11 @@ function mergeComponentDefinitions(
     | Record<string, OpenSceneReactComponentDefinition>
     | undefined,
 ): Record<string, OpenSceneReactComponentDefinition> {
-  if (!custom) return { ...baseReactComponents };
+  if (!custom) return {};
   if (Array.isArray(custom)) {
-    return {
-      ...baseReactComponents,
-      ...Object.fromEntries(custom.map((definition) => [definition.type, definition])),
-    };
+    return Object.fromEntries(custom.map((definition) => [definition.type, definition]));
   }
-  return { ...baseReactComponents, ...custom };
+  return { ...custom };
 }
 
 function mergeActionDefinitions(
@@ -41,14 +40,11 @@ function mergeActionDefinitions(
     | Record<string, OpenSceneReactActionDefinition>
     | undefined,
 ): Record<string, OpenSceneReactActionDefinition> {
-  if (!custom) return { ...baseReactActions };
+  if (!custom) return {};
   if (Array.isArray(custom)) {
-    return {
-      ...baseReactActions,
-      ...Object.fromEntries(custom.map((definition) => [definition.key, definition])),
-    };
+    return Object.fromEntries(custom.map((definition) => [definition.key, definition]));
   }
-  return { ...baseReactActions, ...custom };
+  return { ...custom };
 }
 
 export type ReactRenderer<P = Record<string, unknown>> = (
@@ -388,3 +384,149 @@ export const baseReactActions: Record<string, OpenSceneReactActionDefinition> = 
 };
 
 export const baseActions = baseReactActions;
+
+// ---------------------------------------------------------------------------
+// OpenAPI request action
+// ---------------------------------------------------------------------------
+
+/** Internal fetch-ready request shape built from a resolved OpenApiValue. */
+type ResolvedOpenApiRequest = {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+};
+
+/**
+ * Resolves all `{ $state }` references inside an `OpenApiValue`'s params
+ * against the current runtime state, then builds a concrete fetch request.
+ * Returns `null` when the value is missing or malformed.
+ */
+export function buildOpenApiRequest(
+  value: OpenApiValue | undefined,
+  state: Record<string, unknown> = {},
+): ResolvedOpenApiRequest | null {
+  if (!value || !value.json || typeof value.json !== "object" || !value.path || !value.method) {
+    return null;
+  }
+  // Resolve every param field that may carry a { $state: "/pointer" } binding.
+  const resolvedParams = value.params
+    ? (evaluateDynamicValue(value.params, state) as typeof value.params)
+    : undefined;
+
+  const rawServers = value.json.servers;
+  const serverList = Array.isArray(rawServers) ? (rawServers as Array<{ url?: unknown }>) : [];
+  const base =
+    typeof serverList[0]?.url === "string" && serverList[0].url
+      ? serverList[0].url.replace(/\/$/, "")
+      : "";
+
+  let path = value.path;
+  const pathParams = resolvedParams?.path ?? {};
+  path = path.replace(/\{([^}]+)\}/g, (_: string, name: string) =>
+    encodeURIComponent(String(pathParams[name] ?? "")),
+  );
+
+  const searchParams = new URLSearchParams();
+  const query = resolvedParams?.query ?? {};
+  for (const [key, item] of Object.entries(query)) {
+    searchParams.set(key, typeof item === "string" ? item : JSON.stringify(item));
+  }
+  const queryString = searchParams.toString();
+  const url = `${base}${path}${queryString ? `?${queryString}` : ""}`;
+
+  const headers: Record<string, string> = { accept: "application/json" };
+  const method = value.method.toUpperCase();
+  let body: string | undefined;
+  if (method !== "GET" && method !== "HEAD" && resolvedParams?.body !== undefined) {
+    body = JSON.stringify(resolvedParams.body);
+    headers["content-type"] = "application/json";
+  }
+  return { url, method, headers, body };
+}
+
+/** Executes a resolved OpenAPI request and returns the parsed JSON response. */
+export async function executeOpenApiRequest(request: ResolvedOpenApiRequest): Promise<unknown> {
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+  });
+  if (!response.ok) {
+    throw new Error(`${request.method} ${request.url} -> ${response.status}`);
+  }
+  return response.json() as Promise<unknown>;
+}
+
+/**
+ * Creates a registered action that executes an OpenAPI request when fired.
+ *
+ * The action expects its params to contain:
+ * - `openapi` — an `OpenApiValue` (configured in Studio via the openapi control),
+ *   whose `params.path` / `params.query` / `params.body` values may be
+ *   `{ $state: "/pointer" }` bindings resolved against the current runtime state.
+ * - `resultKey` (optional) — the state key where the JSON response is stored.
+ * - `errorKey`  (optional) — the state key where an error message is stored.
+ *
+ * @example
+ * ```ts
+ * const fetchUser = defineOpenApiRequestAction({ key: "fetchUser" });
+ * ```
+ */
+export function defineOpenApiRequestAction(options: {
+  key: string;
+  title?: string;
+  description?: string;
+}): OpenSceneReactActionDefinition {
+  return defineOpenSceneReactAction({
+    key: options.key,
+    title: options.title ?? options.key,
+    description:
+      options.description ??
+      "Execute an OpenAPI request. Configure the endpoint in Studio via the openapi prop control.",
+    params: z.object({
+      openapi: z
+        .object({
+          json: z.record(z.string(), z.unknown()),
+          path: z.string(),
+          method: z.enum([...openApiMethods]),
+          params: z
+            .object({
+              path: z.record(z.string(), z.unknown()).optional(),
+              query: z.record(z.string(), z.unknown()).optional(),
+              body: z.unknown().optional(),
+            })
+            .optional(),
+        })
+        .meta({ "x-editor": { control: "openapi" } })
+        .optional(),
+      resultKey: z.string().optional(),
+      errorKey: z.string().optional(),
+    }),
+    handler: async (params, setState, state) => {
+      const openapi = params?.openapi as OpenApiValue | undefined;
+      const resultKey = typeof params?.resultKey === "string" ? params.resultKey : undefined;
+      const errorKey = typeof params?.errorKey === "string" ? params.errorKey : undefined;
+
+      const request = buildOpenApiRequest(openapi, state);
+      if (!request) return;
+
+      try {
+        const result = await executeOpenApiRequest(request);
+        if (resultKey) {
+          setState((prev) => ({ ...prev, [resultKey]: result }));
+        }
+        if (errorKey) {
+          setState((prev) => ({ ...prev, [errorKey]: null }));
+        }
+      } catch (err) {
+        if (errorKey) {
+          setState((prev) => ({
+            ...prev,
+            [errorKey]: err instanceof Error ? err.message : String(err),
+          }));
+        }
+      }
+    },
+  });
+}

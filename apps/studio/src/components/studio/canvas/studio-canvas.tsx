@@ -61,6 +61,7 @@ export function StudioCanvas({
   onCopyJson,
   onSave,
   onApplyDocument,
+  onDevManifest,
 }: StudioCanvasProps) {
   const aiPreviewDocument = useAgentChatStore((s) => s.aiPreviewDocument);
   const aiPreviewRevision = useAgentChatStore((s) => s.aiPreviewRevision);
@@ -123,6 +124,7 @@ export function StudioCanvas({
     onHoverElement,
     onGeometryChange: handleGeometryChange,
     onFrameDrop,
+    onDevManifest,
   };
   const adapter = canvasRendererRegistry[bootstrap.app.type];
   const previewElement = adapter ? (

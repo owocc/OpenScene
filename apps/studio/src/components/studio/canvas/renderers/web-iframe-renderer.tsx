@@ -8,7 +8,7 @@ import {
   withEditorConnection,
 } from "@openscene-ai/protocol";
 import type { AppType } from "@openscene-ai/constants";
-import type { ElementRect } from "@openscene-ai/protocol";
+import type { AppManifest, ElementRect } from "@openscene-ai/protocol";
 import type { CanvasRendererProps } from "../types";
 export function isRendererReadyForSession(value: unknown, sessionId: string, appType: AppType) {
   const parsed = RendererWindowMessageSchema.safeParse(value);
@@ -31,6 +31,7 @@ export function WebIframeRenderer({
   onGeometryChange,
   onFrameDrop,
   onError,
+  onDevManifest,
 }: CanvasRendererProps) {
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [connected, setConnected] = useState(false);
@@ -57,6 +58,7 @@ export function WebIframeRenderer({
     onGeometryChange,
     onFrameDrop,
     onError,
+    onDevManifest,
   });
   // Keep the ref pointing at the latest props: the initial capture would
   // otherwise freeze stale closures (e.g. addComponent over an old document).
@@ -67,8 +69,9 @@ export function WebIframeRenderer({
       onGeometryChange,
       onFrameDrop,
       onError,
+      onDevManifest,
     };
-  }, [onSelectionChange, onHoverElement, onGeometryChange, onFrameDrop, onError]);
+  }, [onSelectionChange, onHoverElement, onGeometryChange, onFrameDrop, onError, onDevManifest]);
   const hasLoadedRef = useRef(false);
   const resettingRef = useRef(false);
   // Tracks the last revision pushed to the renderer so every document change
@@ -129,6 +132,14 @@ export function WebIframeRenderer({
 
       const channel = new MessageChannel();
       channel.port1.onmessage = (portEvent: MessageEvent<unknown>) => {
+        // DEV_MANIFEST is handled before schema parse because AppManifestSchema
+        // complexity prevents Zod from including it in the discriminated union type.
+        const raw = portEvent.data as Record<string, unknown> | null;
+        if (raw && raw["type"] === "DEV_MANIFEST" && raw["sessionId"] === sessionId) {
+          const payload = raw["payload"] as { manifest: AppManifest } | undefined;
+          if (payload?.manifest) callbacksRef.current.onDevManifest?.(payload.manifest);
+          return;
+        }
         const message = RendererPortMessageSchema.safeParse(portEvent.data);
         if (!message.success || message.data.sessionId !== sessionId) return;
         if (message.data.type === "SELECTION_CHANGED") {

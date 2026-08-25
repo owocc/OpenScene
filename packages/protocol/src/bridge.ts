@@ -5,6 +5,7 @@ import {
   SceneDocumentSchema,
   type SceneDocument,
 } from "./document.ts";
+import { AppManifestSchema } from "./manifest.ts";
 
 /** Stable browser protocol identifier shared by Studio and renderer SDKs. */
 export const STUDIO_BRIDGE_PROTOCOL = "openscene-studio" as const;
@@ -154,6 +155,10 @@ export const RendererPortMessageSchema = z.discriminatedUnion("type", [
     z.object({ scrollLeft: z.number().nonnegative(), scrollTop: z.number().nonnegative() }),
   ),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
+  /** Dev-mode only: renderer pushes its local manifest so Studio can populate
+   *  PropertyEditor without a server upload. Only handled when sessionId is
+   *  the local-test sentinel; ignored in production sessions. */
+  envelope("DEV_MANIFEST", z.object({ manifest: AppManifestSchema })),
 ]);
 
 export type RendererWindowMessage = z.infer<typeof RendererWindowMessageSchema>;

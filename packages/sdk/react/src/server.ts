@@ -161,7 +161,6 @@ export function defineOpenSceneReactApp(
       ? Object.fromEntries(options.components.map((item) => [item.type, item]))
       : options.components
     : {};
-  const components = { ...baseReactComponents, ...rawComponents };
   const rawActions = options.actions
     ? Array.isArray(options.actions)
       ? Object.fromEntries(options.actions.map((item) => [item.key, item]))
@@ -171,7 +170,7 @@ export function defineOpenSceneReactApp(
     protocolVersion: "2",
     app: { key: appKey, type: appType },
     components: Object.fromEntries(
-      Object.entries(components).map(([type, item]) => [type, componentManifest(item)]),
+      Object.entries(rawComponents).map(([type, item]) => [type, componentManifest(item)]),
     ),
     actions: Object.fromEntries(
       Object.entries(rawActions).map(([key, item]) => [key, actionManifest(item)]),
@@ -182,12 +181,12 @@ export function defineOpenSceneReactApp(
     catalog: {
       data: { components: {}, actions: {} },
       validate: () => ({ success: true, data: undefined as never }),
-      componentNames: Object.keys(components),
+      componentNames: Object.keys(rawComponents),
       actionNames: Object.keys(rawActions),
     } as unknown as OpenSceneReactApp["catalog"],
     registry: {},
     handlers: (() => ({})) as OpenSceneHandlerFactory,
-    componentDefinitions: components,
+    componentDefinitions: rawComponents,
     actionDefinitions: rawActions,
     manifest,
   };
@@ -246,3 +245,66 @@ export type {
   Spec,
   UIElement,
 } from "@openscene-ai/protocol";
+
+// ---------------------------------------------------------------------------
+// OpenAPI request action — server/Node stubs
+// These are imported by vite.config.ts at build time; only manifest metadata
+// is needed on the server side; the actual fetch implementation runs in the
+// browser bundle (catalog.ts).
+// ---------------------------------------------------------------------------
+
+import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
+
+/** Server stub — returns null; real implementation is in the browser bundle. */
+export function buildOpenApiRequest(
+  _value: OpenApiValue | undefined,
+  _state: Record<string, unknown> = {},
+): null {
+  return null;
+}
+
+/** Server stub — always rejects; real implementation is in the browser bundle. */
+export async function executeOpenApiRequest(_request: never): Promise<never> {
+  throw new Error("executeOpenApiRequest is not available in a server/Node context");
+}
+
+/**
+ * Server-side implementation of `defineOpenApiRequestAction`.
+ * Generates the action manifest entry (key, title, description, params schema)
+ * so `createManifest()` works correctly in vite.config.ts without a browser runtime.
+ */
+export function defineOpenApiRequestAction(options: {
+  key: string;
+  title?: string;
+  description?: string;
+}): OpenSceneReactActionDefinition {
+  return defineOpenSceneReactAction({
+    key: options.key,
+    title: options.title ?? options.key,
+    description:
+      options.description ??
+      "Execute an OpenAPI request. Configure the endpoint in Studio via the openapi prop control.",
+    params: z.object({
+      openapi: z
+        .object({
+          json: z.record(z.string(), z.unknown()),
+          path: z.string(),
+          method: z.enum([...openApiMethods]),
+          params: z
+            .object({
+              path: z.record(z.string(), z.unknown()).optional(),
+              query: z.record(z.string(), z.unknown()).optional(),
+              body: z.unknown().optional(),
+            })
+            .optional(),
+        })
+        .meta({ "x-editor": { control: "openapi" } })
+        .optional(),
+      resultKey: z.string().optional(),
+      errorKey: z.string().optional(),
+    }),
+    handler: () => {
+      // No-op on server; real handler runs in the browser bundle.
+    },
+  });
+}
