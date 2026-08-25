@@ -201,13 +201,15 @@ export function applyAgentUiActionsToDocument(
     if (action.action === "delete_element") {
       delete doc.spec.elements[action.elementId];
       // Remove from all parents children / slots
-      for (const elem of Object.values(doc.spec.elements)) {
+      for (const elem of Object.values(doc.spec.elements) as UIElement[]) {
         if (elem.children) {
-          elem.children = elem.children.filter((id) => id !== action.elementId);
+          elem.children = elem.children.filter((id: string) => id !== action.elementId);
         }
         if (elem.slots) {
           for (const slotKey of Object.keys(elem.slots)) {
-            elem.slots[slotKey] = elem.slots[slotKey].filter((id) => id !== action.elementId);
+            elem.slots[slotKey] = (elem.slots[slotKey] ?? []).filter(
+              (id: string) => id !== action.elementId,
+            );
           }
         }
       }
