@@ -55,9 +55,12 @@ async function initialize(config: AppConfig): Promise<DatabaseRuntime> {
 
 function resolveMigrationsFolder(config: AppConfig): string {
   if (config.database.migrationsDir) return config.database.migrationsDir;
-  const cwdFolder = path.join(process.cwd(), "drizzle");
+  const cwdFolder = path.join(/*turbopackIgnore: true*/ process.cwd(), "drizzle");
   if (hasMigrationJournal(cwdFolder)) return cwdFolder;
-  const packageFolder = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../drizzle");
+  const packageFolder = path.resolve(
+    /*turbopackIgnore: true*/ path.dirname(fileURLToPath(import.meta.url)),
+    "../../drizzle",
+  );
   if (hasMigrationJournal(packageFolder)) return packageFolder;
   throw new Error("OpenScene migrations directory is not configured or available");
 }
@@ -70,7 +73,9 @@ function normalizeDatabaseUrl(url: string): string {
   if (!url.startsWith("file:")) return url;
   const filePath = url.slice("file:".length);
   if (!filePath || filePath === ":memory:") return url;
-  const absolutePath = filePath.startsWith("/") ? filePath : path.resolve(process.cwd(), filePath);
+  const absolutePath = filePath.startsWith("/")
+    ? filePath
+    : path.resolve(/*turbopackIgnore: true*/ process.cwd(), filePath);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
   return `file:${absolutePath}`;
 }
