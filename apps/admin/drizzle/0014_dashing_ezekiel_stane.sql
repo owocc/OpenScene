@@ -39,7 +39,6 @@ DROP INDEX "storage_objects_app_idx";--> statement-breakpoint
 DROP INDEX "studio_sessions_app_expiry_index";--> statement-breakpoint
 DROP INDEX "studio_sessions_token_unique";--> statement-breakpoint
 DROP INDEX "templates_app_key_unique";--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "driver" TO "driver" text NOT NULL DEFAULT 'database';--> statement-breakpoint
 CREATE UNIQUE INDEX `ai_chat_sessions_resource_unique` ON `ai_chat_sessions` (`app_id`,`resource_kind`,`resource_id`);--> statement-breakpoint
 CREATE INDEX `ai_chat_sessions_app_idx` ON `ai_chat_sessions` (`app_id`);--> statement-breakpoint
 CREATE INDEX `ai_config_provider_index` ON `ai_config` (`provider`);--> statement-breakpoint
@@ -66,8 +65,4 @@ CREATE INDEX `releases_document_index` ON `releases` (`app_id`,`document_id`,`ch
 CREATE INDEX `studio_sessions_app_expiry_index` ON `studio_sessions` (`app_id`,`expires_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `studio_sessions_token_unique` ON `studio_sessions` (`token_hash`);--> statement-breakpoint
 CREATE UNIQUE INDEX `templates_app_key_unique` ON `templates` (`app_id`,`key`);--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "region" TO "region" text DEFAULT 'auto';--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "bucket" TO "bucket" text;--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "access_key_id" TO "access_key_id" text;--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "secret_access_key_enc" TO "secret_access_key_enc" text;--> statement-breakpoint
 PRAGMA foreign_keys=ON;
