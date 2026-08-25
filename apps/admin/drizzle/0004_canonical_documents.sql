@@ -33,7 +33,7 @@ SET draft_json = CASE
     'spec', json_object('root', 'root', 'elements', json_object('root', json_object('type', 'View', 'props', json('{}'), 'children', json('[]'))), 'state', json('{}'))
   )
 END;
-
+--> statement-breakpoint
 WITH normalized(id, elements) AS (
   SELECT d.id,
     json_group_object(
@@ -49,7 +49,7 @@ WITH normalized(id, elements) AS (
 UPDATE documents
 SET draft_json = json_set(draft_json, '$.spec.elements', json((SELECT elements FROM normalized WHERE normalized.id = documents.id)))
 WHERE id IN (SELECT id FROM normalized);
-
+--> statement-breakpoint
 WITH normalized(id, elements) AS (
   SELECT v.id,
     json_group_object(
@@ -84,7 +84,7 @@ SET document_json = CASE
     'spec', json_object('root', 'root', 'elements', json_object('root', json_object('type', 'View', 'props', json('{}'), 'children', json('[]'))), 'state', json('{}'))
   )
 END;
-
+--> statement-breakpoint
 WITH normalized(id, elements) AS (
   SELECT v.id,
     json_group_object(
