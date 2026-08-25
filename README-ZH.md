@@ -25,7 +25,8 @@ openscene/
 │   └── api-client/       # @openscene-ai/api-client: 自动生成的 Admin REST API Client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite 业务接入示例
-│   └── solid-v1/         # SolidJS + Vite 业务接入示例
+│   ├── solid-vite/      # SolidJS v1 + Vite 业务接入示例
+│   └── solid-v2/        # SolidJS v2 + Vite 业务接入示例
 └── docs/                 # 详细集成与部署指南
 ```
 

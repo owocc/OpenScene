@@ -27,4 +27,4 @@ For local UI and iframe bridge testing, use the development-only session fixture
 http://127.0.0.1:5173/?sessionId=local-test
 ```
 
-The fixture uses `createEmptySceneDocument()` and points at the running `examples/solid-v1` development server. It has no Admin persistence or session token and uses the same Protocol bridge v2 as a production preview.
+The fixture uses `createEmptySceneDocument()` and points at the running `examples/solid-vite` development server. It has no Admin persistence or session token and uses the same Protocol bridge v2 as a production preview.

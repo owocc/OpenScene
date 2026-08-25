@@ -10,7 +10,7 @@ export function createLocalTestBootstrap(origin = "http://localhost:5174"): Stud
   const document = createEmptySceneDocument();
   return {
     session: { id: LOCAL_TEST_SESSION_ID, expiresAt: "2099-12-31T23:59:59.000Z" },
-    app: { id: "local-test-app", key: "solid-v1", name: "Solid example", type: APP_TYPE_WEB },
+    app: { id: "local-test-app", key: "solid-vite", name: "Solid example", type: APP_TYPE_WEB },
     resource: {
       id: "local-page",
       kind: "page",

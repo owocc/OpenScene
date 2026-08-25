@@ -1,179 +1,368 @@
-import { defineOpenSceneSolidApp, defineOpenSceneSolidComponent } from "@openscene-ai/solid/v2";
+import { createComponent, createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { defineAppManifest } from "@openscene-ai/javascript";
+import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import {
-  GuildCardMeta,
-  StatBlockMeta,
-  MemberRowMeta,
-  LevelTierCardMeta,
-  PageHeaderMeta,
-  ConfirmDialogMeta,
-  openApiRequest,
-  showDialog,
-} from "./openscene-manifest.ts";
+  baseSolidComponents,
+  defineOpenSceneSolidAction,
+  defineOpenSceneSolidApp,
+  defineOpenSceneSolidComponent,
+  type OpenSceneSolidApp,
+  useOpenSceneNode,
+  View,
+} from "@openscene-ai/solid";
+import { z } from "zod";
+const baseViewProps = {
+  class: z.string().optional(),
+  className: z.string().optional(),
+  style: z
+    .record(z.string(), z.unknown())
+    .meta({ "x-editor": { control: "style", type: "style" } })
+    .optional(),
+};
 
-// ---------------------------------------------------------------------------
-// Components with JSX renders
-// ---------------------------------------------------------------------------
+const viewProps = z.object(baseViewProps).passthrough();
+const textProps = z
+  .object({
+    text: z.string().optional(),
+    ...baseViewProps,
+  })
+  .passthrough();
+const buttonProps = z
+  .object({
+    label: z.string().optional(),
+    text: z.string().optional(),
+    disabled: z.boolean().optional(),
+    type: z.enum(["button", "submit", "reset"]).optional(),
+    ...baseViewProps,
+  })
+  .passthrough();
+const imageProps = z
+  .object({
+    src: z.string().optional(),
+    alt: z.string().optional(),
+    fit: z.enum(["cover", "contain", "fill", "none", "scale-down"]).optional(),
+    loading: z.enum(["eager", "lazy"]).optional(),
+    ...baseViewProps,
+  })
+  .passthrough();
 
-const GuildCard = defineOpenSceneSolidComponent({
-  ...GuildCardMeta,
-  render: (props) => (
-    <div class="flex items-center gap-3 rounded-xl bg-[#1a2040] px-4 py-3">
-      <div class="relative shrink-0">
-        <img
-          src={(props.avatar as string | undefined) ?? "https://placehold.co/40"}
-          alt={props.name as string | undefined}
-          class="h-10 w-10 rounded-full object-cover ring-2 ring-blue-500/30"
-        />
-        {props.isOnline && (
-          <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#1a2040] bg-emerald-400" />
-        )}
-      </div>
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-semibold text-white">
-          {(props.name as string | undefined) ?? "Agency"}
-        </p>
-        <p class="text-xs text-blue-300">{(props.level as string | undefined) ?? "Standard"}</p>
-      </div>
-      <div class="text-right">
-        <p class="text-sm font-bold text-white">
-          {(props.weeklyRevenue as string | undefined) ?? "—"}
-        </p>
-        <p class="text-xs text-slate-400">
-          {(props.membersCount as number | undefined) ?? 0} members
-        </p>
-      </div>
-    </div>
-  ),
+const baseComponents = [
+  {
+    ...baseSolidComponents.View,
+    schema: viewProps,
+    title: "View",
+    description: "A layout container.",
+    category: "layout",
+    children: true,
+  },
+  {
+    ...baseSolidComponents.Text,
+    schema: textProps,
+    title: "Text",
+    description: "Text content.",
+    category: "content",
+    children: true,
+  },
+  {
+    ...baseSolidComponents.Button,
+    schema: buttonProps,
+    title: "Button",
+    description: "An interactive button.",
+    category: "interactive",
+    events: { press: { title: "Press" } },
+    children: true,
+  },
+];
+
+const calloutProps = z
+  .object({
+    tone: z.enum(["info", "success", "warning"]).optional(),
+  })
+  .passthrough();
+
+const statusCardProps = z
+  .object({
+    label: z.string().optional(),
+    status: z.enum(["idle", "active", "complete"]).optional(),
+  })
+  .passthrough();
+const openApiProviderProps = z
+  .object({
+    openapi: z
+      .object({
+        json: z.record(z.string(), z.unknown()),
+        path: z.string(),
+        method: z.enum([...openApiMethods]),
+        params: z
+          .object({
+            path: z.record(z.string(), z.string()).optional(),
+            query: z.record(z.string(), z.unknown()).optional(),
+            body: z.unknown().optional(),
+          })
+          .optional(),
+      })
+      .meta({ "x-editor": { control: "openapi" } })
+      .optional(),
+  })
+  .passthrough();
+/** An image component supporting image rendering, props, basic view props, and a style editor. */
+function getComponentProps<T extends Record<string, unknown>>(renderProps: unknown): Partial<T> {
+  if (renderProps && typeof renderProps === "object") {
+    if ("props" in renderProps && renderProps.props && typeof renderProps.props === "object") {
+      return renderProps.props as Partial<T>;
+    }
+    if (
+      "element" in renderProps &&
+      renderProps.element &&
+      typeof renderProps.element === "object"
+    ) {
+      const el = renderProps.element as { props?: unknown };
+      if (el.props && typeof el.props === "object") {
+        return el.props as Partial<T>;
+      }
+    }
+  }
+  return {};
+}
+
+const Image = defineOpenSceneSolidComponent({
+  type: "Image",
+  schema: imageProps,
+  title: "Image",
+  description: "An image element supporting source, fit, and styles.",
+  category: "media",
+  tags: ["image", "media"],
+  editor: { fields: ["src", "alt", "fit", "loading"] },
+  children: false,
+  render: (renderProps) => {
+    const node = useOpenSceneNode();
+    const elementProps = getComponentProps<z.infer<typeof imageProps>>(renderProps);
+    const className =
+      typeof elementProps.className === "string"
+        ? elementProps.className
+        : typeof elementProps.class === "string"
+          ? elementProps.class
+          : undefined;
+    const style = (elementProps.style as Record<string, unknown>) ?? {};
+    const fit = typeof elementProps.fit === "string" ? elementProps.fit : undefined;
+    const combinedStyle = fit ? { "object-fit": fit, ...style } : style;
+    const src = typeof elementProps.src === "string" ? elementProps.src : undefined;
+    const alt = typeof elementProps.alt === "string" ? elementProps.alt : "";
+    const loading =
+      elementProps.loading === "eager" || elementProps.loading === "lazy"
+        ? elementProps.loading
+        : undefined;
+
+    return createComponent(Dynamic, {
+      component: "img",
+      ...node.nodeAttrs,
+      src,
+      alt,
+      loading,
+      class: className,
+      style: combinedStyle,
+    });
+  },
 });
 
-const StatBlock = defineOpenSceneSolidComponent({
-  ...StatBlockMeta,
-  render: (props) => (
-    <div class="flex flex-col gap-1 rounded-xl bg-[#1a2040] px-4 py-3">
-      <span class="text-xs text-slate-400">{(props.label as string | undefined) ?? "Stat"}</span>
-      <span class="text-xl font-bold text-white">{(props.value as string | undefined) ?? "—"}</span>
-      {props.trend && (
-        <span class={`text-xs font-medium ${props.trendUp ? "text-emerald-400" : "text-rose-400"}`}>
-          {props.trend as string}
-        </span>
-      )}
-    </div>
-  ),
+/** A composition example: use the shared View primitive as the component root. */
+const Callout = defineOpenSceneSolidComponent({
+  type: "SolidV1Callout",
+  schema: calloutProps,
+  title: "Callout",
+  description: "A styled container composed from the OpenScene View primitive.",
+  category: "layout",
+  tags: ["example", "composition"],
+  editor: { fields: ["tone"] },
+  children: true,
+  render: (renderProps) => {
+    const elementProps = getComponentProps<z.infer<typeof calloutProps>>(renderProps);
+    const tone = typeof elementProps.tone === "string" ? elementProps.tone : "info";
+    return createComponent(View, {
+      props: {
+        ...elementProps,
+        className: `solid-v1-callout solid-v1-callout-${tone}`,
+      },
+      children: renderProps.children,
+      emit: renderProps.emit,
+      on: renderProps.on,
+    });
+  },
 });
 
-const MemberRow = defineOpenSceneSolidComponent({
-  ...MemberRowMeta,
-  render: (props) => (
-    <div class="flex items-center gap-3 border-b border-white/5 px-4 py-2.5 last:border-0">
-      <div class="relative shrink-0">
-        <img
-          src={(props.avatar as string | undefined) ?? "https://placehold.co/36"}
-          alt={props.name as string | undefined}
-          class="h-9 w-9 rounded-full object-cover"
-        />
-        {props.isOnline && (
-          <span class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#131729] bg-emerald-400" />
-        )}
-      </div>
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-medium text-white">
-          {(props.name as string | undefined) ?? "User"}
-        </p>
-        <p class="text-xs text-slate-500">ID: {(props.uid as string | undefined) ?? "—"}</p>
-      </div>
-      {props.actionLabel && (
-        <button class="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-500">
-          {props.actionLabel as string}
-        </button>
-      )}
-      {props.rejectLabel && (
-        <button class="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-slate-300 hover:bg-white/5">
-          {props.rejectLabel as string}
-        </button>
-      )}
-    </div>
-  ),
+/** A hook example: attach the editor identity to a semantic custom root. */
+const StatusCard = defineOpenSceneSolidComponent({
+  type: "SolidV1StatusCard",
+  schema: statusCardProps,
+  title: "Status card",
+  description: "A semantic custom root using useOpenSceneNode for editor identity.",
+  category: "content",
+  tags: ["example", "hook"],
+  editor: { fields: ["label", "status"] },
+  children: true,
+  render: (renderProps) => {
+    const node = useOpenSceneNode();
+    const elementProps = getComponentProps<z.infer<typeof statusCardProps>>(renderProps);
+    const status = typeof elementProps.status === "string" ? elementProps.status : "idle";
+    const label = typeof elementProps.label === "string" ? elementProps.label : "Status";
+    return createComponent(Dynamic, {
+      component: "article",
+      ...node.nodeAttrs,
+      class: `solid-v1-status-card solid-v1-status-card-${status}`,
+      children: [
+        createComponent(Dynamic, { component: "strong", children: label }),
+        createComponent(Dynamic, { component: "span", children: status }),
+        renderProps.children,
+      ],
+    });
+  },
 });
 
-const LevelTierCard = defineOpenSceneSolidComponent({
-  ...LevelTierCardMeta,
-  render: (props) => (
-    <div
-      class={`rounded-xl border p-4 ${
-        props.isActive ? "border-blue-500 bg-blue-500/10" : "border-white/10 bg-[#1a2040]"
-      }`}
-    >
-      <p
-        class="text-sm font-bold"
-        style={{
-          color: (props.color as string | undefined) ?? (props.isActive ? "#60a5fa" : "#94a3b8"),
-        }}
-      >
-        {(props.tierName as string | undefined) ?? "Standard"}
-      </p>
-      <p class="mt-1 text-xs text-slate-400">≥ {(props.minRevenue as string | undefined) ?? "0"}</p>
-      <p class="mt-2 text-lg font-bold text-white">
-        {(props.commissionRate as string | undefined) ?? "—"}
-      </p>
-    </div>
-  ),
+type OpenApiRequest = {
+  url: string;
+  method: string;
+  body?: string;
+  headers: Record<string, string>;
+};
+
+function buildOpenApiRequest(value: OpenApiValue | undefined): OpenApiRequest | null {
+  if (!value || !value.json || typeof value.json !== "object" || !value.path || !value.method) {
+    return null;
+  }
+  const rawServers = value.json.servers;
+  const serverList = Array.isArray(rawServers)
+    ? (rawServers as unknown as Array<{ url?: unknown }>)
+    : [];
+  const base =
+    typeof serverList[0]?.url === "string" && serverList[0].url
+      ? serverList[0].url.replace(/\/$/, "")
+      : "";
+  let path = value.path;
+  const pathParams = value.params?.path ?? {};
+  path = path.replace(/\{([^}]+)\}/g, (_, name: string) =>
+    encodeURIComponent(pathParams[name] ?? ""),
+  );
+  const searchParams = new URLSearchParams();
+  const query = value.params?.query ?? {};
+  for (const [key, item] of Object.entries(query)) {
+    searchParams.set(key, typeof item === "string" ? item : JSON.stringify(item));
+  }
+  const queryString = searchParams.toString();
+  const url = `${base}${path}${queryString ? `?${queryString}` : ""}`;
+  const headers: Record<string, string> = { accept: "application/json" };
+  const method = value.method.toUpperCase();
+  let body: string | undefined;
+  if (method !== "GET" && method !== "HEAD" && value.params?.body !== undefined) {
+    body = JSON.stringify(value.params.body);
+    headers["content-type"] = "application/json";
+  }
+  return { url, method, headers, body };
+}
+
+async function executeOpenApiRequest(request: OpenApiRequest): Promise<unknown> {
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+  });
+  if (!response.ok) {
+    throw new Error(`${request.method} ${request.url} -> ${response.status}`);
+  }
+  return response.json();
+}
+
+const setNotice = defineOpenSceneSolidAction({
+  key: "solidV1SetNotice",
+  title: "Set notice",
+  description: "Store a short runtime notice without changing the canonical page document.",
+  params: z.object({ message: z.string() }).passthrough(),
+  editor: { fields: ["message"] },
+  handler: (params, setState) => {
+    const message = typeof params?.message === "string" ? params.message : "";
+    setState((previous) => ({ ...previous, solidV1Notice: message }));
+  },
+});
+/** Requests an OpenAPI operation (from a self-contained document snapshot) and renders the response. */
+const OpenApiProvider = defineOpenSceneSolidComponent({
+  type: "SolidV1OpenApiProvider",
+  schema: openApiProviderProps,
+  title: "OpenAPI Provider",
+  description: "根据 OpenAPI 文档请求接口并渲染响应。",
+  category: "data",
+  tags: ["openapi", "data"],
+  children: true,
+  render: (renderProps) => {
+    // Snapshot the element props once: `props` is a reactive getter in
+    // json-render, so reading it inside the memo below would re-run the memo
+    // and refetch in a loop. The response is written imperatively to the
+    // output element instead of through reactive children: json-render
+    // re-resolves elements whose rendered output changes, so signal-driven
+    // updates would remount the provider and restart the request endlessly.
+    const value = untrack(
+      () =>
+        (renderProps as unknown as { props?: Record<string, unknown> }).props?.openapi as
+          | OpenApiValue
+          | undefined,
+    );
+    const request = createMemo(() => buildOpenApiRequest(value));
+    let outputEl: { textContent: string | null } | undefined;
+    createEffect(() => {
+      const next = request();
+      if (!next || !outputEl) return;
+      let cancelled = false;
+      outputEl.textContent = "Loading…";
+      void executeOpenApiRequest(next)
+        .then((result) => {
+          if (cancelled || !outputEl) return;
+          outputEl.textContent = JSON.stringify(result, null, 2);
+        })
+        .catch((err) => {
+          if (cancelled || !outputEl) return;
+          outputEl.textContent = String(err);
+        });
+      onCleanup(() => {
+        cancelled = true;
+      });
+    });
+    return Show({
+      get when() {
+        return request();
+      },
+      fallback: createComponent(Dynamic, {
+        component: "span",
+        class: "solid-v1-openapi-missing",
+        children: "OpenAPI not configured",
+      }),
+      children: [
+        createComponent(Dynamic, {
+          component: "pre",
+          class: "solid-v1-openapi-data",
+          ref: (el: { textContent: string | null } | undefined) => {
+            outputEl = el;
+          },
+        }),
+        renderProps.children,
+      ],
+    });
+  },
 });
 
-const PageHeader = defineOpenSceneSolidComponent({
-  ...PageHeaderMeta,
-  render: (props) => (
-    <header class="flex items-center gap-3 bg-[#131729] px-4 py-3">
-      {props.showBack !== false && (
-        <button class="text-slate-400 hover:text-white">
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width={2}
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-      )}
-      <h1 class="flex-1 text-base font-semibold text-white">
-        {(props.title as string | undefined) ?? ""}
-      </h1>
-      {props.children}
-    </header>
-  ),
-});
+export function createSolidApp(appKey: string): OpenSceneSolidApp {
+  return defineOpenSceneSolidApp({
+    app: { key: appKey, type: APP_TYPE_WEB },
+    components: [...baseComponents, Image, Callout, StatusCard, OpenApiProvider],
+    actions: [setNotice],
+  });
+}
 
-const ConfirmDialog = defineOpenSceneSolidComponent({
-  ...ConfirmDialogMeta,
-  render: (props) => (
-    <>
-      {props.visible && (
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div class="w-full max-w-xs rounded-2xl bg-[#1e2642] p-6 shadow-xl">
-            <p class="text-center text-sm text-slate-200">
-              {(props.message as string | undefined) ?? "Are you sure?"}
-            </p>
-            <div class="mt-5 flex gap-3">
-              <button class="flex-1 rounded-lg border border-white/10 py-2 text-sm text-slate-300 hover:bg-white/5">
-                {(props.cancelLabel as string | undefined) ?? "Cancel"}
-              </button>
-              <button class="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-500">
-                {(props.confirmLabel as string | undefined) ?? "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  ),
-});
+export type SolidApp = OpenSceneSolidApp;
 
-// ---------------------------------------------------------------------------
-// Full app with renders — use this in App.tsx
-// ---------------------------------------------------------------------------
+/** The serializable manifest shared by the browser client and Vite plugin. */
+export function createManifest(appKey: string) {
+  return defineAppManifest(createSolidApp(appKey).manifest);
+}
 
-export const app = defineOpenSceneSolidApp({
-  components: [GuildCard, StatBlock, MemberRow, LevelTierCard, PageHeader, ConfirmDialog],
-  actions: [openApiRequest, showDialog],
-});
+// Keep the base catalog visible at this declaration boundary for editor consumers.
+export { baseSolidComponents, Image, imageProps, baseViewProps };

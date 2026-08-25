@@ -1,6 +1,6 @@
 # OpenScene Solid integration example
 
-`examples/solid-v1` is a real two-package OpenScene app. The browser uses the framework-neutral `@openscene-ai/javascript` client and renders through `@openscene-ai/solid`.
+`examples/solid-vite` is a real two-package OpenScene app. The browser uses the framework-neutral `@openscene-ai/javascript` client and renders through `@openscene-ai/solid`.
 
 This example deliberately contains **no page JSON**. Admin is the source of published page documents, and Studio sends a draft document to an editor iframe over the OpenScene bridge. The app source only declares the component/action catalog and the manifest used by both runtime and build tooling.
 

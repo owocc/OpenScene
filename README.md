@@ -25,7 +25,8 @@ openscene/
 │   └── api-client/       # @openscene-ai/api-client: Generated TypeScript Admin REST API client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite integration example
-│   └── solid-v1/         # SolidJS + Vite integration example
+│   ├── solid-vite/      # SolidJS v1 + Vite integration example
+│   └── solid-v2/        # SolidJS v2 + Vite integration example
 └── docs/                 # Detailed architecture and integration guides
 ```
 

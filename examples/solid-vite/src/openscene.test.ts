@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { createSolidApp, createManifest, Image, imageProps, baseViewProps } from "./openscene.tsx";
 
-describe("examples/solid-v1 Image component", () => {
+describe("examples/solid-vite Image component", () => {
   it("defines baseViewProps with style editor metadata", () => {
     expect(baseViewProps.class).toBeDefined();
     expect(baseViewProps.className).toBeDefined();
