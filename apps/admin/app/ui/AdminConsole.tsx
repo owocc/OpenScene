@@ -24,7 +24,7 @@ import {
   type AppType,
 } from "@openscene/constants";
 import { AppManifestSchema, type ComponentManifest } from "@openscene/protocol";
-import { useKumoToastManager } from "@cloudflare/kumo";
+import { DeleteResource, useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Code } from "@cloudflare/kumo/components/code";
@@ -744,6 +744,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
     categoryId: "",
     defaultPromptId: "",
     templateId: "",
+    templateVersionId: "",
   });
   const pageQuery = api.useQuery("get", "/api/v1/apps/{appId}/pages", {
     params: {
@@ -779,6 +780,22 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       },
     },
     { enabled: Boolean(context.appId) && kind === "pages" },
+  );
+  const selectedTemplate = (templatesListQuery.data?.items ?? []).find(
+    (tpl) => tpl.id === form.templateId,
+  );
+  const templateVersionsQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/documents/{documentId}/versions",
+    {
+      params: {
+        path: {
+          appId: context.appId ?? "",
+          documentId: selectedTemplate?.documentId ?? "",
+        },
+      },
+    },
+    { enabled: Boolean(context.appId && selectedTemplate?.documentId) },
   );
   const categoriesQuery = api.useQuery("get", "/api/v1/apps/{appId}/categories", {
     params: { path: { appId: context.appId ?? "" } },
@@ -881,6 +898,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       categoryId: "",
       defaultPromptId: "",
       templateId: "",
+      templateVersionId: "",
     });
     setDialog(true);
   }
@@ -894,6 +912,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       categoryId: resource.categoryId ?? "",
       defaultPromptId: resource.defaultPromptId ?? "",
       templateId: resource.sourceTemplate?.templateId ?? "",
+      templateVersionId: resource.sourceTemplate?.versionId ?? "",
     });
     setDialog(true);
   }
@@ -926,7 +945,14 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
         params: { path: { appId: context.appId ?? "" } },
         body: {
           ...body,
-          ...(form.templateId ? { sourceTemplate: { templateId: form.templateId } } : {}),
+          ...(form.templateId
+            ? {
+                sourceTemplate: {
+                  templateId: form.templateId,
+                  ...(form.templateVersionId ? { versionId: form.templateVersionId } : {}),
+                },
+              }
+            : {}),
         },
       });
     } else {
@@ -1138,24 +1164,65 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
               />
             ) : null}
             {kind === "pages" && !editing ? (
-              <Select
-                label={t("template")}
-                value={form.templateId || "none"}
-                className="w-full"
-                items={{
-                  none: t("noneTemplate"),
-                  ...Object.fromEntries(
-                    (templatesListQuery.data?.items ?? []).map((tpl) => [
-                      tpl.id,
-                      tpl.title ? `${tpl.title} (${tpl.key})` : tpl.key,
-                    ]),
-                  ),
-                }}
-                onValueChange={(value) => {
-                  if (typeof value === "string")
-                    setForm({ ...form, templateId: value === "none" ? "" : value });
-                }}
-              />
+              <>
+                <Select
+                  label={t("template")}
+                  value={form.templateId || "none"}
+                  className="w-full"
+                  items={{
+                    none: t("noneTemplate"),
+                    ...Object.fromEntries(
+                      (templatesListQuery.data?.items ?? []).map((tpl) => [
+                        tpl.id,
+                        tpl.title ? `${tpl.title} (${tpl.key})` : tpl.key,
+                      ]),
+                    ),
+                  }}
+                  onValueChange={(value) => {
+                    if (typeof value === "string")
+                      setForm({
+                        ...form,
+                        templateId: value === "none" ? "" : value,
+                        templateVersionId: "",
+                      });
+                  }}
+                />
+                {form.templateId ? (
+                  <Select
+                    label={t("templateVersion")}
+                    value={form.templateVersionId || "default"}
+                    className="w-full"
+                    items={{
+                      default: `${t("defaultTemplateVersion")}${
+                        selectedTemplate?.currentVersionId
+                          ? ` (v${
+                              (templateVersionsQuery.data ?? []).find(
+                                (v) => v.id === selectedTemplate?.currentVersionId,
+                              )?.versionNumber ?? ""
+                            })`
+                          : ""
+                      }`,
+                      ...Object.fromEntries(
+                        (templateVersionsQuery.data ?? []).map((v) => [
+                          v.id,
+                          `v${v.versionNumber}${
+                            v.id === selectedTemplate?.currentVersionId
+                              ? ` (${t("currentVersion")})`
+                              : ""
+                          } · ${v.message || "—"}`,
+                        ]),
+                      ),
+                    }}
+                    onValueChange={(value) => {
+                      if (typeof value === "string")
+                        setForm({
+                          ...form,
+                          templateVersionId: value === "default" ? "" : value,
+                        });
+                    }}
+                  />
+                ) : null}
+              </>
             ) : null}
             {kind === "pages" && editing && editing.sourceTemplate?.templateId ? (
               <Input
@@ -1276,12 +1343,35 @@ function ResourceDetailView() {
   const promptsQuery = api.useQuery("get", "/api/v1/apps/{appId}/prompts", {
     params: { path: { appId: context.appId ?? "" } },
   });
+  const categoriesQuery = api.useQuery("get", "/api/v1/apps/{appId}/categories", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
   const updatePageMutation = api.useMutation("patch", "/api/v1/apps/{appId}/pages/{pageId}", {
     onSuccess: () => {
       toast.add({ title: t("updated") });
       void queryClient.invalidateQueries();
     },
   });
+  const updateTemplateMutation = api.useMutation(
+    "patch",
+    "/api/v1/apps/{appId}/templates/{templateId}",
+    {
+      onSuccess: () => {
+        toast.add({ title: t("updated") });
+        void queryClient.invalidateQueries();
+      },
+    },
+  );
+  const deleteVersionMutation = api.useMutation(
+    "delete",
+    "/api/v1/apps/{appId}/documents/{documentId}/versions/{versionId}",
+    {
+      onSuccess: () => {
+        toast.add({ title: t("deleted") });
+        void queryClient.invalidateQueries();
+      },
+    },
+  );
   const version = api.useMutation("post", "/api/v1/apps/{appId}/documents/{documentId}/versions", {
     onSuccess: () => {
       toast.add({ title: t("created"), description: t("versions") });
@@ -1316,6 +1406,74 @@ function ResourceDetailView() {
   });
   const [versionMessage, setVersionMessage] = useState("");
   const [channel, setChannel] = useState("production");
+  const [selectedVersion, setSelectedVersion] = useState<components["schemas"]["Version"] | null>(
+    null,
+  );
+  const [deleteVersionItem, setDeleteVersionItem] = useState<
+    components["schemas"]["Version"] | null
+  >(null);
+  const [createVersionDialog, setCreateVersionDialog] = useState(false);
+  const [editDialog, setEditDialog] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    status: "draft",
+    categoryId: "",
+    defaultPromptId: "",
+    currentVersionId: "",
+  });
+
+  function openEdit() {
+    if (!resource) return;
+    setEditForm({
+      title: resource.title,
+      description: resource.description,
+      status: resource.status,
+      categoryId: resource.categoryId ?? "",
+      defaultPromptId:
+        ((resource as Record<string, unknown>)?.defaultPromptId as string | null) ?? "",
+      currentVersionId:
+        ((resource as Record<string, unknown>)?.currentVersionId as string | null) ?? "",
+    });
+    setEditDialog(true);
+  }
+
+  function saveEdit() {
+    if (!resource) return;
+    if (kind === "page") {
+      updatePageMutation.mutate(
+        {
+          params: { path: { appId: context.appId ?? "", pageId: resource.id } },
+          body: {
+            title: editForm.title,
+            description: editForm.description,
+            status: editForm.status as "active" | "disabled" | "draft" | "published",
+            categoryId: editForm.categoryId ? editForm.categoryId : null,
+            defaultPromptId: editForm.defaultPromptId ? editForm.defaultPromptId : null,
+          },
+        },
+        {
+          onSuccess: () => setEditDialog(false),
+        },
+      );
+    } else {
+      updateTemplateMutation.mutate(
+        {
+          params: { path: { appId: context.appId ?? "", templateId: resource.id } },
+          body: {
+            title: editForm.title,
+            description: editForm.description,
+            status: editForm.status as "active" | "disabled" | "draft" | "published",
+            categoryId: editForm.categoryId ? editForm.categoryId : null,
+            currentVersionId: editForm.currentVersionId ? editForm.currentVersionId : null,
+          },
+        },
+        {
+          onSuccess: () => setEditDialog(false),
+        },
+      );
+    }
+  }
   if (pageQuery.isLoading || templateQuery.isLoading) return <LoadingState />;
   if (!resource) return <ErrorState error={pageQuery.error || templateQuery.error} />;
   const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
@@ -1336,6 +1494,9 @@ function ResourceDetailView() {
               : (templateQuery.data?.key ?? pageResource.sourceTemplate.templateId)}
           </Badge>
         ) : null}
+        <Button icon={PencilSimple} onClick={openEdit}>
+          {t("edit")}
+        </Button>
         <Button
           loading={studio.isPending}
           onClick={() => {
@@ -1384,66 +1545,188 @@ function ResourceDetailView() {
             />
           </Surface>
         )}
-        <Surface className="grid gap-4 p-4">
+        <div className="flex items-center justify-between pt-2">
           <Text variant="heading" as="h2">
             {t("versions")}
           </Text>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[200px]">
-              <Input
-                label="Message"
-                value={versionMessage}
-                onChange={(e) => setVersionMessage(e.target.value)}
-              />
-            </div>
-            <Button
-              variant="primary"
-              loading={version.isPending}
-              onClick={() =>
-                version.mutate({
-                  params: { path: { appId: context.appId ?? "", documentId: resource.documentId } },
-                  body: { message: versionMessage },
-                })
-              }
-            >
-              {t("create")}
-            </Button>
-          </div>
-          {(versionsQuery.data ?? []).map((item) => (
-            <div key={item.id} className="flex justify-between border-b border-kumo-line py-2">
-              <Text>
-                v{item.versionNumber} · {item.message || "—"}
-              </Text>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => {
+              setVersionMessage("");
+              setCreateVersionDialog(true);
+            }}
+          >
+            {t("createVersion")}
+          </Button>
+        </div>
+        {(versionsQuery.data ?? []).length === 0 ? (
+          <Empty
+            title={t("noResults")}
+            description={t("noResultsDescription")}
+            contents={
               <Button
-                size="sm"
-                onClick={() =>
-                  release.mutate({
-                    params: {
-                      path: { appId: context.appId ?? "", documentId: resource.documentId },
-                    },
-                    body: { versionId: item.id, channel },
-                  })
-                }
+                onClick={() => {
+                  setVersionMessage("");
+                  setCreateVersionDialog(true);
+                }}
               >
-                {t("releases")}
+                {t("createVersion")}
               </Button>
-            </div>
-          ))}
+            }
+          />
+        ) : (
+          <Table layout="fixed">
+            <colgroup>
+              <col style={{ width: "120px" }} />
+              <col />
+              <col style={{ width: "200px" }} />
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "56px" }} />
+            </colgroup>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>Version</Table.Head>
+                <Table.Head>Message</Table.Head>
+                <Table.Head>Created</Table.Head>
+                <Table.Head>{t("status")}</Table.Head>
+                <Table.Head sticky="right">
+                  <span className="sr-only">{t("actions")}</span>
+                </Table.Head>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {(versionsQuery.data ?? []).map((item) => {
+                const isCurrent =
+                  kind === "template" &&
+                  resource &&
+                  "currentVersionId" in resource &&
+                  resource.currentVersionId === item.id;
+                return (
+                  <Table.Row
+                    key={item.id}
+                    className="cursor-pointer transition hover:bg-kumo-hover"
+                    onClick={() => setSelectedVersion(item)}
+                  >
+                    <Table.Cell>
+                      <button
+                        type="button"
+                        className="font-medium text-kumo-link hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedVersion(item);
+                        }}
+                      >
+                        v{item.versionNumber}
+                      </button>
+                    </Table.Cell>
+                    <Table.Cell className="truncate">{item.message || "—"}</Table.Cell>
+                    <Table.Cell className="text-kumo-secondary">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {isCurrent ? <Badge variant="green">{t("currentVersion")}</Badge> : "—"}
+                    </Table.Cell>
+                    <Table.Cell
+                      sticky="right"
+                      className="text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenu.Trigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              shape="square"
+                              aria-label={t("moreOptions")}
+                            >
+                              <DotsThree weight="bold" size={16} />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenu.Content>
+                          <DropdownMenu.Item icon={Eye} onClick={() => setSelectedVersion(item)}>
+                            {t("details")}
+                          </DropdownMenu.Item>
+                          {kind === "template" && !isCurrent ? (
+                            <DropdownMenu.Item
+                              icon={Star}
+                              onClick={() =>
+                                updateTemplateMutation.mutate({
+                                  params: {
+                                    path: {
+                                      appId: context.appId ?? "",
+                                      templateId: resource.id,
+                                    },
+                                  },
+                                  body: { currentVersionId: item.id },
+                                })
+                              }
+                            >
+                              {t("setCurrentVersion")}
+                            </DropdownMenu.Item>
+                          ) : null}
+                          {kind === "page" ? (
+                            <DropdownMenu.Item
+                              icon={ArrowSquareOut}
+                              onClick={() =>
+                                release.mutate({
+                                  params: {
+                                    path: {
+                                      appId: context.appId ?? "",
+                                      documentId: resource.documentId,
+                                    },
+                                  },
+                                  body: { versionId: item.id, channel },
+                                })
+                              }
+                            >
+                              {t("releases")}
+                            </DropdownMenu.Item>
+                          ) : null}
+                          {!isCurrent ? (
+                            <>
+                              <DropdownMenu.Separator />
+                              <DropdownMenu.Item
+                                icon={Trash}
+                                variant="danger"
+                                onClick={() => {
+                                  setDeleteVersionItem(item);
+                                }}
+                              >
+                                {t("delete")}
+                              </DropdownMenu.Item>
+                            </>
+                          ) : null}
+                        </DropdownMenu.Content>
+                      </DropdownMenu>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table>
+        )}
+        {kind === "page" && (
           <div className="max-w-xs">
             <Input label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)} />
           </div>
-        </Surface>
-        <Surface className="grid gap-2 p-4">
-          <Text variant="heading" as="h2">
-            {t("releases")}
-          </Text>
-          {(releasesQuery.data ?? []).map((item) => (
-            <div key={item.id} className="flex justify-between">
-              <Text>{item.channel}</Text>
-              <StatusBadge status={item.status} />
-            </div>
-          ))}
-        </Surface>
+        )}
+        {kind === "page" && (
+          <Surface className="grid gap-2 p-4">
+            <Text variant="heading" as="h2">
+              {t("releases")}
+            </Text>
+            {(releasesQuery.data ?? []).map((item) => (
+              <div key={item.id} className="flex justify-between">
+                <Text>{item.channel}</Text>
+                <StatusBadge status={item.status} />
+              </div>
+            ))}
+          </Surface>
+        )}
         <Collapsible.Root defaultOpen={false}>
           <Surface className="p-4">
             <Collapsible.DefaultTrigger className="w-full justify-between">
@@ -1457,6 +1740,282 @@ function ResourceDetailView() {
           </Surface>
         </Collapsible.Root>
       </div>
+      <Dialog.Root open={editDialog} onOpenChange={setEditDialog}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("edit")}</Dialog.Title>
+          <Dialog.Description>
+            {kind === "page" ? t("pageEditDescription") : t("templateEditDescription")}
+          </Dialog.Description>
+          <div className="grid gap-3 py-4">
+            <Input
+              label={t("title")}
+              value={editForm.title}
+              onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+            />
+            <Textarea
+              label={t("description")}
+              value={editForm.description}
+              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            />
+            <Select
+              label={t("status")}
+              value={editForm.status}
+              items={{
+                draft: t("draft"),
+                active: t("active"),
+                published: t("published"),
+                disabled: t("disabled"),
+              }}
+              onValueChange={(val) => {
+                if (typeof val === "string") setEditForm({ ...editForm, status: val });
+              }}
+            />
+            <Select
+              label={t("category")}
+              value={editForm.categoryId || "none"}
+              items={{
+                none: t("uncategorized"),
+                ...Object.fromEntries(
+                  (categoriesQuery.data ?? []).map((cat) => [cat.id, cat.name]),
+                ),
+              }}
+              onValueChange={(val) => {
+                if (typeof val === "string")
+                  setEditForm({ ...editForm, categoryId: val === "none" ? "" : val });
+              }}
+            />
+            {kind === "page" ? (
+              <Select
+                label={t("pageDefaultPrompt")}
+                value={editForm.defaultPromptId || "none"}
+                items={{
+                  none: t("noneDefaultPrompt"),
+                  ...Object.fromEntries(
+                    (promptsQuery.data ?? []).map((p) => [p.id, `${p.name} (${p.key})`]),
+                  ),
+                }}
+                onValueChange={(val) => {
+                  if (typeof val === "string")
+                    setEditForm({ ...editForm, defaultPromptId: val === "none" ? "" : val });
+                }}
+              />
+            ) : null}
+            {kind === "template" ? (
+              <Select
+                label={t("currentVersion")}
+                value={editForm.currentVersionId || "none"}
+                items={{
+                  none: t("none"),
+                  ...Object.fromEntries(
+                    (versionsQuery.data ?? []).map((v) => [
+                      v.id,
+                      `v${v.versionNumber} · ${v.message || "—"}`,
+                    ]),
+                  ),
+                }}
+                onValueChange={(val) => {
+                  if (typeof val === "string")
+                    setEditForm({ ...editForm, currentVersionId: val === "none" ? "" : val });
+                }}
+              />
+            ) : null}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+            <Button
+              variant="primary"
+              loading={updatePageMutation.isPending || updateTemplateMutation.isPending}
+              onClick={saveEdit}
+            >
+              {t("save")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+      <Dialog.Root
+        open={Boolean(selectedVersion)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedVersion(null);
+        }}
+      >
+        <Dialog size="lg" className="max-w-3xl px-8 py-6">
+          <Dialog.Title>
+            {selectedVersion
+              ? `v${selectedVersion.versionNumber} ${selectedVersion.message ? `· ${selectedVersion.message}` : ""}`
+              : t("details")}
+          </Dialog.Title>
+          <Dialog.Description>
+            {selectedVersion ? new Date(selectedVersion.createdAt).toLocaleString() : ""}
+          </Dialog.Description>
+          {selectedVersion ? (
+            <div className="flex flex-col gap-4 py-4">
+              <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                <div>
+                  <Text variant="secondary">Version</Text>
+                  <span className="font-mono font-medium">v{selectedVersion.versionNumber}</span>
+                </div>
+                <div>
+                  <Text variant="secondary">Revision</Text>
+                  <span className="font-mono">{selectedVersion.sourceRevision}</span>
+                </div>
+                <div>
+                  <Text variant="secondary">Created At</Text>
+                  <Text>{new Date(selectedVersion.createdAt).toLocaleDateString()}</Text>
+                </div>
+                <div>
+                  <Text variant="secondary">Status</Text>
+                  <div>
+                    {kind === "template" &&
+                    resource &&
+                    "currentVersionId" in resource &&
+                    resource.currentVersionId === selectedVersion.id ? (
+                      <Badge variant="green">{t("currentVersion")}</Badge>
+                    ) : (
+                      <Text variant="secondary">—</Text>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <Text variant="secondary">Document JSON</Text>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={Copy}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(
+                        JSON.stringify(selectedVersion.document ?? {}, null, 2),
+                      );
+                      toast.add({ title: t("copied") });
+                    }}
+                  >
+                    {t("copy")}
+                  </Button>
+                </div>
+                <div className="max-h-96 overflow-auto rounded-md border border-kumo-line bg-kumo-subtle/10 p-2">
+                  <Code
+                    code={JSON.stringify(selectedVersion.document ?? {}, null, 2)}
+                    lang="jsonc"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+          <div className="flex justify-between gap-2 pt-2">
+            <div>
+              {kind === "template" &&
+              selectedVersion &&
+              resource &&
+              "currentVersionId" in resource &&
+              resource.currentVersionId !== selectedVersion.id ? (
+                <Button
+                  loading={updateTemplateMutation.isPending}
+                  onClick={() => {
+                    updateTemplateMutation.mutate(
+                      {
+                        params: { path: { appId: context.appId ?? "", templateId: resource.id } },
+                        body: { currentVersionId: selectedVersion.id },
+                      },
+                      {
+                        onSuccess: () => setSelectedVersion(null),
+                      },
+                    );
+                  }}
+                >
+                  {t("setCurrentVersion")}
+                </Button>
+              ) : null}
+            </div>
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+          </div>
+        </Dialog>
+      </Dialog.Root>
+      <Dialog.Root open={createVersionDialog} onOpenChange={setCreateVersionDialog}>
+        <Dialog size="lg" className="max-w-md px-8 py-6">
+          <Dialog.Title>{t("createVersion")}</Dialog.Title>
+          <Dialog.Description>{t("createVersionDescription")}</Dialog.Description>
+          {(() => {
+            const versions = versionsQuery.data ?? [];
+            const latestVersionNumber = versions.reduce(
+              (max, v) => (v.versionNumber > max ? v.versionNumber : max),
+              0,
+            );
+            const nextVersionNumber = latestVersionNumber + 1;
+            return (
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex items-center justify-between rounded-md border border-kumo-line bg-kumo-subtle/10 px-4 py-3">
+                  <div>
+                    <div className="text-xs text-kumo-secondary">{t("newVersionPreview")}</div>
+                    <div className="font-mono text-lg font-semibold text-kumo-default">
+                      v{nextVersionNumber}
+                    </div>
+                  </div>
+                  <Badge variant="blue">{`Revision ${
+                    (draftQuery.data as { revision?: number } | undefined)?.revision ?? 0
+                  }`}</Badge>
+                </div>
+                <Textarea
+                  label={t("versionMessage")}
+                  value={versionMessage}
+                  onChange={(e) => setVersionMessage(e.target.value)}
+                  placeholder={t("versionMessagePlaceholder")}
+                  rows={3}
+                  autoFocus
+                />
+              </div>
+            );
+          })()}
+          <div className="flex justify-end gap-2">
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+            <Button
+              variant="primary"
+              loading={version.isPending}
+              onClick={() =>
+                version.mutate(
+                  {
+                    params: {
+                      path: { appId: context.appId ?? "", documentId: resource.documentId },
+                    },
+                    body: { message: versionMessage },
+                  },
+                  {
+                    onSuccess: () => {
+                      setCreateVersionDialog(false);
+                      setVersionMessage("");
+                    },
+                  },
+                )
+              }
+            >
+              {t("create")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+      <DeleteResource
+        open={Boolean(deleteVersionItem)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteVersionItem(null);
+        }}
+        resourceType="Version"
+        resourceName={deleteVersionItem ? `v${deleteVersionItem.versionNumber}` : ""}
+        deleteButtonText={`${t("delete")} Version`}
+        isDeleting={deleteVersionMutation.isPending}
+        onDelete={async () => {
+          if (!deleteVersionItem) return;
+          await deleteVersionMutation.mutateAsync({
+            params: {
+              path: {
+                appId: context.appId ?? "",
+                documentId: resource.documentId,
+                versionId: deleteVersionItem.id,
+              },
+            },
+          });
+          setDeleteVersionItem(null);
+        }}
+      />
     </>
   );
 }
@@ -3161,7 +3720,7 @@ function SettingsView() {
   const [rotationError, setRotationError] = useState<unknown>(null);
   const [isRotating, setIsRotating] = useState(false);
 
-  const [storageDriver, setStorageDriver] = useState<"s3" | "memory">("s3");
+  const [storageDriver, setStorageDriver] = useState<"database" | "s3" | "memory">("database");
   const [storageBucket, setStorageBucket] = useState("");
   const [storageEndpoint, setStorageEndpoint] = useState("");
   const [storageRegion, setStorageRegion] = useState("auto");
@@ -3170,7 +3729,7 @@ function SettingsView() {
   const [storageForcePathStyle, setStorageForcePathStyle] = useState(true);
   const [storagePublicBaseUrl, setStoragePublicBaseUrl] = useState("");
   const [storageTestResult, setStorageTestResult] = useState<{
-    status: "up" | "down" | "not_configured";
+    status: "up" | "down" | "not_configured" | "deprecated";
     detail?: string;
   } | null>(null);
 
@@ -3208,15 +3767,16 @@ function SettingsView() {
   }, [app]);
   useEffect(() => {
     if (storageConfig) {
-      setStorageDriver(storageConfig.driver);
-      setStorageBucket(storageConfig.bucket);
+      setStorageDriver(storageConfig.driver ?? "database");
+      setStorageBucket(storageConfig.bucket ?? "");
       setStorageEndpoint(storageConfig.endpoint ?? "");
-      setStorageRegion(storageConfig.region);
-      setStorageAccessKeyId(storageConfig.accessKeyId);
-      setStorageForcePathStyle(storageConfig.forcePathStyle);
+      setStorageRegion(storageConfig.region ?? "auto");
+      setStorageAccessKeyId(storageConfig.accessKeyId ?? "");
+      setStorageForcePathStyle(storageConfig.forcePathStyle ?? true);
       setStoragePublicBaseUrl(storageConfig.publicBaseUrl ?? "");
       setStorageSecretAccessKey("");
     } else {
+      setStorageDriver("database");
       setStorageBucket("");
       setStorageEndpoint("");
       setStorageRegion("auto");
@@ -3375,61 +3935,86 @@ function SettingsView() {
             <LayerCard.Primary className="grid gap-4">
               <Text variant="secondary">{t("storageSettingsDescription")}</Text>
               {storageQuery.error ? <ErrorState error={storageQuery.error} /> : null}
-              <Input
-                label={t("storageBucket")}
-                value={storageBucket}
-                onChange={(e) => setStorageBucket(e.target.value)}
-                placeholder={t("storageBucketPlaceholder")}
-              />
-              <Input
-                label={t("storageEndpoint")}
-                value={storageEndpoint}
-                onChange={(e) => setStorageEndpoint(e.target.value)}
-                placeholder={t("storageEndpointPlaceholder")}
-              />
-              <Input
-                label={t("storageRegion")}
-                value={storageRegion}
-                onChange={(e) => setStorageRegion(e.target.value)}
-                placeholder="auto"
-              />
-              <Input
-                label={t("storageAccessKeyId")}
-                value={storageAccessKeyId}
-                onChange={(e) => setStorageAccessKeyId(e.target.value)}
-              />
-              <div>
-                <Input
-                  label={t("storageSecretAccessKey")}
-                  type="password"
-                  value={storageSecretAccessKey}
-                  onChange={(e) => setStorageSecretAccessKey(e.target.value)}
-                  placeholder={
-                    storageConfig?.hasSecretAccessKey
-                      ? t("storageSecretAccessKeySet")
-                      : t("storageSecretAccessKeyPlaceholder")
+              <Select
+                label={t("storageMode")}
+                value={storageDriver}
+                items={{
+                  database: t("storageModeDatabase"),
+                  s3: t("storageModeS3"),
+                }}
+                onValueChange={(value) => {
+                  if (value === "database" || value === "s3") {
+                    setStorageDriver(value);
+                    setStorageTestResult(null);
                   }
-                />
-                <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
-              </div>
-              <Switch
-                checked={storageForcePathStyle}
-                label={t("storageForcePathStyle")}
-                onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+                }}
               />
-              <Input
-                label={t("storagePublicBaseUrl")}
-                value={storagePublicBaseUrl}
-                onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
-                placeholder={t("storagePublicBaseUrlPlaceholder")}
-              />
+              <Text variant="secondary">
+                {storageDriver === "database"
+                  ? t("storageModeDatabaseDescription")
+                  : t("storageModeS3Description")}
+              </Text>
+              {storageDriver === "s3" ? (
+                <>
+                  <Input
+                    label={t("storageBucket")}
+                    value={storageBucket}
+                    onChange={(e) => setStorageBucket(e.target.value)}
+                    placeholder={t("storageBucketPlaceholder")}
+                  />
+                  <Input
+                    label={t("storageEndpoint")}
+                    value={storageEndpoint}
+                    onChange={(e) => setStorageEndpoint(e.target.value)}
+                    placeholder={t("storageEndpointPlaceholder")}
+                  />
+                  <Input
+                    label={t("storageRegion")}
+                    value={storageRegion}
+                    onChange={(e) => setStorageRegion(e.target.value)}
+                    placeholder="auto"
+                  />
+                  <Input
+                    label={t("storageAccessKeyId")}
+                    value={storageAccessKeyId}
+                    onChange={(e) => setStorageAccessKeyId(e.target.value)}
+                  />
+                  <div>
+                    <Input
+                      label={t("storageSecretAccessKey")}
+                      type="password"
+                      value={storageSecretAccessKey}
+                      onChange={(e) => setStorageSecretAccessKey(e.target.value)}
+                      placeholder={
+                        storageConfig?.hasSecretAccessKey
+                          ? t("storageSecretAccessKeySet")
+                          : t("storageSecretAccessKeyPlaceholder")
+                      }
+                    />
+                    <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
+                  </div>
+                  <Switch
+                    checked={storageForcePathStyle}
+                    label={t("storageForcePathStyle")}
+                    onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+                  />
+                  <Input
+                    label={t("storagePublicBaseUrl")}
+                    value={storagePublicBaseUrl}
+                    onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
+                    placeholder={t("storagePublicBaseUrlPlaceholder")}
+                  />
+                </>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" loading={updateStorage.isPending} onClick={saveStorage}>
                   {t("save")}
                 </Button>
-                <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
-                  {t("storageTest")}
-                </Button>
+                {storageDriver === "s3" ? (
+                  <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
+                    {t("storageTest")}
+                  </Button>
+                ) : null}
                 {storageConfig ? (
                   <Button
                     variant="destructive"

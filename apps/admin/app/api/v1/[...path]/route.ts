@@ -35,6 +35,7 @@ import {
   deleteLocale,
   deletePreviewProfile,
   deleteResource,
+  deleteVersion,
   deleteAppStorageConfig,
   getApp,
   getAppOpenApiDoc,
@@ -542,6 +543,10 @@ async function documentRoutes(
     return json(await createVersion(db, appId, documentId, await body(request)), 201);
   if (path[4] === "versions" && path.length === 6 && method === "GET")
     return json(await getVersion(db, appId, documentId, path[5]));
+  if (path[4] === "versions" && path.length === 6 && method === "DELETE") {
+    await deleteVersion(db, appId, documentId, path[5]);
+    return noContent();
+  }
   if (path[4] === "releases" && path.length === 5 && method === "GET")
     return json(await listReleases(db, appId, documentId));
   if (path[4] === "releases" && path.length === 5 && method === "POST")

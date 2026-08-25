@@ -300,7 +300,7 @@ export interface paths {
     get: operations["getVersion"];
     put?: never;
     post?: never;
-    delete?: never;
+    delete: operations["deleteVersion"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1142,15 +1142,15 @@ export interface components {
       /** @default true */
       enabled: boolean;
     };
-    /** @description App S3 object storage configuration */
+    /** @description App object storage configuration */
     AppStorageConfig: {
       appId: string;
       /** @enum {string} */
-      driver: "s3" | "memory";
+      driver: "database" | "s3" | "memory";
       endpoint?: string | null;
-      region: string;
-      bucket: string;
-      accessKeyId: string;
+      region?: string | null;
+      bucket?: string | null;
+      accessKeyId?: string | null;
       hasSecretAccessKey: boolean;
       forcePathStyle: boolean;
       publicBaseUrl?: string | null;
@@ -1159,18 +1159,18 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @description App S3 storage configuration and status */
+    /** @description App storage configuration and status */
     AppStorageConfigStatus: {
       configured: boolean;
-      /** @description App S3 object storage configuration */
+      /** @description App object storage configuration */
       config?: {
         appId: string;
         /** @enum {string} */
-        driver: "s3" | "memory";
+        driver: "database" | "s3" | "memory";
         endpoint?: string | null;
-        region: string;
-        bucket: string;
-        accessKeyId: string;
+        region?: string | null;
+        bucket?: string | null;
+        accessKeyId?: string | null;
         hasSecretAccessKey: boolean;
         forcePathStyle: boolean;
         publicBaseUrl?: string | null;
@@ -1180,31 +1180,30 @@ export interface components {
         updatedAt: string;
       };
     };
-    /** @description Create or update app S3 storage configuration */
+    /** @description Create or update app storage configuration */
     AppStorageConfigUpsert: {
       /**
-       * @default s3
+       * @default database
        * @enum {string}
        */
-      driver: "s3" | "memory";
+      driver: "database" | "s3" | "memory";
       /** Format: uri */
       endpoint?: string | null;
-      /** @default auto */
-      region: string;
-      bucket: string;
-      accessKeyId: string;
-      secretAccessKey?: string;
+      region?: string | null;
+      bucket?: string | null;
+      accessKeyId?: string | null;
+      secretAccessKey?: string | null;
       /** @default true */
       forcePathStyle: boolean;
       /** Format: uri */
       publicBaseUrl?: string | null;
     };
-    /** @description App S3 storage health check result */
+    /** @description App storage health check result */
     AppStorageHealth: {
       /** @enum {string} */
-      status: "up" | "down" | "not_configured";
+      status: "up" | "down" | "not_configured" | "deprecated";
       /** @enum {string} */
-      driver: "s3" | "memory";
+      driver: "database" | "s3" | "memory" | "none" | "deprecated";
       detail?: string;
     };
     Bootstrap: {
@@ -1378,6 +1377,7 @@ export interface components {
       description: string;
       categoryId: string | null;
       documentId: string;
+      currentVersionId?: string | null;
       sourceTemplate: {
         templateId: string;
         versionId?: string | null;
@@ -6692,6 +6692,142 @@ export interface operations {
       };
     };
   };
+  deleteVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+        documentId: string;
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
   listLocales: {
     parameters: {
       query?: never;
@@ -8911,6 +9047,7 @@ export interface operations {
               description: string;
               categoryId: string | null;
               documentId: string;
+              currentVersionId?: string | null;
               sourceTemplate: {
                 templateId: string;
                 versionId?: string | null;
@@ -9059,7 +9196,7 @@ export interface operations {
           title: string;
           /** @default  */
           description?: string;
-          categoryId?: string;
+          categoryId?: string | null;
           /**
            * @default draft
            * @enum {string}
@@ -9088,6 +9225,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;
@@ -9244,6 +9382,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;
@@ -9526,13 +9665,14 @@ export interface operations {
           title?: string;
           /** @default  */
           description?: string;
-          categoryId?: string;
+          categoryId?: string | null;
           /**
            * @default draft
            * @enum {string}
            */
           status?: "active" | "disabled" | "draft" | "published";
           defaultPromptId?: string | null;
+          currentVersionId?: string | null;
         };
       };
     };
@@ -9551,6 +9691,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;
@@ -11432,15 +11573,15 @@ export interface operations {
         content: {
           "application/json": {
             configured: boolean;
-            /** @description App S3 object storage configuration */
+            /** @description App object storage configuration */
             config?: {
               appId: string;
               /** @enum {string} */
-              driver: "s3" | "memory";
+              driver: "database" | "s3" | "memory";
               endpoint?: string | null;
-              region: string;
-              bucket: string;
-              accessKeyId: string;
+              region?: string | null;
+              bucket?: string | null;
+              accessKeyId?: string | null;
               hasSecretAccessKey: boolean;
               forcePathStyle: boolean;
               publicBaseUrl?: string | null;
@@ -11581,17 +11722,16 @@ export interface operations {
       content: {
         "application/json": {
           /**
-           * @default s3
+           * @default database
            * @enum {string}
            */
-          driver?: "s3" | "memory";
+          driver?: "database" | "s3" | "memory";
           /** Format: uri */
           endpoint?: string | null;
-          /** @default auto */
-          region?: string;
-          bucket: string;
-          accessKeyId: string;
-          secretAccessKey?: string;
+          region?: string | null;
+          bucket?: string | null;
+          accessKeyId?: string | null;
+          secretAccessKey?: string | null;
           /** @default true */
           forcePathStyle?: boolean;
           /** Format: uri */
@@ -11609,11 +11749,11 @@ export interface operations {
           "application/json": {
             appId: string;
             /** @enum {string} */
-            driver: "s3" | "memory";
+            driver: "database" | "s3" | "memory";
             endpoint?: string | null;
-            region: string;
-            bucket: string;
-            accessKeyId: string;
+            region?: string | null;
+            bucket?: string | null;
+            accessKeyId?: string | null;
             hasSecretAccessKey: boolean;
             forcePathStyle: boolean;
             publicBaseUrl?: string | null;
@@ -11893,9 +12033,9 @@ export interface operations {
         content: {
           "application/json": {
             /** @enum {string} */
-            status: "up" | "down" | "not_configured";
+            status: "up" | "down" | "not_configured" | "deprecated";
             /** @enum {string} */
-            driver: "s3" | "memory";
+            driver: "database" | "s3" | "memory" | "none" | "deprecated";
             detail?: string;
           };
         };
@@ -12029,17 +12169,16 @@ export interface operations {
       content: {
         "application/json": {
           /**
-           * @default s3
+           * @default database
            * @enum {string}
            */
-          driver?: "s3" | "memory";
+          driver?: "database" | "s3" | "memory";
           /** Format: uri */
           endpoint?: string | null;
-          /** @default auto */
-          region?: string;
-          bucket: string;
-          accessKeyId: string;
-          secretAccessKey?: string;
+          region?: string | null;
+          bucket?: string | null;
+          accessKeyId?: string | null;
+          secretAccessKey?: string | null;
           /** @default true */
           forcePathStyle?: boolean;
           /** Format: uri */
@@ -12056,9 +12195,9 @@ export interface operations {
         content: {
           "application/json": {
             /** @enum {string} */
-            status: "up" | "down" | "not_configured";
+            status: "up" | "down" | "not_configured" | "deprecated";
             /** @enum {string} */
-            driver: "s3" | "memory";
+            driver: "database" | "s3" | "memory" | "none" | "deprecated";
             detail?: string;
           };
         };
@@ -12368,6 +12507,7 @@ export interface operations {
               description: string;
               categoryId: string | null;
               documentId: string;
+              currentVersionId?: string | null;
               sourceTemplate: {
                 templateId: string;
                 versionId?: string | null;
@@ -12516,7 +12656,7 @@ export interface operations {
           title: string;
           /** @default  */
           description?: string;
-          categoryId?: string;
+          categoryId?: string | null;
           /**
            * @default draft
            * @enum {string}
@@ -12545,6 +12685,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;
@@ -12701,6 +12842,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;
@@ -12983,13 +13125,14 @@ export interface operations {
           title?: string;
           /** @default  */
           description?: string;
-          categoryId?: string;
+          categoryId?: string | null;
           /**
            * @default draft
            * @enum {string}
            */
           status?: "active" | "disabled" | "draft" | "published";
           defaultPromptId?: string | null;
+          currentVersionId?: string | null;
         };
       };
     };
@@ -13008,6 +13151,7 @@ export interface operations {
             description: string;
             categoryId: string | null;
             documentId: string;
+            currentVersionId?: string | null;
             sourceTemplate: {
               templateId: string;
               versionId?: string | null;

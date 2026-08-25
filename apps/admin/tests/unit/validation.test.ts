@@ -101,7 +101,8 @@ describe("crypto encryption", () => {
 
 describe("app storage schemas", () => {
   test("validates and parses valid storage config upsert input", () => {
-    const valid = AppStorageConfigUpsertSchema.parse({
+    const validS3 = AppStorageConfigUpsertSchema.parse({
+      driver: "s3",
       bucket: "my-bucket",
       accessKeyId: "my-key-id",
       secretAccessKey: "my-secret-key",
@@ -110,19 +111,19 @@ describe("app storage schemas", () => {
       forcePathStyle: true,
       publicBaseUrl: "https://cdn.example.com",
     });
-    expect(valid.bucket).toBe("my-bucket");
-    expect(valid.region).toBe("us-west-2");
-    expect(valid.driver).toBe("s3");
-    expect(valid.forcePathStyle).toBe(true);
+    expect(validS3.bucket).toBe("my-bucket");
+    expect(validS3.region).toBe("us-west-2");
+    expect(validS3.driver).toBe("s3");
+    expect(validS3.forcePathStyle).toBe(true);
+
+    const validDb = AppStorageConfigUpsertSchema.parse({
+      driver: "database",
+    });
+    expect(validDb.driver).toBe("database");
   });
 
-  test("requires bucket and accessKeyId for S3 storage upsert", () => {
-    expect(() => AppStorageConfigUpsertSchema.parse({})).toThrow();
-    expect(() =>
-      AppStorageConfigUpsertSchema.parse({
-        bucket: "",
-        accessKeyId: "key",
-      }),
-    ).toThrow();
+  test("parses default database driver when not specified", () => {
+    const defaultParsed = AppStorageConfigUpsertSchema.parse({});
+    expect(defaultParsed.driver).toBe("database");
   });
 });

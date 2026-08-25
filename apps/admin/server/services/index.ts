@@ -88,6 +88,7 @@ type ResourceRecordInput = {
   description: string;
   categoryId: string | null | undefined;
   documentId: string;
+  currentVersionId?: string | null | undefined;
   sourceTemplateId?: string | null | undefined;
   sourceTemplateVersionId?: string | null | undefined;
   status: "active" | "disabled" | "draft" | "published";
@@ -762,24 +763,45 @@ export async function createResource(
     if (kind !== "page") throw validation("Only Pages can be initialized from a Template");
     const template = await getResourceRow(db, appId, "template", body.sourceTemplate.templateId);
     let documentJson: string | null = null;
-    if (body.sourceTemplate.versionId) {
+    let resolvedVersionId: string | null = body.sourceTemplate.versionId ?? null;
+    if (resolvedVersionId) {
       const version = await db
         .select()
         .from(documentVersions)
         .where(
           and(
             eq(documentVersions.appId, appId),
-            eq(documentVersions.id, body.sourceTemplate.versionId),
+            eq(documentVersions.id, resolvedVersionId),
             eq(documentVersions.documentId, template.documentId),
           ),
         )
         .get();
       if (!version) throw notFound();
       documentJson = version.documentJson;
+    } else if ("currentVersionId" in template && template.currentVersionId) {
+      const version = await db
+        .select()
+        .from(documentVersions)
+        .where(
+          and(
+            eq(documentVersions.appId, appId),
+            eq(documentVersions.id, template.currentVersionId as string),
+            eq(documentVersions.documentId, template.documentId),
+          ),
+        )
+        .get();
+      if (version) {
+        documentJson = version.documentJson;
+        resolvedVersionId = version.id;
+      } else {
+        const templateDoc = await getDocumentRow(db, appId, template.documentId);
+        documentJson = templateDoc.draftJson;
+      }
     } else {
       const templateDoc = await getDocumentRow(db, appId, template.documentId);
       documentJson = templateDoc.draftJson;
     }
+    body.sourceTemplate.versionId = resolvedVersionId;
     initialDocument = parseJson(SceneDocumentSchema, documentJson);
   }
   const resourceId = newId(kind);
@@ -853,6 +875,20 @@ export async function updateResource(
   const existing = await getResourceRow(db, appId, kind, resourceId);
   const body = ResourcePatchSchema.parse(input);
   if (body.categoryId) await getCategoryRow(db, appId, body.categoryId);
+  if (kind === "template" && body.currentVersionId) {
+    const version = await db
+      .select({ id: documentVersions.id })
+      .from(documentVersions)
+      .where(
+        and(
+          eq(documentVersions.appId, appId),
+          eq(documentVersions.documentId, existing.documentId),
+          eq(documentVersions.id, body.currentVersionId),
+        ),
+      )
+      .get();
+    if (!version) throw notFound();
+  }
   const table = kind === "page" ? pages : templates;
   await db
     .update(table)
@@ -870,7 +906,14 @@ export async function updateResource(
                   ? (existing.defaultPromptId as string | null)
                   : null,
           }
-        : {}),
+        : {
+            currentVersionId:
+              body.currentVersionId !== undefined
+                ? body.currentVersionId
+                : "currentVersionId" in existing
+                  ? (existing.currentVersionId as string | null)
+                  : null,
+          }),
       updatedAt: nowIso(),
     })
     .where(and(eq(table.appId, appId), eq(table.id, resourceId)))
@@ -1022,9 +1065,22 @@ export async function createVersion(
     updatedAt: nowIso(),
   };
   await db.insert(documentVersions).values(version).run();
+  if (document.resourceKind === "template") {
+    const template = await db
+      .select({ id: templates.id, currentVersionId: templates.currentVersionId })
+      .from(templates)
+      .where(and(eq(templates.appId, appId), eq(templates.id, document.resourceId)))
+      .get();
+    if (template && !template.currentVersionId) {
+      await db
+        .update(templates)
+        .set({ currentVersionId: version.id, updatedAt: version.updatedAt })
+        .where(eq(templates.id, template.id))
+        .run();
+    }
+  }
   return VersionSchema.parse(versionRecord(version));
 }
-
 export async function getVersion(
   db: AppDatabase,
   appId: string,
@@ -1044,6 +1100,70 @@ export async function getVersion(
     .get();
   if (!row) throw notFound();
   return VersionSchema.parse(versionRecord(row));
+}
+export async function deleteVersion(
+  db: AppDatabase,
+  appId: string,
+  documentId: string,
+  versionId: string,
+): Promise<void> {
+  const document = await getDocumentRow(db, appId, documentId);
+  const row = await db
+    .select()
+    .from(documentVersions)
+    .where(
+      and(
+        eq(documentVersions.appId, appId),
+        eq(documentVersions.documentId, documentId),
+        eq(documentVersions.id, versionId),
+      ),
+    )
+    .get();
+  if (!row) throw notFound();
+
+  const releaseRef = await db
+    .select({ id: releases.id })
+    .from(releases)
+    .where(and(eq(releases.appId, appId), eq(releases.versionId, versionId)))
+    .limit(1)
+    .get();
+  if (releaseRef) {
+    throw conflict("Version is referenced by a Release and cannot be deleted");
+  }
+
+  const pageRef = await db
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.appId, appId), eq(pages.sourceTemplateVersionId, versionId)))
+    .limit(1)
+    .get();
+  if (pageRef) {
+    throw conflict("Version is referenced by a Page and cannot be deleted");
+  }
+
+  if (document.resourceKind === "template") {
+    const template = await db
+      .select({ id: templates.id, currentVersionId: templates.currentVersionId })
+      .from(templates)
+      .where(and(eq(templates.appId, appId), eq(templates.id, document.resourceId)))
+      .get();
+    if (template && template.currentVersionId === versionId) {
+      throw conflict(
+        "Current version of the template cannot be deleted. Please set another version as the current version first.",
+      );
+    }
+  }
+
+  await db
+    .delete(documentVersions)
+    .where(
+      and(
+        eq(documentVersions.appId, appId),
+        eq(documentVersions.documentId, documentId),
+        eq(documentVersions.id, versionId),
+      ),
+    )
+    .run();
 }
 
 export async function listReleases(
@@ -1071,6 +1191,9 @@ export async function createRelease(
   const app = await getAppRow(db, appId);
   if (app.status === "disabled") throw conflict("Disabled Apps cannot create Releases");
   const document = await getDocumentRow(db, appId, documentId);
+  if (document.resourceKind === "template") {
+    throw validation("Templates cannot be published. Releases are only supported for Pages.");
+  }
   const version = await db
     .select()
     .from(documentVersions)
@@ -1744,7 +1867,12 @@ export async function bootstrapStudioSession(db: AppDatabase, sessionId: string)
     },
     manifest: manifestResult.manifest,
     preview: { url: profile.url, allowedOrigin: origins[0], profileId: profile.id },
-    capabilities: { saveDraft: true, createVersion: true, publish: true, uploadAsset: true },
+    capabilities: {
+      saveDraft: true,
+      createVersion: true,
+      publish: session.resourceKind !== "template",
+      uploadAsset: true,
+    },
     returnUrl: session.returnUrl,
     prompts: await listAppPrompts(db, session.appId),
     locales: await listLocales(db, session.appId),
@@ -1884,6 +2012,8 @@ export async function storageHealth(): Promise<unknown> {
   };
 }
 
+const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
+
 export async function getAppStorageConfig(db: AppDatabase, appId: string): Promise<unknown> {
   await getAppRow(db, appId);
   const row = await db
@@ -1892,7 +2022,22 @@ export async function getAppStorageConfig(db: AppDatabase, appId: string): Promi
     .where(eq(appStorageConfigs.appId, appId))
     .get();
   if (!row) {
-    return AppStorageConfigStatusSchema.parse({ configured: false });
+    return AppStorageConfigStatusSchema.parse({
+      configured: false,
+      config: {
+        appId,
+        driver: "database",
+        endpoint: null,
+        region: "auto",
+        bucket: null,
+        accessKeyId: null,
+        hasSecretAccessKey: false,
+        forcePathStyle: true,
+        publicBaseUrl: null,
+        createdAt: EPOCH_ISO,
+        updatedAt: EPOCH_ISO,
+      },
+    });
   }
   return AppStorageConfigStatusSchema.parse({
     configured: true,
@@ -1900,10 +2045,10 @@ export async function getAppStorageConfig(db: AppDatabase, appId: string): Promi
       appId: row.appId,
       driver: row.driver,
       endpoint: row.endpoint ?? null,
-      region: row.region,
-      bucket: row.bucket,
-      accessKeyId: row.accessKeyId,
-      hasSecretAccessKey: true,
+      region: row.region ?? "auto",
+      bucket: row.bucket ?? null,
+      accessKeyId: row.accessKeyId ?? null,
+      hasSecretAccessKey: Boolean(row.secretAccessKeyEnc),
       forcePathStyle: row.forcePathStyle,
       publicBaseUrl: row.publicBaseUrl ?? null,
       createdAt: row.createdAt,
@@ -1927,29 +2072,56 @@ export async function upsertAppStorageConfig(
     .get();
 
   const encryptionKey = getConfig().ai.encryptionKey;
-  let secretAccessKeyEnc: string;
-  if (body.secretAccessKey) {
-    secretAccessKeyEnc = encryptSecret(body.secretAccessKey, encryptionKey);
-  } else if (existing?.secretAccessKeyEnc) {
-    secretAccessKeyEnc = existing.secretAccessKeyEnc;
+  let secretAccessKeyEnc: string | null = null;
+  let bucket: string | null = null;
+  let accessKeyId: string | null = null;
+  let endpoint: string | null = null;
+  let region: string | null = "auto";
+  let publicBaseUrl: string | null = null;
+  const forcePathStyle = body.forcePathStyle ?? true;
+
+  if (body.driver === "s3") {
+    if (!body.bucket && !existing?.bucket) {
+      throw validation("A bucket name is required to configure S3 storage", [
+        { path: "bucket", message: "Bucket name is required" },
+      ]);
+    }
+    if (!body.accessKeyId && !existing?.accessKeyId) {
+      throw validation("An access key ID is required to configure S3 storage", [
+        { path: "accessKeyId", message: "Access key ID is required" },
+      ]);
+    }
+    bucket = body.bucket ?? existing?.bucket ?? null;
+    accessKeyId = body.accessKeyId ?? existing?.accessKeyId ?? null;
+    endpoint = body.endpoint ? body.endpoint : (existing?.endpoint ?? null);
+    region = body.region ? body.region : (existing?.region ?? "auto");
+    publicBaseUrl = body.publicBaseUrl ? body.publicBaseUrl : (existing?.publicBaseUrl ?? null);
+
+    if (body.secretAccessKey) {
+      secretAccessKeyEnc = encryptSecret(body.secretAccessKey, encryptionKey);
+    } else if (existing?.secretAccessKeyEnc) {
+      secretAccessKeyEnc = existing.secretAccessKeyEnc;
+    } else {
+      throw validation("A secret access key is required to configure S3 storage", [
+        { path: "secretAccessKey", message: "Secret access key is required" },
+      ]);
+    }
   } else if (body.driver === "memory") {
     secretAccessKeyEnc = encryptSecret("memory-secret", encryptionKey);
-  } else {
-    throw validation("A secret access key is required to configure S3 storage", [
-      { path: "secretAccessKey", message: "Secret access key is required" },
-    ]);
+    bucket = "memory";
+    accessKeyId = "memory";
   }
 
   const values = {
     appId,
     driver: body.driver,
-    endpoint: body.endpoint ? body.endpoint : null,
-    region: body.region,
-    bucket: body.bucket,
-    accessKeyId: body.accessKeyId,
+    endpoint,
+    region,
+    bucket,
+    accessKeyId,
     secretAccessKeyEnc,
-    forcePathStyle: body.forcePathStyle,
-    publicBaseUrl: body.publicBaseUrl ? body.publicBaseUrl : null,
+    forcePathStyle,
+    publicBaseUrl,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
@@ -1982,7 +2154,7 @@ export async function upsertAppStorageConfig(
     region: values.region,
     bucket: values.bucket,
     accessKeyId: values.accessKeyId,
-    hasSecretAccessKey: true,
+    hasSecretAccessKey: Boolean(values.secretAccessKeyEnc),
     forcePathStyle: values.forcePathStyle,
     publicBaseUrl: values.publicBaseUrl,
     createdAt: values.createdAt,
@@ -2012,7 +2184,10 @@ export async function testAppStorage(
   if (input && typeof input === "object" && Object.keys(input).length > 0) {
     body = AppStorageConfigUpsertSchema.partial().parse(input);
   }
-  const driver = body?.driver ?? existing?.driver ?? "s3";
+  const driver = body?.driver ?? existing?.driver ?? "database";
+  if (driver === "database") {
+    return AppStorageHealthSchema.parse({ status: "up", driver: "database" });
+  }
   if (driver === "memory") {
     return AppStorageHealthSchema.parse({ status: "up", driver: "memory" });
   }
@@ -2023,7 +2198,7 @@ export async function testAppStorage(
   const accessKeyId = body?.accessKeyId ?? existing?.accessKeyId;
   const forcePathStyle = body?.forcePathStyle ?? existing?.forcePathStyle ?? true;
 
-  let secretAccessKey: string | undefined = body?.secretAccessKey;
+  let secretAccessKey: string | undefined = body?.secretAccessKey || undefined;
   if (!secretAccessKey && existing?.secretAccessKeyEnc) {
     const encryptionKey = getConfig().ai.encryptionKey;
     secretAccessKey = decryptSecret(existing.secretAccessKeyEnc, encryptionKey);
@@ -2198,6 +2373,7 @@ function resourceRecord(row: ResourceRecordInput): unknown {
         }
       : null,
     status: row.status,
+    currentVersionId: "currentVersionId" in row ? (row.currentVersionId ?? null) : null,
     defaultPromptId: "defaultPromptId" in row ? (row.defaultPromptId ?? null) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

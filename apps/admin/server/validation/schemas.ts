@@ -86,6 +86,7 @@ export const ResourceSchema = z.object({
   description: z.string(),
   categoryId: IdSchema.nullable(),
   documentId: IdSchema,
+  currentVersionId: IdSchema.nullable().optional(),
   sourceTemplate: z
     .object({ templateId: IdSchema, versionId: IdSchema.nullable().optional() })
     .nullable(),
@@ -312,14 +313,17 @@ export const ResourceCreateSchema = z.object({
   key: KeySchema,
   title: z.string().min(1),
   description: z.string().default(""),
-  categoryId: IdSchema.optional(),
+  categoryId: IdSchema.nullable().optional(),
   status: ResourceStatusSchema.default("draft"),
   sourceTemplate: z
     .object({ templateId: IdSchema, versionId: IdSchema.nullable().optional() })
     .optional(),
   defaultPromptId: IdSchema.nullable().optional(),
 });
-export const ResourcePatchSchema = ResourceCreateSchema.partial()
+export const ResourcePatchSchema = ResourceCreateSchema.extend({
+  currentVersionId: IdSchema.nullable().optional(),
+})
+  .partial()
   .omit({ sourceTemplate: true })
   .refine((value) => value.key === undefined, {
     message: "Resource key cannot be changed",
@@ -579,44 +583,45 @@ export const PromptPreviewResponseSchema = z
 export const AppStorageConfigSchema = z
   .object({
     appId: IdSchema,
-    driver: z.enum(["s3", "memory"]),
+    driver: z.enum(["database", "s3", "memory"]),
     endpoint: z.string().nullable().optional(),
-    region: z.string(),
-    bucket: z.string(),
-    accessKeyId: z.string(),
+    region: z.string().nullable().optional(),
+    bucket: z.string().nullable().optional(),
+    accessKeyId: z.string().nullable().optional(),
     hasSecretAccessKey: z.boolean(),
     forcePathStyle: z.boolean(),
     publicBaseUrl: z.string().nullable().optional(),
     createdAt: IsoDateSchema,
     updatedAt: IsoDateSchema,
   })
-  .openapi({ description: "App S3 object storage configuration" });
+  .openapi({ description: "App object storage configuration" });
 
 export const AppStorageConfigStatusSchema = z
   .object({
     configured: z.boolean(),
     config: AppStorageConfigSchema.optional(),
   })
-  .openapi({ description: "App S3 storage configuration and status" });
+  .openapi({ description: "App storage configuration and status" });
 
 export const AppStorageConfigUpsertSchema = z
   .object({
-    driver: z.enum(["s3", "memory"]).default("s3"),
+    driver: z.enum(["database", "s3", "memory"]).default("database"),
     endpoint: z.string().url().optional().nullable(),
-    region: z.string().min(1).default("auto"),
-    bucket: z.string().min(1).max(256),
-    accessKeyId: z.string().min(1).max(256),
-    secretAccessKey: z.string().min(1).max(4096).optional(),
+    region: z.string().optional().nullable(),
+    bucket: z.string().max(256).optional().nullable(),
+    accessKeyId: z.string().max(256).optional().nullable(),
+    secretAccessKey: z.string().max(4096).optional().nullable(),
     forcePathStyle: z.boolean().default(true),
     publicBaseUrl: z.string().url().optional().nullable(),
   })
-  .openapi({ description: "Create or update app S3 storage configuration" });
+  .openapi({ description: "Create or update app storage configuration" });
 
 export const AppStorageHealthSchema = z
   .object({
-    status: z.enum(["up", "down", "not_configured"]),
-    driver: z.enum(["s3", "memory"]),
+    status: z.enum(["up", "down", "not_configured", "deprecated"]),
+    driver: z.enum(["database", "s3", "memory", "none", "deprecated"]),
     detail: z.string().optional(),
   })
-  .openapi({ description: "App S3 storage health check result" });
+  .openapi({ description: "App storage health check result" });
+
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

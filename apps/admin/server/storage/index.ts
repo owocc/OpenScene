@@ -7,17 +7,18 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getConfig } from "../config/env";
 import { decryptSecret } from "../crypto/encryption";
 import type { AppDatabase } from "../db/client";
-import { appStorageConfigs } from "../db/schema";
+import { nowIso } from "../db/ids";
+import { appStorageConfigs, storageObjects } from "../db/schema";
 import { unavailable } from "../errors";
 
 export type StorageHead = { size: number; mimeType?: string; checksum?: string };
 export type StorageHealth = {
   status: "up" | "down" | "not_configured" | "deprecated";
-  driver: "s3" | "memory";
+  driver: "database" | "s3" | "memory" | "none" | "deprecated";
   detail?: string;
 };
 
@@ -169,6 +170,84 @@ export class S3StorageAdapter implements StorageAdapter {
   }
 }
 
+export class DatabaseStorageAdapter implements StorageAdapter {
+  constructor(
+    private readonly db: AppDatabase,
+    private readonly appId: string,
+  ) {}
+
+  async health(): Promise<StorageHealth> {
+    return { status: "up", driver: "database" };
+  }
+
+  async createUploadIntent(input: {
+    key: string;
+    mimeType: string;
+    size: number;
+    expiresInSeconds: number;
+  }): Promise<{ url: string; expiresAt: string }> {
+    return {
+      url: `/api/v1/apps/${encodeURIComponent(this.appId)}/assets/upload?key=${encodeURIComponent(input.key)}`,
+      expiresAt: new Date(Date.now() + input.expiresInSeconds * 1_000).toISOString(),
+    };
+  }
+
+  async head(key: string): Promise<StorageHead | undefined> {
+    const row = await this.db
+      .select()
+      .from(storageObjects)
+      .where(and(eq(storageObjects.appId, this.appId), eq(storageObjects.key, key)))
+      .get();
+    return row ? { size: row.size, mimeType: row.mimeType, checksum: row.checksum } : undefined;
+  }
+
+  async put(key: string, body: Uint8Array, mimeType: string): Promise<void> {
+    const timestamp = nowIso();
+    const hash = await checksum(body);
+    const data = Buffer.from(body).toString("base64");
+    const size = body.byteLength;
+    await this.db
+      .insert(storageObjects)
+      .values({
+        key,
+        appId: this.appId,
+        mimeType,
+        size,
+        checksum: hash,
+        data,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      })
+      .onConflictDoUpdate({
+        target: storageObjects.key,
+        set: {
+          mimeType,
+          size,
+          checksum: hash,
+          data,
+          updatedAt: timestamp,
+        },
+      })
+      .run();
+  }
+
+  async get(key: string): Promise<Uint8Array | undefined> {
+    const row = await this.db
+      .select()
+      .from(storageObjects)
+      .where(and(eq(storageObjects.appId, this.appId), eq(storageObjects.key, key)))
+      .get();
+    if (!row) return undefined;
+    return new Uint8Array(Buffer.from(row.data, "base64"));
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.db
+      .delete(storageObjects)
+      .where(and(eq(storageObjects.appId, this.appId), eq(storageObjects.key, key)))
+      .run();
+  }
+}
 export class MemoryStorageAdapter implements StorageAdapter {
   private readonly objects = new Map<
     string,
@@ -223,12 +302,10 @@ export async function getAppStorage(db: AppDatabase, appId: string): Promise<Sto
     .where(eq(appStorageConfigs.appId, appId))
     .get();
 
-  if (!row) {
-    const defaultTestAdapter = appAdapters.get("__default_test__");
-    if (defaultTestAdapter) return defaultTestAdapter;
-    throw unavailable(
-      `Object storage is not configured for application ${appId}. Please configure storage in App Settings.`,
-    );
+  if (!row || row.driver === "database") {
+    const adapter = new DatabaseStorageAdapter(db, appId);
+    appAdapters.set(appId, adapter);
+    return adapter;
   }
 
   if (row.driver === "memory") {
@@ -237,11 +314,19 @@ export async function getAppStorage(db: AppDatabase, appId: string): Promise<Sto
     return adapter;
   }
 
+  if (!row.bucket || !row.accessKeyId || !row.secretAccessKeyEnc) {
+    const defaultTestAdapter = appAdapters.get("__default_test__");
+    if (defaultTestAdapter) return defaultTestAdapter;
+    throw unavailable(
+      `S3 object storage is not configured for application ${appId}. Please configure S3 settings in App Settings.`,
+    );
+  }
+
   const encryptionKey = getConfig().ai.encryptionKey;
   const secretAccessKey = decryptSecret(row.secretAccessKeyEnc, encryptionKey);
   const adapter = new S3StorageAdapter({
     endpoint: row.endpoint ?? undefined,
-    region: row.region,
+    region: row.region ?? "auto",
     bucket: row.bucket,
     accessKeyId: row.accessKeyId,
     secretAccessKey,

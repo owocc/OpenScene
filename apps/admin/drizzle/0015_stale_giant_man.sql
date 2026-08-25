@@ -1,0 +1,1 @@
+ALTER TABLE `templates` ADD `current_version_id` text;

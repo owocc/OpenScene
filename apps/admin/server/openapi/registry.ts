@@ -405,6 +405,15 @@ const operations: Operation[] = [
     params: true,
   },
   {
+    method: "delete",
+    path: "/api/v1/apps/{appId}/documents/{documentId}/versions/{versionId}",
+    operationId: "deleteVersion",
+    tag: "Versions",
+    response: z.void(),
+    params: true,
+    status: 204,
+  },
+  {
     method: "get",
     path: "/api/v1/apps/{appId}/documents/{documentId}/releases",
     operationId: "listReleases",

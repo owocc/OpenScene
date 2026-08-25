@@ -218,6 +218,7 @@ export const templates = sqliteTable(
     description: text("description").notNull().default(""),
     categoryId: text("category_id").references(() => categories.id, { onDelete: "restrict" }),
     documentId: text("document_id").notNull(),
+    currentVersionId: text("current_version_id"),
     status: text("status", { enum: ["active", "disabled", "draft", "published"] }).notNull(),
     ...timestamps,
   },
@@ -387,19 +388,35 @@ export const appStorageConfigs = sqliteTable(
     appId: text("app_id")
       .primaryKey()
       .references(() => apps.id, { onDelete: "cascade" }),
-    driver: text("driver", { enum: ["s3", "memory"] })
+    driver: text("driver", { enum: ["database", "s3", "memory"] })
       .notNull()
-      .default("s3"),
+      .default("database"),
     endpoint: text("endpoint"),
-    region: text("region").notNull().default("auto"),
-    bucket: text("bucket").notNull(),
-    accessKeyId: text("access_key_id").notNull(),
-    secretAccessKeyEnc: text("secret_access_key_enc").notNull(),
+    region: text("region").default("auto"),
+    bucket: text("bucket"),
+    accessKeyId: text("access_key_id"),
+    secretAccessKeyEnc: text("secret_access_key_enc"),
     forcePathStyle: integer("force_path_style", { mode: "boolean" }).notNull().default(true),
     publicBaseUrl: text("public_base_url"),
     ...timestamps,
   },
   (table) => [index("app_storage_configs_app_idx").on(table.appId)],
+);
+
+export const storageObjects = sqliteTable(
+  "storage_objects",
+  {
+    key: text("key").primaryKey(),
+    appId: text("app_id")
+      .notNull()
+      .references(() => apps.id, { onDelete: "cascade" }),
+    mimeType: text("mime_type").notNull(),
+    size: integer("size").notNull(),
+    checksum: text("checksum").notNull(),
+    data: text("data").notNull(),
+    ...timestamps,
+  },
+  (table) => [index("storage_objects_app_idx").on(table.appId)],
 );
 
 export const schema = {
@@ -422,6 +439,7 @@ export const schema = {
   systemPrompts,
   aiChatSessions,
   appStorageConfigs,
+  storageObjects,
 };
 
 export type AppRow = typeof apps.$inferSelect;
@@ -439,4 +457,5 @@ export type StudioSessionRow = typeof studioSessions.$inferSelect;
 export type AiConfigRow = typeof aiConfig.$inferSelect;
 export type SystemPromptRow = typeof systemPrompts.$inferSelect;
 export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;
+export type StorageObjectRow = typeof storageObjects.$inferSelect;
 export type AppStorageConfigRow = typeof appStorageConfigs.$inferSelect;

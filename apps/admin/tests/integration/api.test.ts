@@ -200,6 +200,117 @@ describe("Admin API HTTP flow", () => {
       versionId: null,
     });
   });
+  test("templates cannot be published as releases and support version management", async () => {
+    // 1. Create a template
+    const tplRes = await call("POST", ["apps", appA.id, "templates"], {
+      key: "tpl-versioned",
+      title: "Template Versioned",
+    });
+    expect(tplRes.status).toBe(201);
+    const tpl = await tplRes.json();
+    expect(tpl.currentVersionId).toBeNull();
+
+    // 2. Create version 1 for template
+    const v1Res = await call("POST", ["apps", appA.id, "documents", tpl.documentId, "versions"], {
+      message: "Version 1",
+    });
+    expect(v1Res.status).toBe(201);
+    const v1 = await v1Res.json();
+
+    // Template currentVersionId automatically updated to first created version
+    const tplAfterV1 = await (await call("GET", ["apps", appA.id, "templates", tpl.id])).json();
+    expect(tplAfterV1.currentVersionId).toBe(v1.id);
+
+    // 3. Create version 2 for template
+    const v2Res = await call("POST", ["apps", appA.id, "documents", tpl.documentId, "versions"], {
+      message: "Version 2",
+    });
+    expect(v2Res.status).toBe(201);
+    const v2 = await v2Res.json();
+
+    // 4. Manually set version 2 as current version
+    const setCurRes = await call("PATCH", ["apps", appA.id, "templates", tpl.id], {
+      currentVersionId: v2.id,
+    });
+    expect(setCurRes.status).toBe(200);
+    expect((await setCurRes.json()).currentVersionId).toBe(v2.id);
+
+    // 5. Create a page choosing the template without versionId -> automatically uses template currentVersion (v2)
+    const pageAutoV2 = await (
+      await call("POST", ["apps", appA.id, "pages"], {
+        key: "page-auto-v2",
+        title: "Page Auto V2",
+        sourceTemplate: { templateId: tpl.id },
+      })
+    ).json();
+    expect(pageAutoV2.sourceTemplate.versionId).toBe(v2.id);
+
+    // 6. Create a page explicitly choosing v1
+    const pageWithV1 = await (
+      await call("POST", ["apps", appA.id, "pages"], {
+        key: "page-explicit-v1",
+        title: "Page Explicit V1",
+        sourceTemplate: { templateId: tpl.id, versionId: v1.id },
+      })
+    ).json();
+    expect(pageWithV1.sourceTemplate.versionId).toBe(v1.id);
+
+    // 7. Verify templates cannot create releases (publishing is not allowed for templates)
+    const releaseAttempt = await call(
+      "POST",
+      ["apps", appA.id, "documents", tpl.documentId, "releases"],
+      { versionId: v2.id },
+    );
+    expect(releaseAttempt.status).toBe(422);
+
+    // 8. Version deletion conflict: v1 cannot be deleted because it is referenced by pageWithV1
+    const delConflict = await call("DELETE", [
+      "apps",
+      appA.id,
+      "documents",
+      tpl.documentId,
+      "versions",
+      v1.id,
+    ]);
+    expect(delConflict.status).toBe(409);
+    // 8b. Current version deletion conflict: v2 is current version of template and cannot be deleted
+    const delCurrentConflict = await call("DELETE", [
+      "apps",
+      appA.id,
+      "documents",
+      tpl.documentId,
+      "versions",
+      v2.id,
+    ]);
+    expect(delCurrentConflict.status).toBe(409);
+
+    // 9. Create an unreferenced version 3 and delete it
+    const v3 = await (
+      await call("POST", ["apps", appA.id, "documents", tpl.documentId, "versions"], {
+        message: "Version 3",
+      })
+    ).json();
+
+    const delV3 = await call("DELETE", [
+      "apps",
+      appA.id,
+      "documents",
+      tpl.documentId,
+      "versions",
+      v3.id,
+    ]);
+    expect(delV3.status).toBe(204);
+
+    const getV3 = await call("GET", [
+      "apps",
+      appA.id,
+      "documents",
+      tpl.documentId,
+      "versions",
+      v3.id,
+    ]);
+    expect(getV3.status).toBe(404);
+  });
 
   test("creates a short-lived Studio Session and Bootstrap", async () => {
     const session = await call("POST", ["apps", appA.id, "studio-sessions"], {
@@ -644,7 +755,7 @@ describe("App Storage binding & encryption", () => {
     expect(dbRow).toBeDefined();
     expect(dbRow?.secretAccessKeyEnc).toBeDefined();
     expect(dbRow?.secretAccessKeyEnc).not.toBe("super-secret-s3-key-value");
-    expect(dbRow?.secretAccessKeyEnc.split(".")).toHaveLength(3);
+    expect(dbRow?.secretAccessKeyEnc?.split(".")).toHaveLength(3);
 
     // 4. Retrieve storage config via GET: secret key is never exposed
     const getRes = await call("GET", ["apps", appA.id, "storage"]);
@@ -696,6 +807,31 @@ describe("App Storage binding & encryption", () => {
     const postDelete = await call("GET", ["apps", appA.id, "storage"]);
     expect(postDelete.status).toBe(200);
     expect((await postDelete.json()).configured).toBe(false);
+  });
+  test("supports database storage mode storing releases directly in DB", async () => {
+    // 1. Configure App A for database storage mode
+    const saveDbMode = await call("PUT", ["apps", appA.id, "storage"], {
+      driver: "database",
+    });
+    expect(saveDbMode.status).toBe(200);
+    const saved = await saveDbMode.json();
+    expect(saved.driver).toBe("database");
+    expect(saved.bucket).toBeNull();
+    expect(saved.hasSecretAccessKey).toBe(false);
+
+    // 2. Check health in database mode
+    const healthRes = await call("GET", ["apps", appA.id, "storage", "health"]);
+    expect(healthRes.status).toBe(200);
+    const healthBody = await healthRes.json();
+    expect(healthBody.status).toBe("up");
+    expect(healthBody.driver).toBe("database");
+
+    // 3. Test storage in database mode returns up
+    const testRes = await call("POST", ["apps", appA.id, "storage", "test"], {
+      driver: "database",
+    });
+    expect(testRes.status).toBe(200);
+    expect((await testRes.json()).status).toBe("up");
   });
 
   test("global storage is deprecated and reports status in health check", async () => {
