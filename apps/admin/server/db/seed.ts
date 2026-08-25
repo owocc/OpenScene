@@ -4,6 +4,8 @@ import { apps, appKeys, categories, locales } from "./schema";
 import { eq } from "drizzle-orm";
 import { hashSecret, newId, newSecret, nowIso } from "./ids";
 
+import { auth } from "../../lib/auth";
+import { user } from "./schema";
 const { db } = await initializeDatabase();
 const existing = await db.select({ id: apps.id }).from(apps).where(eq(apps.key, "demo")).get();
 if (!existing) {
@@ -76,4 +78,33 @@ if (!existing) {
   console.log(JSON.stringify({ appId, appKey, runtimeKey }));
 } else {
   console.log("OpenScene demo App already exists");
+}
+
+const defaultAdminEmail = process.env.OPENSCENE_DEFAULT_ADMIN_EMAIL || "admin@openscene.dev";
+const defaultAdminPassword = process.env.OPENSCENE_DEFAULT_ADMIN_PASSWORD || "Admin123456!";
+const defaultAdminName = process.env.OPENSCENE_DEFAULT_ADMIN_NAME || "Administrator";
+
+const existingUser = await db
+  .select({ id: user.id })
+  .from(user)
+  .where(eq(user.email, defaultAdminEmail))
+  .get();
+
+if (!existingUser) {
+  try {
+    await auth.api.signUpEmail({
+      body: {
+        name: defaultAdminName,
+        email: defaultAdminEmail,
+        password: defaultAdminPassword,
+      },
+    });
+    console.log(
+      `Created default admin account: ${defaultAdminEmail} (password: ${defaultAdminPassword})`,
+    );
+  } catch (err) {
+    console.error("Failed to create default admin account:", err);
+  }
+} else {
+  console.log(`Default admin account (${defaultAdminEmail}) already exists`);
 }

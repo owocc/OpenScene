@@ -113,6 +113,20 @@
       "when": 1787630278444,
       "tag": "0015_stale_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1787632373738,
+      "tag": "0016_aberrant_big_bertha",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1787632540512,
+      "tag": "0017_lively_blackheart",
+      "breakpoints": true
     }
   ]
 }

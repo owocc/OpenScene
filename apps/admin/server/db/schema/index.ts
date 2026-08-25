@@ -8,6 +8,16 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { APP_TYPE_WEB, APP_TYPES } from "@openscene/constants";
+export * from "./auth";
+import {
+  user,
+  session,
+  account,
+  verification,
+  userRelations,
+  sessionRelations,
+  accountRelations,
+} from "./auth";
 
 const timestamps = {
   createdAt: text("created_at").notNull(),
@@ -440,6 +450,13 @@ export const schema = {
   aiChatSessions,
   appStorageConfigs,
   storageObjects,
+  user,
+  session,
+  account,
+  verification,
+  userRelations,
+  sessionRelations,
+  accountRelations,
 };
 
 export type AppRow = typeof apps.$inferSelect;

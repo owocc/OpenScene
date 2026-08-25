@@ -42,6 +42,7 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
+import { useSession, signOut } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
@@ -5145,19 +5146,22 @@ function SystemView() {
 }
 
 function AccountView() {
-  const context = useAdminContext();
   const { t } = useI18n();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const sessionQuery = api.useQuery("get", "/api/v1/auth/session");
   const session = sessionQuery.data;
+  const { data: betterAuthSession } = useSession();
 
   async function handleSignOut() {
     setIsSigningOut(true);
     try {
+      await signOut();
       await fetchClient.DELETE("/api/v1/auth/session");
-      context.router.replace(context.href("/login", { appId: undefined }));
+    } catch (error) {
+      console.error("Sign out error:", error);
     } finally {
       setIsSigningOut(false);
+      window.location.href = "/login";
     }
   }
 
@@ -5171,16 +5175,35 @@ function AccountView() {
           <div className="grid gap-2">
             <Text variant="secondary">{t("status")}</Text>
             <div>
-              <StatusBadge status={session?.authenticated ? "active" : "disabled"} />
+              <StatusBadge
+                status={betterAuthSession?.user || session?.authenticated ? "active" : "disabled"}
+              />
             </div>
           </div>
+          {betterAuthSession?.user && (
+            <>
+              <div className="grid gap-1">
+                <Text variant="secondary">User</Text>
+                <Text>{betterAuthSession.user.name || "Administrator"}</Text>
+              </div>
+              <div className="grid gap-1">
+                <Text variant="secondary">Email</Text>
+                <Text>{betterAuthSession.user.email}</Text>
+              </div>
+            </>
+          )}
           {session?.mode ? (
             <div className="grid gap-1">
               <Text variant="secondary">{t("authMode")}</Text>
               <Text>{session.mode}</Text>
             </div>
           ) : null}
-          {session?.expiresAt ? (
+          {betterAuthSession?.session?.expiresAt ? (
+            <div className="grid gap-1">
+              <Text variant="secondary">Expires</Text>
+              <Text>{new Date(betterAuthSession.session.expiresAt).toLocaleString()}</Text>
+            </div>
+          ) : session?.expiresAt ? (
             <div className="grid gap-1">
               <Text variant="secondary">Expires</Text>
               <Text>{new Date(session.expiresAt).toLocaleString()}</Text>

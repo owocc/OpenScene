@@ -23,8 +23,9 @@ import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
+import { useSession } from "@/lib/auth-client";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import { navigationGroups } from "./navigation";
@@ -52,6 +53,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
+  const { data: session, isPending: isSessionPending } = useSession();
+  const sessionQuery = api.useQuery("get", "/api/v1/auth/session");
+  const isAuthenticated = Boolean(session?.user || sessionQuery.data?.authenticated);
+  const isChecking = isSessionPending && sessionQuery.isLoading;
+
+  useEffect(() => {
+    if (pathname === "/login") return;
+    if (context.mode === "embedded") return;
+    if (!isAuthenticated && !isChecking) {
+      const nextParam = pathname !== "/" ? `?next=${encodeURIComponent(pathname)}` : "";
+      context.router.replace(`/login${nextParam}`);
+    }
+  }, [pathname, isAuthenticated, isChecking, context]);
   const [navigationSearch, setNavigationSearch] = useState("");
   const appsQuery = api.useQuery("get", "/api/v1/apps", {
     params: { query: { limit: "100" } },
@@ -73,7 +87,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (pathname === "/login") return <main className="min-h-dvh">{children}</main>;
   if (context.mode === "embedded") return <main className="min-h-dvh">{children}</main>;
-
+  if (!isAuthenticated && !isChecking) return null;
   return (
     <Sidebar.Provider
       defaultOpen
