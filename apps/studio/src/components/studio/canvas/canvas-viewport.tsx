@@ -34,6 +34,11 @@ export function CanvasViewport({
     undefined,
   );
   const [isPanning, setIsPanning] = useState(false);
+  // Always-fresh refs so wheel/gesture handlers never capture stale state.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const onPatchRef = useRef(onPatch);
+  onPatchRef.current = onPatch;
   const showBackgroundPattern = useCanvasSettingsStore((s) => s.showBackgroundPattern);
   const backgroundTexture = useCanvasSettingsStore((s) => s.backgroundTexture);
 
@@ -43,6 +48,8 @@ export function CanvasViewport({
 
     const onWheelNative = (event: globalThis.WheelEvent) => {
       event.preventDefault();
+      const vp = viewportRef.current;
+      const patch = onPatchRef.current;
       const isZoom = event.metaKey || event.ctrlKey;
 
       if (isZoom) {
@@ -51,34 +58,34 @@ export function CanvasViewport({
         const cursorY = event.clientY - rect.top - rect.height / 2;
 
         const factor = Math.exp(-event.deltaY * 0.005);
-        const currentZoom = viewport.zoom;
-        const nextZoom = Math.min(Math.max(Number((currentZoom * factor).toFixed(3)), 0.1), 5.0);
+        const nextZoom = Math.min(Math.max(Number((vp.zoom * factor).toFixed(3)), 0.1), 5.0);
 
-        const ratio = nextZoom / currentZoom;
-        const nextPanX = Number((cursorX - (cursorX - viewport.panX) * ratio).toFixed(1));
-        const nextPanY = Number((cursorY - (cursorY - viewport.panY) * ratio).toFixed(1));
+        const ratio = nextZoom / vp.zoom;
+        const nextPanX = Number((cursorX - (cursorX - vp.panX) * ratio).toFixed(1));
+        const nextPanY = Number((cursorY - (cursorY - vp.panY) * ratio).toFixed(1));
 
-        onPatch({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
+        patch({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
         return;
       }
 
       const deltaX = event.shiftKey ? event.deltaY : event.deltaX;
       const deltaY = event.shiftKey ? 0 : event.deltaY;
-      onPatch({
-        panX: Number((viewport.panX - deltaX).toFixed(1)),
-        panY: Number((viewport.panY - deltaY).toFixed(1)),
+      patch({
+        panX: Number((vp.panX - deltaX).toFixed(1)),
+        panY: Number((vp.panY - deltaY).toFixed(1)),
       });
     };
 
-    let gestureStartZoom = viewport.zoom;
-    let gestureStartPanX = viewport.panX;
-    let gestureStartPanY = viewport.panY;
+    let gestureStartZoom = 1;
+    let gestureStartPanX = 0;
+    let gestureStartPanY = 0;
 
     const onGestureStart = (event: Event) => {
       event.preventDefault();
-      gestureStartZoom = viewport.zoom;
-      gestureStartPanX = viewport.panX;
-      gestureStartPanY = viewport.panY;
+      const vp = viewportRef.current;
+      gestureStartZoom = vp.zoom;
+      gestureStartPanX = vp.panX;
+      gestureStartPanY = vp.panY;
     };
 
     const onGestureChange = (event: Event) => {
@@ -96,7 +103,7 @@ export function CanvasViewport({
       const nextPanX = Number((cursorX - (cursorX - gestureStartPanX) * ratio).toFixed(1));
       const nextPanY = Number((cursorY - (cursorY - gestureStartPanY) * ratio).toFixed(1));
 
-      onPatch({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
+      onPatchRef.current({ zoom: nextZoom, panX: nextPanX, panY: nextPanY });
     };
 
     const onGestureEnd = (event: Event) => {
@@ -114,7 +121,8 @@ export function CanvasViewport({
       el.removeEventListener("gesturechange", onGestureChange);
       el.removeEventListener("gestureend", onGestureEnd);
     };
-  }, [viewport.zoom, viewport.panX, viewport.panY, onPatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount-once: handlers read live state via viewportRef / onPatchRef.
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (activeToolMode !== "hand" && event.button !== 1) return;
