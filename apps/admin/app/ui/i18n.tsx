@@ -66,6 +66,10 @@ export const messages = {
     chooseAppDescription: "This page is scoped to an app. Select one from the app list first.",
     language: "Language",
     preferences: "Preferences",
+    theme: "Theme",
+    themeSystem: "System",
+    themeLight: "Light",
+    themeDark: "Dark",
     english: "English",
     chinese: "简体中文",
     signOut: "Sign out",
@@ -259,6 +263,10 @@ export const messages = {
     chooseAppDescription: "此页面属于某个应用，请先从应用列表中选择应用。",
     language: "语言",
     preferences: "偏好设置",
+    theme: "外观主题",
+    themeSystem: "跟随系统",
+    themeLight: "浅色",
+    themeDark: "深色",
     english: "English",
     chinese: "简体中文",
     signOut: "退出登录",
@@ -415,7 +423,6 @@ export function useAdminContext() {
   useEffect(() => {
     document.cookie = `openscene_admin_lang=${language}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [language]);
-
   const href = useCallback(
     (path: string, extra?: Record<string, string | undefined>) =>
       buildHref(path, { mode, lang: language, appId }, extra),
@@ -431,9 +438,18 @@ export function useAdminContext() {
   );
 
   const dictionary = useMemo(() => messages[language], [language]);
-  return { pathname, router, params, mode, language, appId, href, setLanguage, dictionary };
+  return {
+    pathname,
+    router,
+    params,
+    mode,
+    language,
+    appId,
+    href,
+    setLanguage,
+    dictionary,
+  };
 }
-
 export function useI18n() {
   const { dictionary, language } = useAdminContext();
   return { lang: language, t: (key: MessageKey) => dictionary[key] };

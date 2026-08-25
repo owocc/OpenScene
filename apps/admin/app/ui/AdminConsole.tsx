@@ -43,6 +43,7 @@ import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { components } from "@openscene/api-client";
@@ -3107,6 +3108,7 @@ function MetaView() {
 
 function SettingsView() {
   const context = useAdminContext();
+  const { theme, setTheme } = useTheme();
   const { t } = useI18n();
   const toast = useKumoToastManager();
   const queryClient = useQueryClient();
@@ -3179,6 +3181,18 @@ function SettingsView() {
             items={{ en: t("english"), "zh-CN": t("chinese") }}
             onValueChange={(value) => {
               if (value === "en" || value === "zh-CN") context.setLanguage(value);
+            }}
+          />
+          <Select
+            label={t("theme")}
+            value={theme ?? "system"}
+            items={{
+              system: t("themeSystem"),
+              light: t("themeLight"),
+              dark: t("themeDark"),
+            }}
+            onValueChange={(value) => {
+              if (value === "system" || value === "light" || value === "dark") setTheme(value);
             }}
           />
         </LayerCard.Primary>

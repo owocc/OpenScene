@@ -1,5 +1,6 @@
 export type AdminMode = "standalone" | "embedded";
 export type AdminLanguage = "en" | "zh-CN";
+export type AdminTheme = "system" | "light" | "dark";
 
 export function parseMode(value: string | null | undefined): AdminMode {
   return value === "embedded" ? "embedded" : "standalone";
@@ -7,6 +8,10 @@ export function parseMode(value: string | null | undefined): AdminMode {
 
 export function parseLanguage(value: string | null | undefined): AdminLanguage | undefined {
   return value === "en" || value === "zh-CN" ? value : undefined;
+}
+
+export function parseTheme(value: string | null | undefined): AdminTheme | undefined {
+  return value === "system" || value === "light" || value === "dark" ? value : undefined;
 }
 
 export function buildHref(

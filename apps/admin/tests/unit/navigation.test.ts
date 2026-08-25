@@ -6,6 +6,7 @@ import {
   navigationGroups,
   parseLanguage,
   parseMode,
+  parseTheme,
 } from "../../app/ui/navigation";
 
 describe("admin navigation context", () => {
@@ -15,6 +16,11 @@ describe("admin navigation context", () => {
     expect(parseMode("embedded")).toBe("embedded");
     expect(parseLanguage("fr")).toBeUndefined();
     expect(parseLanguage("zh-CN")).toBe("zh-CN");
+    expect(parseTheme(undefined)).toBeUndefined();
+    expect(parseTheme("invalid")).toBeUndefined();
+    expect(parseTheme("system")).toBe("system");
+    expect(parseTheme("light")).toBe("light");
+    expect(parseTheme("dark")).toBe("dark");
   });
 
   test("preserves mode, language, and app scope in links", () => {

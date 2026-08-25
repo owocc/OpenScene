@@ -6,6 +6,22 @@
   color-scheme: light dark;
 }
 
+:root[data-mode="dark"],
+:root.dark,
+html[data-mode="dark"],
+html.dark {
+  color-scheme: dark;
+}
+
+:root[data-mode="light"],
+:root.light,
+html[data-mode="light"],
+html.light {
+  color-scheme: light;
+}
+
+@custom-variant dark (&:where(.dark, .dark *, [data-mode="dark"], [data-mode="dark"] *));
+
 html,
 body {
   min-height: 100%;
