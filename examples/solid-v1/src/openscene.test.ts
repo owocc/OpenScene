@@ -24,11 +24,12 @@ describe("examples/solid-v1 Image component", () => {
     expect(parsed.style).toEqual({ width: "300px", height: "200px", borderRadius: "8px" });
   });
 
-  it("includes Image component in its manifest", () => {
+  it("includes Image component in manifest and catalog", () => {
     expect(Image).toBeDefined();
     expect(Image.type).toBe("Image");
 
     const app = createSolidApp("test-app");
+    expect(app.catalog.componentNames).toContain("Image");
     expect(app.componentDefinitions.Image).toBeDefined();
     expect(app.componentDefinitions.Image.title).toBe("Image");
     expect(app.componentDefinitions.Image.category).toBe("media");

@@ -12,15 +12,14 @@
     "@openscene-ai/javascript": "workspace:*",
     "@openscene-ai/schema": "workspace:*",
     "@openscene-ai/solid": "workspace:*",
-    "@solidjs/web": "^2.0.0-rc.0",
-    "solid-js": "^2.0.0-rc.2",
+    "solid-js": "^1.9.14",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@solidjs/vite-plugin": "^3.0.0-next.29",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
+    "vite-plugin-solid": "^2.11.13",
     "vite-plus": "catalog:"
   }
 }

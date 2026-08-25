@@ -15,7 +15,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "preserve",
-    "jsxImportSource": "@solidjs/web",
+    "jsxImportSource": "solid-js",
 
     /* Linting */
     "noUnusedLocals": true,
