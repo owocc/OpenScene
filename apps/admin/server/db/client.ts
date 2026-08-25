@@ -5,8 +5,8 @@ import { sql } from "drizzle-orm";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getConfig, type AppConfig } from "../config/env";
-import { schema } from "./schema";
+import { getConfig, type AppConfig } from "../config/env.ts";
+import { schema } from "./schema/index.ts";
 
 export type AppDatabase = LibSQLDatabase<typeof schema>;
 export type DatabaseRuntime = { db: AppDatabase; client: Client };
