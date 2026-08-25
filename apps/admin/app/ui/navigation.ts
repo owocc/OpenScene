@@ -63,6 +63,7 @@ export const navigationGroups = [
       { href: "/templates", key: "templates", icon: "copy" },
       { href: "/components", key: "components", icon: "cubes" },
       { href: "/assets", key: "assets", icon: "image" },
+      { href: "/preview-profiles", key: "previewProfiles", icon: "eye" },
       { href: "/meta", key: "meta", icon: "code" },
       { href: "/categories", key: "categories", icon: "tag" },
       { href: "/locales", key: "locales", icon: "globe" },

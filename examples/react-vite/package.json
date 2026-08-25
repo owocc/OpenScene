@@ -1,0 +1,35 @@
+{
+  "name": "react-vite",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "check": "vp check",
+    "test": "vp test",
+    "lint": "vp lint",
+    "preview": "vp preview"
+  },
+  "dependencies": {
+    "@json-render/core": "^0.20.0",
+    "@json-render/react": "^0.20.0",
+    "@openscene/constants": "workspace:*",
+    "@openscene/javascript": "workspace:*",
+    "@openscene/protocol": "workspace:*",
+    "@openscene/react": "workspace:*",
+    "@openscene/schema": "workspace:*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

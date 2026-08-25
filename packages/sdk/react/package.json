@@ -1,0 +1,51 @@
+{
+  "name": "@openscene/react",
+  "version": "0.0.0",
+  "description": "React adapter for OpenScene and json-render.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "node": "./dist/server.mjs",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack --from-vite",
+    "dev": "vp pack --from-vite --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@json-render/core": "^0.20.0",
+    "@json-render/react": "^0.20.0",
+    "@openscene/constants": "workspace:*",
+    "@openscene/javascript": "workspace:*",
+    "@openscene/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^4.0.0"
+  }
+}
