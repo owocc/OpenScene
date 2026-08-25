@@ -7,11 +7,13 @@
     "dist"
   ],
   "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
   "exports": {
     ".": {
-      "node": "./dist/server.mjs",
-      "import": "./dist/index.mjs",
-      "default": "./dist/index.mjs"
+      "node": "./src/server.ts",
+      "import": "./src/index.tsx",
+      "default": "./src/index.tsx"
     },
     "./package.json": "./package.json"
   },

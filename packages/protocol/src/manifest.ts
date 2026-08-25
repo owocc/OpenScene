@@ -1,6 +1,6 @@
 import { APP_TYPES, type AppType } from "@openscene/constants";
 import { z } from "zod";
-import { SceneDocumentSchema, type SceneDocument } from "./document";
+import { SceneDocumentSchema, type SceneDocument } from "./document.ts";
 
 const nonEmptyString = z.string().min(1);
 const unknownRecord = z.record(z.string(), z.unknown());

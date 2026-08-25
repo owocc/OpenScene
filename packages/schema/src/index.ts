@@ -1,3 +1,3 @@
-export * from "./schema";
-export * from "./openapi";
-export * from "./web/index";
+export * from "./schema.ts";
+export * from "./openapi.ts";
+export * from "./web/index.ts";

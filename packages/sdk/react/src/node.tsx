@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { evaluateDynamicValue } from "@openscene/javascript";
-import { useOpenScene } from "./context.js";
+import { useOpenScene } from "./context.ts";
 
 export interface OpenSceneNodeContextValue {
   nodeId: string | null;

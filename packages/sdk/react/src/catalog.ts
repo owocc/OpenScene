@@ -6,7 +6,7 @@ import { z } from "zod";
 import type React from "react";
 import type { ComponentRenderProps } from "@json-render/react";
 import { defineRegistry as defineRegistryUntyped } from "@json-render/react";
-import { Button, Text, View } from "./node.js";
+import { Button, Text, View } from "./node.tsx";
 
 const defineRegistry = defineRegistryUntyped;
 

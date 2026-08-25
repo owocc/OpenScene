@@ -20,10 +20,10 @@ import {
 } from "@json-render/react";
 import type { Spec, UIElement } from "@json-render/core";
 import type { SceneDocument } from "@openscene/protocol";
-import type { OpenSceneReactApp } from "./catalog.js";
-import { OpenSceneContext, useOpenScene, type OpenSceneContextValue } from "./context.js";
-import { OpenSceneNodeProvider } from "./node.js";
-import { SelectionCanvas } from "./selection.js";
+import type { OpenSceneReactApp } from "./catalog.ts";
+import { OpenSceneContext, useOpenScene, type OpenSceneContextValue } from "./context.ts";
+import { OpenSceneNodeProvider } from "./node.tsx";
+import { SelectionCanvas } from "./selection.tsx";
 
 export interface OpenSceneProviderProps {
   client?: OpenSceneClient;
@@ -122,7 +122,7 @@ export function OpenSceneProvider(props: OpenSceneProviderProps): React.JSX.Elem
   );
 }
 
-export { useOpenScene, type OpenSceneContextValue } from "./context.js";
+export { useOpenScene, type OpenSceneContextValue } from "./context.ts";
 
 function removePrivateNodeId(element: UIElement): UIElement {
   const nextProps = { ...(element.props as Record<string, unknown>) };

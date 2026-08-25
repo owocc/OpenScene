@@ -1,4 +1,4 @@
-import { isInputSchemaBase, type InputSchemaBase } from "../schema.js";
+import { isInputSchemaBase, type InputSchemaBase } from "../schema.ts";
 
 /**
  * CSS units offered by the web unit input. `vm` is the viewport-max unit

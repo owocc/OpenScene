@@ -1,4 +1,4 @@
-import { isInputSchemaBase, type InputSchemaBase, type JsonValue } from "../schema.js";
+import { isInputSchemaBase, type InputSchemaBase, type JsonValue } from "../schema.ts";
 
 export type KeyValueRecord = Record<string, JsonValue>;
 

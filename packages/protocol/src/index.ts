@@ -2,11 +2,21 @@ export {
   SCENE_DOCUMENT_SCHEMA_VERSION,
   SceneDocumentSchema,
   createEmptySceneDocument,
-} from "./document";
-export type { SceneDocument, SceneGlobalConfig, ScenePageInfo, Spec, UIElement } from "./document";
+} from "./document.ts";
+export type {
+  SceneDocument,
+  SceneGlobalConfig,
+  ScenePageInfo,
+  Spec,
+  UIElement,
+} from "./document.ts";
 
-export { AppManifestSchema, ComponentManifestSchema, RuntimePageDeliverySchema } from "./manifest";
-export type { AppManifest, ComponentManifest, RuntimePageDelivery } from "./manifest";
+export {
+  AppManifestSchema,
+  ComponentManifestSchema,
+  RuntimePageDeliverySchema,
+} from "./manifest.ts";
+export type { AppManifest, ComponentManifest, RuntimePageDelivery } from "./manifest.ts";
 
 export {
   BridgeEnvelopeSchema,
@@ -21,7 +31,7 @@ export {
   getEditorConnection,
   isBridgeEnvelope,
   withEditorConnection,
-} from "./bridge";
+} from "./bridge.ts";
 export type {
   EditorConnection,
   ElementRect,
@@ -32,10 +42,10 @@ export type {
   StudioBridgeEnvelope,
   StudioPortMessage,
   StudioWindowMessage,
-} from "./bridge";
+} from "./bridge.ts";
 
-export { DraftRecordSchema } from "./draft-store";
-export type { DocumentDraftStore, DraftRecord } from "./draft-store";
+export { DraftRecordSchema } from "./draft-store.ts";
+export type { DocumentDraftStore, DraftRecord } from "./draft-store.ts";
 
 export type { DirectiveDefinition } from "@json-render/core";
 export {
@@ -51,7 +61,7 @@ export {
   extractAgentUiActions,
   normalizeAiDocument,
   splitContentAndUiActions,
-} from "./agent-action";
+} from "./agent-action.ts";
 export type {
   AgentUiAction,
   AgentUiActionPlan,
@@ -60,4 +70,4 @@ export type {
   ReplaceDocumentAction,
   UpdateElementAction,
   ParsedAgentMessage,
-} from "./agent-action";
+} from "./agent-action.ts";

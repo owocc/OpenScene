@@ -9,7 +9,7 @@ export {
   baseReactActions,
   baseComponents,
   baseActions,
-} from "./catalog.js";
+} from "./catalog.ts";
 export type {
   DefineOpenSceneReactAppOptions,
   OpenSceneHandlerFactory,
@@ -17,10 +17,10 @@ export type {
   OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
   ReactRenderer,
-} from "./catalog.js";
-export { OpenSceneProvider, OpenSceneRenderer, useOpenScene } from "./provider.js";
-export type { OpenSceneProviderProps } from "./provider.js";
-export { useOpenSceneNode, View, Text, Button } from "./node.js";
-export type { OpenSceneNodeContextValue, PrimitiveProps } from "./node.js";
+} from "./catalog.ts";
+export { OpenSceneProvider, OpenSceneRenderer, useOpenScene } from "./provider.tsx";
+export type { OpenSceneProviderProps } from "./provider.tsx";
+export { useOpenSceneNode, View, Text, Button } from "./node.tsx";
+export type { OpenSceneNodeContextValue, PrimitiveProps } from "./node.tsx";
 export { useBoundProp, useStateValue, useAction } from "@json-render/react";
 export { schema } from "@json-render/react/schema";

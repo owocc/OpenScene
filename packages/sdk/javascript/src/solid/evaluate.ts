@@ -1,4 +1,4 @@
-import { isObjectRecord } from "./guards.js";
+import { isObjectRecord } from "./guards.ts";
 
 export function getValueByPointer(object: unknown, pointer: string): unknown {
   if (!pointer || pointer === "/") return undefined;

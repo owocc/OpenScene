@@ -1,5 +1,5 @@
-import { isInputSchemaBase, type InputSchemaBase } from "../schema";
-import type { UnitValue } from "./unit";
+import { isInputSchemaBase, type InputSchemaBase } from "../schema.ts";
+import type { UnitValue } from "./unit.ts";
 
 /**
  * Dimension fields carried by the web size input. `width`/`height` are the

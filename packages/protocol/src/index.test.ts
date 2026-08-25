@@ -13,7 +13,7 @@ import {
   editorQueryKeys,
   getEditorConnection,
   withEditorConnection,
-} from "./index";
+} from "./index.ts";
 
 function bridge(type: string, payload: unknown) {
   return { protocol: "openscene-studio", version: 2, sessionId: "session-1", type, payload };

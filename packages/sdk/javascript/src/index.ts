@@ -1,6 +1,5 @@
-export * from "./solid/types.js";
-export * from "./solid/evaluate.js";
-export { installOpenScene, OpenSceneController } from "./client.js";
+export * from "./solid/evaluate.ts";
+export { installOpenScene, OpenSceneController } from "./client.ts";
 export type {
   DeepReadonly,
   OpenSceneClient,
@@ -9,15 +8,15 @@ export type {
   OpenSceneInteractionMode,
   OpenSceneStatus,
   SelectionReport,
-} from "./client.js";
-export { createIndexedDbDraftStore } from "./draft-store.js";
-export { defineAppManifest, defineComponentManifest } from "./manifest.js";
+} from "./client.ts";
+export { createIndexedDbDraftStore } from "./draft-store.ts";
+export { defineAppManifest, defineComponentManifest } from "./manifest.ts";
 export {
   directives,
   openSceneDirectives,
   pageDirective,
   translationDirective,
-} from "./directives.js";
+} from "./directives.ts";
 export type { DirectiveDefinition } from "@json-render/core";
 export type {
   AppManifest,

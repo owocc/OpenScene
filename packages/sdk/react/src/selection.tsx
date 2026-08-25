@@ -7,7 +7,7 @@ import React, {
   type ReactNode,
 } from "react";
 import type { SelectionReport } from "@openscene/javascript";
-import { useOpenScene } from "./provider.js";
+import { useOpenScene } from "./provider.tsx";
 
 interface Point {
   x: number;

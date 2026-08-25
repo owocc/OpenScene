@@ -136,10 +136,13 @@ export class OpenSceneController implements OpenSceneClient {
   private readonly onPortMessage = (event: MessageEvent<unknown>) => this.handlePortMessage(event);
   onGeometryRequest?: ((elementId: string) => ElementRect | null) | null = null;
 
+  private readonly targetWindow: Window | null;
+
   constructor(
     options: OpenSceneClientOptions,
-    private readonly targetWindow: Window | null = typeof window === "undefined" ? null : window,
+    targetWindow: Window | null = typeof window === "undefined" ? null : window,
   ) {
+    this.targetWindow = targetWindow;
     this.pageKey = options.pageKey;
     this.manifest = freezeDeep(structuredClone(options.manifest));
     this.options = { ...options, manifest: this.manifest };

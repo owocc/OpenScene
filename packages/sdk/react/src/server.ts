@@ -6,7 +6,7 @@ import type {
   OpenSceneReactActionDefinition,
   OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
-} from "./catalog.js";
+} from "./catalog.ts";
 
 function schemaJson(schema: z.ZodType | undefined): Record<string, unknown> {
   if (!schema) return {};
@@ -141,7 +141,7 @@ export type {
   OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
   ReactRenderer,
-} from "./catalog.js";
+} from "./catalog.ts";
 
 export function defineOpenSceneReactApp(
   options: {
