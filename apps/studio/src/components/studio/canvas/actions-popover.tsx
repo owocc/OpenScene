@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Zap } from "lucide-react";
 
-import { COMPONENT_DRAG_MIME } from "@openscene/constants";
+import { COMPONENT_DRAG_MIME } from "@openscene-ai/constants";
 import { useI18n } from "@/i18n";
 import type { ComponentMeta } from "@/core/meta";
 import { Command, CommandInput, CommandItem, CommandList } from "@/components/ui/command";

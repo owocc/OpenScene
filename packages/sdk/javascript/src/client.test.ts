@@ -6,11 +6,11 @@ import {
   createBridgeEnvelope,
   createEmptySceneDocument,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 
 import { OpenSceneController, type OpenSceneClientOptions } from "./client.js";
 import { createIndexedDbDraftStore } from "./draft-store.js";
-import type { AppManifest } from "@openscene/protocol";
+import type { AppManifest } from "@openscene-ai/protocol";
 
 const manifest: AppManifest = {
   protocolVersion: "2",
@@ -91,7 +91,7 @@ describe("OpenScene bridge sync", () => {
       revision: 3,
     });
     const { StudioPortMessageSchema } =
-      require("@openscene/protocol") as typeof import("@openscene/protocol");
+      require("@openscene-ai/protocol") as typeof import("@openscene-ai/protocol");
     expect(StudioPortMessageSchema.safeParse(envelope).success).toBe(true);
   });
 });

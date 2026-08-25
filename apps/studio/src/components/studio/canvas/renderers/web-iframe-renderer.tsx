@@ -6,9 +6,9 @@ import {
   StudioPortMessageSchema,
   createBridgeEnvelope,
   withEditorConnection,
-} from "@openscene/protocol";
-import type { AppType } from "@openscene/constants";
-import type { ElementRect } from "@openscene/protocol";
+} from "@openscene-ai/protocol";
+import type { AppType } from "@openscene-ai/constants";
+import type { ElementRect } from "@openscene-ai/protocol";
 import type { CanvasRendererProps } from "../types";
 export function isRendererReadyForSession(value: unknown, sessionId: string, appType: AppType) {
   const parsed = RendererWindowMessageSchema.safeParse(value);

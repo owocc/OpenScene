@@ -22,13 +22,13 @@ import { StyleControl } from "./property-editor/style";
 import { Button } from "@/components/ui/button";
 import { AssetPickerDialog } from "./asset-picker-dialog";
 export * from "./dynamic-value-input";
-import { createOpenSceneClient } from "@openscene/api-client";
+import { createOpenSceneClient } from "@openscene-ai/api-client";
 import {
   openApiMethods,
   type OpenApiMethod,
   type OpenApiRequestParams,
   type OpenApiValue,
-} from "@openscene/schema";
+} from "@openscene-ai/schema";
 import { cn } from "@/lib/utils";
 const inputClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";

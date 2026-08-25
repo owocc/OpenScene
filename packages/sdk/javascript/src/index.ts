@@ -23,4 +23,4 @@ export type {
   ComponentManifest,
   RuntimePageDelivery,
   SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";

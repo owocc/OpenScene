@@ -15,7 +15,7 @@ if (process.argv.includes("--check")) {
   const current = await readFile(outputPath, "utf8").catch(() => "");
   const expected = await formatOutput(output);
   if (current !== expected) {
-    console.error("@openscene/api-client is out of date. Run: bun run generate");
+    console.error("@openscene-ai/api-client is out of date. Run: bun run generate");
     process.exitCode = 1;
   }
 } else {

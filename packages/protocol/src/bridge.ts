@@ -1,4 +1,4 @@
-import { APP_TYPE_WEB } from "@openscene/constants";
+import { APP_TYPE_WEB } from "@openscene-ai/constants";
 import { z } from "zod";
 import {
   SCENE_DOCUMENT_SCHEMA_VERSION,

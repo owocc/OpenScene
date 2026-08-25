@@ -6,7 +6,7 @@ import React, {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import type { SelectionReport } from "@openscene/javascript";
+import type { SelectionReport } from "@openscene-ai/javascript";
 import { useOpenScene } from "./provider.tsx";
 
 interface Point {

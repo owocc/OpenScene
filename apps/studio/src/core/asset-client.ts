@@ -1,4 +1,4 @@
-import { createOpenSceneClient } from "@openscene/api-client";
+import { createOpenSceneClient } from "@openscene-ai/api-client";
 import { useQueryStore } from "@/stores/query-store";
 import { LOCAL_TEST_SESSION_ID } from "./local-test-session";
 

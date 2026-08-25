@@ -1,5 +1,5 @@
 {
-  "name": "@openscene/constants",
+  "name": "@openscene-ai/constants",
   "version": "0.0.1",
   "description": "Shared OpenScene application constants.",
   "license": "MIT",

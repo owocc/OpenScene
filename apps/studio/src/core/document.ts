@@ -1,4 +1,4 @@
-import type { SceneDocument } from "@openscene/protocol";
+import type { SceneDocument } from "@openscene-ai/protocol";
 
 export type JsonPrimitive = string | number | boolean | null;
 

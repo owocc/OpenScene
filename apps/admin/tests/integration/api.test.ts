@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { APP_TYPE_WEB } from "@openscene/constants";
-import { createEmptySceneDocument } from "@openscene/protocol";
+import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { createEmptySceneDocument } from "@openscene-ai/protocol";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";

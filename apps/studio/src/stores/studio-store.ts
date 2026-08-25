@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createEmptySceneDocument } from "@openscene/protocol";
+import { createEmptySceneDocument } from "@openscene-ai/protocol";
 
 import type { JsonValue } from "@/core/document";
 import { isSlotNodeId } from "@/core/slot-tree";

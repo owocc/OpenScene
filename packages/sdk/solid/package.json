@@ -1,5 +1,5 @@
 {
-  "name": "@openscene/solid",
+  "name": "@openscene-ai/solid",
   "version": "0.0.0",
   "description": "Solid adapter for OpenScene and json-render.",
   "license": "MIT",
@@ -28,9 +28,9 @@
   "dependencies": {
     "@json-render/core": "^0.20.0",
     "@json-render/solid": "^0.20.0",
-    "@openscene/constants": "workspace:*",
-    "@openscene/javascript": "workspace:*",
-    "@openscene/protocol": "workspace:*"
+    "@openscene-ai/constants": "workspace:*",
+    "@openscene-ai/javascript": "workspace:*",
+    "@openscene-ai/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

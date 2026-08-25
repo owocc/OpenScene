@@ -27,7 +27,7 @@ export const DraftRecordSchema = z.object({
 
 /**
  * Storage contract for session-keyed document drafts. The canonical browser
- * implementation is IndexedDB-backed (`@openscene/javascript`), but the
+ * implementation is IndexedDB-backed (`@openscene-ai/javascript`), but the
  * interface keeps the core layer framework- and backend-agnostic.
  */
 export interface DocumentDraftStore {

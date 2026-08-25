@@ -1,11 +1,11 @@
-import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
-import type { AppType } from "@openscene/constants";
+import { createOpenSceneClient, isApiProblem } from "@openscene-ai/api-client";
+import type { AppType } from "@openscene-ai/constants";
 import {
   AppManifestSchema,
   SceneDocumentSchema,
   type AppManifest,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 
 import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
 import { useQueryStore } from "@/stores/query-store";

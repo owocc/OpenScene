@@ -8,13 +8,13 @@ import { PropertyEditor } from "@/components/studio/property-editor";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useQueryStore, useStudioStore } from "@/stores";
 import { useI18n } from "@/i18n";
-import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
+import { createOpenSceneClient, isApiProblem } from "@openscene-ai/api-client";
 import {
   applyAgentUiActionsToDocument,
   SceneDocumentSchema,
   type AgentUiAction,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import type { JsonValue } from "@/core/document";
 import { createEditorState, editorReducer, type EditorElement } from "@/core/editor-state";
 import { defaultProps } from "@/core/meta";

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { AppManifestSchema, type AppManifest } from "@openscene/protocol";
+import { AppManifestSchema, type AppManifest } from "@openscene-ai/protocol";
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export interface OpenSceneManifestPluginOptions {

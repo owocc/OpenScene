@@ -43,7 +43,7 @@ import {
   SceneDocumentSchema,
   createEmptySceneDocument,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import {
   AppCreateSchema,
   AppKeyRotationSchema,

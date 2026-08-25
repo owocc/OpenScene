@@ -1,4 +1,4 @@
-import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
 import { useStudioStore } from "@/stores/studio-store";
 import type { StyleControlProps } from "./types";
 import { WebStyleControl } from "./web";

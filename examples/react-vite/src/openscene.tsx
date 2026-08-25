@@ -11,7 +11,7 @@ import {
   type OpenSceneReactApp,
   useOpenSceneNode,
   View,
-} from "@openscene/react";
+} from "@openscene-ai/react";
 import { z } from "zod";
 
 const baseViewProps = {

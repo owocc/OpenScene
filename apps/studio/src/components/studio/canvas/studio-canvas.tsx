@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
 
 import { CanvasSettingsDialog } from "./canvas-settings-dialog";
 import { CanvasToolbar } from "./canvas-toolbar";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { Astroid, CheckCheck, X } from "lucide-react";
-import type { ElementRect } from "@openscene/protocol";
+import type { ElementRect } from "@openscene-ai/protocol";
 import type { CanvasRendererAdapter, CanvasRendererProps, StudioCanvasProps } from "./types";
 
 export const canvasRendererRegistry: Partial<Record<AppType, CanvasRendererAdapter>> = {

@@ -76,7 +76,7 @@ Host App
 ```text
 openscene/
 ├── apps/
-│   ├── admin/                      # @openscene/admin
+│   ├── admin/                      # @openscene-ai/admin
 │   │   ├── app/                    # Next.js 管理页面和 Route Handlers
 │   │   ├── server/
 │   │   │   ├── auth/
@@ -88,7 +88,7 @@ openscene/
 │   │   │   ├── storage/
 │   │   │   └── validation/
 │   │   └── .agents/docs/
-│   └── studio/                     # @openscene/studio
+│   └── studio/                     # @openscene-ai/studio
 │       └── src/
 │           ├── canvas/
 │           ├── content-mode/
@@ -98,14 +98,14 @@ openscene/
 │           ├── scenarios/
 │           └── workspace/
 ├── packages/
-│   ├── document/                   # @openscene/document
-│   ├── manifest/                   # @openscene/manifest
-│   ├── protocol/                   # @openscene/protocol
-│   ├── editor-core/                # @openscene/editor-core
-│   ├── api-client/                 # @openscene/api-client，OpenAPI 生成
-│   ├── host-core/                  # @openscene/host-core
-│   ├── host-react/                 # @openscene/host-react
-│   ├── host-vue/                   # @openscene/host-vue
+│   ├── document/                   # @openscene-ai/document
+│   ├── manifest/                   # @openscene-ai/manifest
+│   ├── protocol/                   # @openscene-ai/protocol
+│   ├── editor-core/                # @openscene-ai/editor-core
+│   ├── api-client/                 # @openscene-ai/api-client，OpenAPI 生成
+│   ├── host-core/                  # @openscene-ai/host-core
+│   ├── host-react/                 # @openscene-ai/host-react
+│   ├── host-vue/                   # @openscene-ai/host-vue
 │   ├── registry-schema/            # Registry 条目格式
 │   ├── cli/                        # openscene CLI
 │   └── sdk/
@@ -369,7 +369,7 @@ interface PreviewScenario {
 - 错误响应采用 `application/problem+json`。
 - 修改 Draft 等并发敏感资源时使用 `revision`/`ETag` 与 `If-Match`。
 - 删除成功返回 `204 No Content`，不构造假的已删除资源。
-- OpenAPI `operationId` 必须稳定，用于生成 `@openscene/api-client`。
+- OpenAPI `operationId` 必须稳定，用于生成 `@openscene-ai/api-client`。
 
 标准错误示例：
 
@@ -743,9 +743,9 @@ INDEX  document_versions(document_id, created_at)
 
 ### 11.1 必须实现
 
-1. `@openscene/document`：从旧项目迁移并去除 Vue 依赖。
-2. `@openscene/manifest`：定义 App/Component/Content Meta。
-3. `@openscene/protocol`：迁移并版本化 Preview Bridge。
+1. `@openscene-ai/document`：从旧项目迁移并去除 Vue 依赖。
+2. `@openscene-ai/manifest`：定义 App/Component/Content Meta。
+3. `@openscene-ai/protocol`：迁移并版本化 Preview Bridge。
 4. Admin 数据库基础：App、PreviewProfile、Page、Template、Document。
 5. Apps CRUD 与 Manifest Sync。
 6. Pages/Templates CRUD。
@@ -779,7 +779,7 @@ INDEX  document_versions(document_id, created_at)
 2. Route Handler 必须使用同一 Schema 做运行时校验，禁止另外维护 DTO。
 3. 从 Schema 注册表自动生成并校验 `/openapi.json`，不提交手写 `openapi.yaml`。
 4. 使用 Scalar Next.js API Reference 在 `/reference` 渲染 `/openapi.json`。
-5. 从同一份生成结果生成 `@openscene/api-client`。
+5. 从同一份生成结果生成 `@openscene-ai/api-client`。
 6. Studio、Admin UI 和 CLI 只调用生成 Client，不手写路径和响应类型。
 7. 每个 operation 必须有契约测试，并验证实际响应符合生成 Schema。
 8. 修改响应结构时必须明确兼容策略；破坏性变更进入新的 API 或协议大版本。
@@ -788,8 +788,8 @@ INDEX  document_versions(document_id, created_at)
 ## 13. 决策摘要
 
 - 系统名称继续使用 OpenScene。
-- 管理 App 名称使用 `@openscene/admin`。
-- 编辑器 App 名称使用 `@openscene/studio`。
+- 管理 App 名称使用 `@openscene-ai/admin`。
+- 编辑器 App 名称使用 `@openscene-ai/studio`。
 - Admin 同时承载管理 UI 和第一版 API Server。
 - 数据库核心固定为 Drizzle ORM + libSQL，本地自部署使用 `file:`，可选连接远程 Turso/libSQL。
 - 一个 Studio 只配置一个 Admin Base URL。

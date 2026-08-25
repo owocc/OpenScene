@@ -1,4 +1,4 @@
-import type { AppType } from "@openscene/constants";
+import type { AppType } from "@openscene-ai/constants";
 import type { EditorMeta } from "@/core/meta";
 import type { JsonValue } from "@/core/document";
 

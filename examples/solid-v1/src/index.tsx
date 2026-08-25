@@ -1,5 +1,5 @@
 /* @refresh reload */
-import { installOpenScene } from "@openscene/javascript";
+import { installOpenScene } from "@openscene-ai/javascript";
 import { render } from "solid-js/web";
 import "./index.css";
 import App from "./App.tsx";

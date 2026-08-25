@@ -63,7 +63,7 @@ Every message has a versioned envelope and is validated by the directional Zod d
 
 ## SCENE_DOCUMENT_SCHEMA_VERSION
 
-Protocol constant exported by `@openscene/protocol`.
+Protocol constant exported by `@openscene-ai/protocol`.
 
 **Kind:** Constant
 
@@ -73,7 +73,7 @@ const SCENE_DOCUMENT_SCHEMA_VERSION = "1.0.0" as const;
 
 ## ScenePageInfo
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -89,7 +89,7 @@ interface ScenePageInfo {
 
 ## SceneGlobalConfig
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -106,7 +106,7 @@ interface SceneGlobalConfig {
 
 ## SceneDocument
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -189,7 +189,7 @@ const SceneDocumentSchema: z.ZodType<SceneDocument> = z
 
 ## createEmptySceneDocument
 
-Protocol function exported by `@openscene/protocol`.
+Protocol function exported by `@openscene-ai/protocol`.
 
 **Kind:** Function
 
@@ -218,7 +218,7 @@ function createEmptySceneDocument(): SceneDocument {
 
 ## ComponentManifest
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -243,7 +243,7 @@ interface ComponentManifest {
 
 ## AppManifest
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -266,7 +266,7 @@ interface AppManifest {
 
 ## AppManifestSchema
 
-Protocol constant exported by `@openscene/protocol`.
+Protocol constant exported by `@openscene-ai/protocol`.
 
 **Kind:** Constant
 
@@ -291,7 +291,7 @@ const AppManifestSchema: z.ZodType<AppManifest> = z
 
 ## RuntimePageDelivery
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -365,7 +365,7 @@ const editorQueryKeys = {
 
 ## EditorConnection
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -378,7 +378,7 @@ interface EditorConnection {
 
 ## StudioBridgeEnvelope
 
-Protocol interface exported by `@openscene/protocol`.
+Protocol interface exported by `@openscene-ai/protocol`.
 
 **Kind:** Interface
 
@@ -557,7 +557,7 @@ const RendererPortMessageSchema = z.discriminatedUnion("type", [
 
 ## RendererWindowMessage
 
-Protocol type exported by `@openscene/protocol`.
+Protocol type exported by `@openscene-ai/protocol`.
 
 **Kind:** Type
 
@@ -567,7 +567,7 @@ type RendererWindowMessage = z.infer<typeof RendererWindowMessageSchema>;
 
 ## StudioWindowMessage
 
-Protocol type exported by `@openscene/protocol`.
+Protocol type exported by `@openscene-ai/protocol`.
 
 **Kind:** Type
 
@@ -577,7 +577,7 @@ type StudioWindowMessage = z.infer<typeof StudioWindowMessageSchema>;
 
 ## StudioPortMessage
 
-Protocol type exported by `@openscene/protocol`.
+Protocol type exported by `@openscene-ai/protocol`.
 
 **Kind:** Type
 
@@ -587,7 +587,7 @@ type StudioPortMessage = z.infer<typeof StudioPortMessageSchema>;
 
 ## RendererPortMessage
 
-Protocol type exported by `@openscene/protocol`.
+Protocol type exported by `@openscene-ai/protocol`.
 
 **Kind:** Type
 

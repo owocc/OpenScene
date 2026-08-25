@@ -1,6 +1,6 @@
 import { createContext, useContext } from "solid-js";
 import type { JSX } from "solid-js";
-import { evaluateDynamicValue } from "@openscene/javascript";
+import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import { useOpenScene } from "./context.js";
 
 export interface OpenSceneNodeContextValue {

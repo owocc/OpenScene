@@ -1,5 +1,5 @@
-import { APP_TYPE_WEB, type AppType } from "@openscene/constants";
-import type { AppManifest, ComponentManifest } from "@openscene/protocol";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
+import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
 import { z } from "zod";
 import type {
   OpenSceneHandlerFactory,
@@ -205,7 +205,7 @@ export {
   openSceneDirectives,
   pageDirective,
   translationDirective,
-} from "@openscene/javascript";
+} from "@openscene-ai/javascript";
 export type {
   DeepReadonly,
   DirectiveDefinition,
@@ -215,7 +215,7 @@ export type {
   OpenSceneInteractionMode,
   OpenSceneStatus,
   SelectionReport,
-} from "@openscene/javascript";
+} from "@openscene-ai/javascript";
 
 export {
   APP_TYPE_WEB,
@@ -223,10 +223,10 @@ export {
   APP_TYPE_FLUTTER,
   APP_TYPES,
   COMPONENT_DRAG_MIME,
-} from "@openscene/constants";
-export type { AppType } from "@openscene/constants";
+} from "@openscene-ai/constants";
+export type { AppType } from "@openscene-ai/constants";
 
-export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene/schema";
+export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene-ai/schema";
 
 export {
   SCENE_DOCUMENT_SCHEMA_VERSION,
@@ -235,7 +235,7 @@ export {
   AppManifestSchema,
   ComponentManifestSchema,
   RuntimePageDeliverySchema,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 export type {
   AppManifest,
   ComponentManifest,
@@ -245,4 +245,4 @@ export type {
   ScenePageInfo,
   Spec,
   UIElement,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";

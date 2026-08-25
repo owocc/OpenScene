@@ -62,17 +62,17 @@ jobs:
             EXTRA_ARGS="--dry-run"
           fi
 
-          echo "Publishing @openscene/constants..."
+          echo "Publishing @openscene-ai/constants..."
           cd packages/constants && npm publish --access public $EXTRA_ARGS
 
-          echo "Publishing @openscene/protocol..."
+          echo "Publishing @openscene-ai/protocol..."
           cd ../protocol && npm publish --access public $EXTRA_ARGS
 
-          echo "Publishing @openscene/schema..."
+          echo "Publishing @openscene-ai/schema..."
           cd ../schema && npm publish --access public $EXTRA_ARGS
 
-          echo "Publishing @openscene/javascript..."
+          echo "Publishing @openscene-ai/javascript..."
           cd ../sdk/javascript && npm publish --access public $EXTRA_ARGS
 
-          echo "Publishing @openscene/react..."
+          echo "Publishing @openscene-ai/react..."
           cd ../react && npm publish --access public $EXTRA_ARGS

@@ -11,18 +11,18 @@ OpenScene is a modern, self-hostable visual content orchestration and page-build
 ```text
 openscene/
 ├── apps/
-│   ├── admin/       # @openscene/admin: Next.js management service (Multi-app, Releases, Assets, Studio Sessions)
-│   ├── studio/      # @openscene/studio: React SPA visual canvas editor
-│   └── docs/        # @openscene/docs: Documentation site (Astro / Nimbus)
+│   ├── admin/       # @openscene-ai/admin: Next.js management service (Multi-app, Releases, Assets, Studio Sessions)
+│   ├── studio/      # @openscene-ai/studio: React SPA visual canvas editor
+│   └── docs/        # @openscene-ai/docs: Documentation site (Astro / Nimbus)
 ├── packages/
 │   ├── sdk/
-│   │   ├── react/        # @openscene/react: React 19 UI adapter and runtime components
-│   │   ├── solid/        # @openscene/solid: SolidJS UI adapter
-│   │   └── javascript/   # @openscene/javascript: Framework-neutral runtime client and Vite manifest plugin
-│   ├── protocol/         # @openscene/protocol: Document schema, protocol v2 bridge definitions
-│   ├── schema/           # @openscene/schema: Styles, layout, OpenAPI schema contracts
-│   ├── constants/        # @openscene/constants: Shared constants and status enums
-│   └── api-client/       # @openscene/api-client: Generated TypeScript Admin REST API client
+│   │   ├── react/        # @openscene-ai/react: React 19 UI adapter and runtime components
+│   │   ├── solid/        # @openscene-ai/solid: SolidJS UI adapter
+│   │   └── javascript/   # @openscene-ai/javascript: Framework-neutral runtime client and Vite manifest plugin
+│   ├── protocol/         # @openscene-ai/protocol: Document schema, protocol v2 bridge definitions
+│   ├── schema/           # @openscene-ai/schema: Styles, layout, OpenAPI schema contracts
+│   ├── constants/        # @openscene-ai/constants: Shared constants and status enums
+│   └── api-client/       # @openscene-ai/api-client: Generated TypeScript Admin REST API client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite integration example
 │   └── solid-v1/         # SolidJS + Vite integration example

@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { installOpenScene } from "@openscene/react";
+import { installOpenScene } from "@openscene-ai/react";
 import "./index.css";
 import App from "./App.tsx";
 import { createManifest, createReactApp } from "./openscene.tsx";

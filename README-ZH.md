@@ -11,18 +11,18 @@ OpenScene 是一套现代化的、可自部署的可视化内容编排与页面�
 ```text
 openscene/
 ├── apps/
-│   ├── admin/       # @openscene/admin: Next.js 管理后台服务 (多 App、页面版本发布、素材库、Studio 会话)
-│   ├── studio/      # @openscene/studio: React SPA 可视化画布编辑器
-│   └── docs/        # @openscene/docs: 官方文档站点 (Astro / Nimbus)
+│   ├── admin/       # @openscene-ai/admin: Next.js 管理后台服务 (多 App、页面版本发布、素材库、Studio 会话)
+│   ├── studio/      # @openscene-ai/studio: React SPA 可视化画布编辑器
+│   └── docs/        # @openscene-ai/docs: 官方文档站点 (Astro / Nimbus)
 ├── packages/
 │   ├── sdk/
-│   │   ├── react/        # @openscene/react: React 19 UI Adapter 与运行时组件库
-│   │   ├── solid/        # @openscene/solid: SolidJS UI Adapter
-│   │   └── javascript/   # @openscene/javascript: 框架中立的运行时 Client 与 Vite Manifest 插件
-│   ├── protocol/         # @openscene/protocol: 协议定义、Document Schema、Bridge 规范
-│   ├── schema/           # @openscene/schema: 样式、尺寸、OpenAPI 契约定义
-│   ├── constants/        # @openscene/constants: 共享常量与状态定义
-│   └── api-client/       # @openscene/api-client: 自动生成的 Admin REST API Client
+│   │   ├── react/        # @openscene-ai/react: React 19 UI Adapter 与运行时组件库
+│   │   ├── solid/        # @openscene-ai/solid: SolidJS UI Adapter
+│   │   └── javascript/   # @openscene-ai/javascript: 框架中立的运行时 Client 与 Vite Manifest 插件
+│   ├── protocol/         # @openscene-ai/protocol: 协议定义、Document Schema、Bridge 规范
+│   ├── schema/           # @openscene-ai/schema: 样式、尺寸、OpenAPI 契约定义
+│   ├── constants/        # @openscene-ai/constants: 共享常量与状态定义
+│   └── api-client/       # @openscene-ai/api-client: 自动生成的 Admin REST API Client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite 业务接入示例
 │   └── solid-v1/         # SolidJS + Vite 业务接入示例

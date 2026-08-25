@@ -20,14 +20,14 @@ OpenScene 采用「JSON Render + 独立 Studio 编辑器 + 框架适配器（UI 
 │              Host App Preview Iframe / Runtime                   │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ @openscene/javascript (Client Controller)                  │  │
+│  │ @openscene-ai/javascript (Client Controller)                  │  │
 │  │ - 负责与 Studio 建立双向 MessagePort 握手                  │  │
 │  │ - 管理 Document Snapshot、StateStore 与 Runtime 数据获取  │  │
 │  │ - 提供 Selection / Hover / Scroll / Geometry 坐标上报      │  │
 │  └────────────────────────────┬───────────────────────────────┘  │
 │                               │                                  │
 │  ┌────────────────────────────▼───────────────────────────────┐  │
-│  │ @openscene/react (SDK Adapter)                             │  │
+│  │ @openscene-ai/react (SDK Adapter)                             │  │
 │  │ - defineOpenSceneReactApp / defineOpenSceneReactComponent  │  │
 │  │ - OpenSceneProvider / OpenSceneRenderer / useOpenSceneNode │  │
 │  │ - SelectionCanvas (拖拽框选 / 单选 / 滚动同步 / 高亮包围盒)│  │
@@ -47,7 +47,7 @@ OpenScene 采用「JSON Render + 独立 Studio 编辑器 + 框架适配器（UI 
 
 ## 2. 核心包与模块说明
 
-### 2.1 `@openscene/react` SDK 适配包 (`packages/sdk/react`)
+### 2.1 `@openscene-ai/react` SDK 适配包 (`packages/sdk/react`)
 
 负责连接 React 渲染体系与 OpenScene 协议层：
 
@@ -78,7 +78,7 @@ OpenScene 采用「JSON Render + 独立 Studio 编辑器 + 框架适配器（UI 
 
 ### 3.1 `package.json`
 
-引入 React 19、`@json-render/react`、`@openscene/*` 工作区依赖与 Zod：
+引入 React 19、`@json-render/react`、`@openscene-ai/*` 工作区依赖与 Zod：
 
 ```json
 {
@@ -97,11 +97,11 @@ OpenScene 采用「JSON Render + 独立 Studio 编辑器 + 框架适配器（UI 
   "dependencies": {
     "@json-render/core": "^0.20.0",
     "@json-render/react": "^0.20.0",
-    "@openscene/constants": "workspace:*",
-    "@openscene/javascript": "workspace:*",
-    "@openscene/protocol": "workspace:*",
-    "@openscene/react": "workspace:*",
-    "@openscene/schema": "workspace:*",
+    "@openscene-ai/constants": "workspace:*",
+    "@openscene-ai/javascript": "workspace:*",
+    "@openscene-ai/protocol": "workspace:*",
+    "@openscene-ai/react": "workspace:*",
+    "@openscene-ai/schema": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.3.6"
@@ -123,7 +123,7 @@ OpenScene 采用「JSON Render + 独立 Studio 编辑器 + 框架适配器（UI 
 配置 `openSceneManifestPlugin`，在构建与开发期自动提取组件 Manifest：
 
 ```ts
-import { openSceneManifestPlugin } from "@openscene/javascript/vite";
+import { openSceneManifestPlugin } from "@openscene-ai/javascript/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
 import { createManifest } from "./src/openscene.tsx";
@@ -144,8 +144,8 @@ export default defineConfig(({ mode }) => {
 
 ```tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { APP_TYPE_WEB } from "@openscene/constants";
-import { defineAppManifest } from "@openscene/javascript";
+import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { defineAppManifest } from "@openscene-ai/javascript";
 import {
   baseReactComponents,
   defineOpenSceneReactAction,
@@ -154,7 +154,7 @@ import {
   type OpenSceneReactApp,
   useOpenSceneNode,
   View,
-} from "@openscene/react";
+} from "@openscene-ai/react";
 import { z } from "zod";
 
 // 1. 声明公共视图样式属性（支持 Studio 样式面板）
@@ -252,8 +252,8 @@ export function createManifest(appKey: string) {
 **`src/App.tsx`**:
 
 ```tsx
-import type { OpenSceneClient } from "@openscene/javascript";
-import { OpenSceneProvider, OpenSceneRenderer } from "@openscene/react";
+import type { OpenSceneClient } from "@openscene-ai/javascript";
+import { OpenSceneProvider, OpenSceneRenderer } from "@openscene-ai/react";
 import type { ReactApp } from "./openscene.tsx";
 import "./App.css";
 
@@ -278,7 +278,7 @@ export default App;
 ```tsx
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { installOpenScene } from "@openscene/javascript";
+import { installOpenScene } from "@openscene-ai/javascript";
 import App from "./App.tsx";
 import { createManifest, createReactApp } from "./openscene.tsx";
 
@@ -344,7 +344,7 @@ OPENSCENE_APP_KEY=appkey_2z7TOcEf2_tk8_XbTikymI7mTT2r9VgJ2PNz87svZxQ
 # 安装/同步依赖
 vp install
 
-# 运行 @openscene/react 测试
+# 运行 @openscene-ai/react 测试
 vp test packages/sdk/react
 
 # 运行 examples/react-vite 测试
@@ -400,4 +400,4 @@ vp -C examples/react-vite dev -- --port 5174
   - CI/CD 在执行 `vp build` 时注入生产 `OPENSCENE_ADMIN_URL`、`OPENSCENE_APP_ID`、`OPENSCENE_APP_KEY`，确保最新组件 Schema 自动同步至 Admin。
 - [ ] **5. 静态资源与页面发布通道 (Release Channels)**：
   - 确认 Admin 中的 Storage 配置已就绪（S3 或 Database 存储）。
-  - 确认生产发布通道（`production` / `staging`）生效，终端用户正常通过 `/@openscene/runtime` 消费已发布的页面文档。
+  - 确认生产发布通道（`production` / `staging`）生效，终端用户正常通过 `/@openscene-ai/runtime` 消费已发布的页面文档。

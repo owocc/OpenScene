@@ -1,5 +1,5 @@
 import { createContext, useContext, type Accessor } from "solid-js";
-import type { OpenSceneClient, OpenSceneClientState } from "@openscene/javascript";
+import type { OpenSceneClient, OpenSceneClientState } from "@openscene-ai/javascript";
 import type { OpenSceneSolidApp } from "./catalog.js";
 
 export interface OpenSceneContextValue {

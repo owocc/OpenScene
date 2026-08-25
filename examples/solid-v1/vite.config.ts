@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { openSceneManifestPlugin } from "@openscene/javascript/vite";
+import { openSceneManifestPlugin } from "@openscene-ai/javascript/vite";
 import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
 import solid from "vite-plugin-solid";
 import { createManifest } from "./src/openscene.tsx";

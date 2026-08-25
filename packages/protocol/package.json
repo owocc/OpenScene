@@ -1,5 +1,5 @@
 {
-  "name": "@openscene/protocol",
+  "name": "@openscene-ai/protocol",
   "version": "0.0.1",
   "description": "Versioned browser protocol for OpenScene Studio and renderers.",
   "license": "MIT",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@json-render/core": "^0.20.0",
-    "@openscene/constants": "workspace:*",
+    "@openscene-ai/constants": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {

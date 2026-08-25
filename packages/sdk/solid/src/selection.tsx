@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
-import type { SelectionReport } from "@openscene/javascript";
+import type { SelectionReport } from "@openscene-ai/javascript";
 import { useOpenScene } from "./provider.js";
 
 interface Point {

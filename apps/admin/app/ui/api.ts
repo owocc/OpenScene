@@ -1,6 +1,6 @@
 "use client";
 
-import { createOpenSceneClient, isApiProblem } from "@openscene/api-client";
+import { createOpenSceneClient, isApiProblem } from "@openscene-ai/api-client";
 import createClient from "openapi-react-query";
 
 const fetchClient = createOpenSceneClient({

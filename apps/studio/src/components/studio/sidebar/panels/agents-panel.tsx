@@ -25,7 +25,7 @@ import {
   splitContentAndUiActions,
   type AgentUiAction,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";

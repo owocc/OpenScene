@@ -1,5 +1,5 @@
-import type { OpenSceneClient } from "@openscene/javascript";
-import { OpenSceneProvider, OpenSceneRenderer } from "@openscene/solid";
+import type { OpenSceneClient } from "@openscene-ai/javascript";
+import { OpenSceneProvider, OpenSceneRenderer } from "@openscene-ai/solid";
 import type { SolidApp } from "./openscene.tsx";
 
 interface AppProps {

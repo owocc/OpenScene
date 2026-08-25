@@ -11,7 +11,7 @@ import {
   type OpenSceneClientState,
   evaluateDynamicValue,
   openSceneDirectives,
-} from "@openscene/javascript";
+} from "@openscene-ai/javascript";
 import {
   JSONUIProvider,
   Renderer,
@@ -19,7 +19,7 @@ import {
   type ComponentRegistry,
 } from "@json-render/react";
 import type { Spec, UIElement } from "@json-render/core";
-import type { SceneDocument } from "@openscene/protocol";
+import type { SceneDocument } from "@openscene-ai/protocol";
 import type { OpenSceneReactApp } from "./catalog.ts";
 import { OpenSceneContext, useOpenScene, type OpenSceneContextValue } from "./context.ts";
 import { OpenSceneNodeProvider } from "./node.tsx";

@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { OpenSceneClient, OpenSceneClientState } from "@openscene/javascript";
+import type { OpenSceneClient, OpenSceneClientState } from "@openscene-ai/javascript";
 import type { OpenSceneReactApp } from "./catalog.ts";
 
 export interface OpenSceneContextValue {

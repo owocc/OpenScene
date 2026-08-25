@@ -13,7 +13,7 @@ import {
   type RendererPortMessage,
   type SceneDocument,
   type StudioPortMessage,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import { createStateStore, type StateStore } from "@json-render/core";
 
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown

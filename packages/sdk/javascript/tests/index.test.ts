@@ -3,7 +3,7 @@ import {
   createEmptySceneDocument,
   createBridgeEnvelope,
   type AppManifest,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import { MessageChannel } from "node:worker_threads";
 import { OpenSceneController, defineAppManifest, openSceneDirectives } from "../src/index.ts";
 import { evaluateDynamicValue, resolveTemplate } from "../src/solid/evaluate.ts";

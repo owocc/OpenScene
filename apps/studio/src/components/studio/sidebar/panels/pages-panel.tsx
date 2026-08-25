@@ -7,12 +7,12 @@ import {
   type DragTarget,
   type ItemInstance,
 } from "@headless-tree/core";
-import { COMPONENT_DRAG_MIME } from "@openscene/constants";
+import { COMPONENT_DRAG_MIME } from "@openscene-ai/constants";
 import { useTree } from "@headless-tree/react";
 
 import { Tree, TreeDragLine, TreeItem, TreeItemLabel } from "@/components/reui/tree";
 import { useI18n } from "@/i18n";
-import type { SceneDocument } from "@openscene/protocol";
+import type { SceneDocument } from "@openscene-ai/protocol";
 import type { AdapterRegistry } from "@/core/registry";
 import { buildPageTreeItems, type SidebarTreeItem } from "@/core/slot-tree";
 import { cn } from "@/lib/utils";

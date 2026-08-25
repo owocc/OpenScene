@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vite-plus/test";
-import { createEmptySceneDocument } from "@openscene/protocol";
+import { createEmptySceneDocument } from "@openscene-ai/protocol";
 import { z } from "zod";
 import {
   baseReactComponents,

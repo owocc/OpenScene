@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from "react";
-import { evaluateDynamicValue } from "@openscene/javascript";
+import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import { useOpenScene } from "./context.ts";
 
 export interface OpenSceneNodeContextValue {

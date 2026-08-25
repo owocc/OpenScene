@@ -1,5 +1,5 @@
 {
-  "name": "@openscene/admin",
+  "name": "@openscene-ai/admin",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -24,9 +24,9 @@
     "@headless-tree/core": "^1.7.0",
     "@headless-tree/react": "^1.7.0",
     "@libsql/client": "^0.17.4",
-    "@openscene/api-client": "workspace:*",
-    "@openscene/constants": "workspace:*",
-    "@openscene/protocol": "workspace:*",
+    "@openscene-ai/api-client": "workspace:*",
+    "@openscene-ai/constants": "workspace:*",
+    "@openscene-ai/protocol": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",
     "@scalar/nextjs-api-reference": "^0.11.16",
     "@tanstack/react-query": "^5.90.12",

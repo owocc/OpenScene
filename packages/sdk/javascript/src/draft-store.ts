@@ -1,4 +1,4 @@
-import type { DocumentDraftStore, DraftRecord } from "@openscene/protocol";
+import type { DocumentDraftStore, DraftRecord } from "@openscene-ai/protocol";
 
 const DEFAULT_DB_NAME = "openscene";
 const DEFAULT_STORE_NAME = "drafts";

@@ -1,5 +1,5 @@
 {
-  "name": "@openscene/react",
+  "name": "@openscene-ai/react",
   "version": "0.0.1",
   "description": "React adapter for OpenScene and json-render.",
   "license": "MIT",
@@ -36,10 +36,10 @@
   "dependencies": {
     "@json-render/core": "^0.20.0",
     "@json-render/react": "^0.20.0",
-    "@openscene/constants": "workspace:*",
-    "@openscene/javascript": "workspace:*",
-    "@openscene/protocol": "workspace:*",
-    "@openscene/schema": "workspace:*"
+    "@openscene-ai/constants": "workspace:*",
+    "@openscene-ai/javascript": "workspace:*",
+    "@openscene-ai/protocol": "workspace:*",
+    "@openscene-ai/schema": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

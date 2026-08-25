@@ -4,7 +4,7 @@ import {
   getEditorConnection,
   isBridgeEnvelope,
   type SceneDocumentSnapshot,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import type { SceneDocument } from "./types.js";
 
 export interface SceneEditorBridge {

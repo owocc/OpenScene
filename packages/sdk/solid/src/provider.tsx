@@ -20,8 +20,8 @@ import {
   openSceneDirectives,
   type OpenSceneClient,
   type OpenSceneClientState,
-} from "@openscene/javascript";
-import type { SceneDocument } from "@openscene/protocol";
+} from "@openscene-ai/javascript";
+import type { SceneDocument } from "@openscene-ai/protocol";
 import type { OpenSceneSolidApp } from "./catalog.js";
 import { OpenSceneContext, useOpenScene } from "./context.js";
 import { OpenSceneNodeProvider } from "./node.js";

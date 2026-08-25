@@ -4,7 +4,7 @@ import {
   extractAgentUiActions,
   type AgentUiAction,
   type SceneDocument,
-} from "@openscene/protocol";
+} from "@openscene-ai/protocol";
 import { useQueryStore } from "./query-store";
 import { useStudioStore } from "./studio-store";
 

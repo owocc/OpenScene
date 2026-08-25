@@ -1,4 +1,4 @@
-import type { SceneDocument, UIElement } from "@openscene/protocol";
+import type { SceneDocument, UIElement } from "@openscene-ai/protocol";
 
 import type { ComponentMeta } from "./meta";
 

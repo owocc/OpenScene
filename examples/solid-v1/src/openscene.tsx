@@ -1,8 +1,8 @@
 import { createComponent, createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { APP_TYPE_WEB } from "@openscene/constants";
-import { defineAppManifest } from "@openscene/javascript";
-import { openApiMethods, type OpenApiValue } from "@openscene/schema";
+import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { defineAppManifest } from "@openscene-ai/javascript";
+import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import {
   baseSolidComponents,
   defineOpenSceneSolidAction,
@@ -11,7 +11,7 @@ import {
   type OpenSceneSolidApp,
   useOpenSceneNode,
   View,
-} from "@openscene/solid";
+} from "@openscene-ai/solid";
 import { z } from "zod";
 const baseViewProps = {
   class: z.string().optional(),

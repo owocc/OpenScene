@@ -4,10 +4,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   transpilePackages: [
-    "@openscene/api-client",
-    "@openscene/constants",
-    "@openscene/protocol",
-    "@openscene/schema",
+    "@openscene-ai/api-client",
+    "@openscene-ai/constants",
+    "@openscene-ai/protocol",
+    "@openscene-ai/schema",
   ],
   outputFileTracingIncludes: {
     "/*": ["./drizzle/**/*"],

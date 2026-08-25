@@ -1,4 +1,4 @@
-import { openSceneManifestPlugin } from "@openscene/react/vite";
+import { openSceneManifestPlugin } from "@openscene-ai/react/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
 import { createManifest } from "./src/openscene.tsx";

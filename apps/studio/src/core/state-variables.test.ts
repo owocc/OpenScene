@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { createEmptySceneDocument, type SceneDocument } from "@openscene/protocol";
+import { createEmptySceneDocument, type SceneDocument } from "@openscene-ai/protocol";
 
 import {
   addI18nKeyInDocument,

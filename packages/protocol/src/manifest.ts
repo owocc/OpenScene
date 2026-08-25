@@ -1,4 +1,4 @@
-import { APP_TYPES, type AppType } from "@openscene/constants";
+import { APP_TYPES, type AppType } from "@openscene-ai/constants";
 import { z } from "zod";
 import { SceneDocumentSchema, type SceneDocument } from "./document.ts";
 

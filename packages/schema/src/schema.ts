@@ -1,5 +1,5 @@
 /**
- * Base types shared by every input schema in `@openscene/schema`.
+ * Base types shared by every input schema in `@openscene-ai/schema`.
  *
  * An input schema is the contract between a property definition and the
  * property editor: `type` names the schema family, and the editor maps that

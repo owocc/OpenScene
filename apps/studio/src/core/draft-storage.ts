@@ -1,6 +1,6 @@
-import { createIndexedDbDraftStore } from "@openscene/javascript";
-import type { DraftRecord } from "@openscene/protocol";
-import type { SceneDocument } from "@openscene/protocol";
+import { createIndexedDbDraftStore } from "@openscene-ai/javascript";
+import type { DraftRecord } from "@openscene-ai/protocol";
+import type { SceneDocument } from "@openscene-ai/protocol";
 
 /**
  * Session-keyed local draft storage for Studio. Every edit is persisted here

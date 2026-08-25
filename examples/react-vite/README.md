@@ -1,6 +1,6 @@
 # OpenScene React + Vite integration example
 
-`examples/react-vite` is a complete React application integrated with OpenScene and `@json-render/react`. The browser uses the framework-neutral `@openscene/javascript` client and renders through `@openscene/react`.
+`examples/react-vite` is a complete React application integrated with OpenScene and `@json-render/react`. The browser uses the framework-neutral `@openscene-ai/javascript` client and renders through `@openscene-ai/react`.
 
 This example deliberately contains **no hardcoded page JSON**. Admin is the source of published page documents, and Studio sends draft documents to the preview iframe over the OpenScene bridge protocol. The app source declares the component/action catalog and the manifest used by both runtime and build tooling.
 

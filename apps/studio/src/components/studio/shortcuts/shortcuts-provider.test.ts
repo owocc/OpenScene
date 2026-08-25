@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { createEmptySceneDocument } from "@openscene/protocol";
+import { createEmptySceneDocument } from "@openscene-ai/protocol";
 
 import type { ShortcutsProviderProps } from "./shortcuts-provider";
 import { useStudioStore } from "@/stores/studio-store";
