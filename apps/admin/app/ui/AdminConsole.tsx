@@ -484,6 +484,7 @@ function AppsView() {
             <Select
               label="Type"
               value={form.type}
+              className="w-full"
               items={{
                 [APP_TYPE_WEB]: "Web",
                 [APP_TYPE_REACT_NATIVE]: { label: "React Native (Coming soon)", disabled: true },
@@ -501,6 +502,7 @@ function AppsView() {
             <Select
               label="Manifest mode"
               value={form.mode}
+              className="w-full"
               items={{ push: "Push", remote: "Remote" }}
               onValueChange={(value) => {
                 if (value === "push" || value === "remote") setForm({ ...form, mode: value });
@@ -737,7 +739,6 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
     categoryId: "",
     defaultPromptId: "",
     templateId: "",
-    versionId: "",
   });
   const pageQuery = api.useQuery("get", "/api/v1/apps/{appId}/pages", {
     params: {
@@ -763,6 +764,17 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       },
     },
   });
+  const templatesListQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/templates",
+    {
+      params: {
+        path: { appId: context.appId ?? "" },
+        query: { limit: "100" },
+      },
+    },
+    { enabled: Boolean(context.appId) && kind === "pages" },
+  );
   const categoriesQuery = api.useQuery("get", "/api/v1/apps/{appId}/categories", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -825,7 +837,6 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       categoryId: "",
       defaultPromptId: "",
       templateId: "",
-      versionId: "",
     });
     setDialog(true);
   }
@@ -837,9 +848,8 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       description: resource.description,
       status: resource.status,
       categoryId: resource.categoryId ?? "",
-      defaultPromptId: ((resource as Record<string, unknown>).defaultPromptId as string) ?? "",
-      templateId: "",
-      versionId: "",
+      defaultPromptId: resource.defaultPromptId ?? "",
+      templateId: resource.sourceTemplate?.templateId ?? "",
     });
     setDialog(true);
   }
@@ -872,12 +882,12 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
         params: { path: { appId: context.appId ?? "" } },
         body: {
           ...body,
-          ...(form.templateId && form.versionId
-            ? { sourceTemplate: { templateId: form.templateId, versionId: form.versionId } }
-            : {}),
+          ...(form.templateId ? { sourceTemplate: { templateId: form.templateId } } : {}),
         },
       });
-    } else createTemplate.mutate({ params: { path: { appId: context.appId ?? "" } }, body });
+    } else {
+      createTemplate.mutate({ params: { path: { appId: context.appId ?? "" } }, body });
+    }
   }
   function remove() {
     if (!deleteId) return;
@@ -1049,6 +1059,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
             <Select
               label={t("status")}
               value={form.status}
+              className="w-full"
               items={{
                 active: t("active"),
                 disabled: t("disabled"),
@@ -1063,6 +1074,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
               <Select
                 label={t("pageDefaultPrompt")}
                 value={form.defaultPromptId || "none"}
+                className="w-full"
                 items={{
                   none: t("noneDefaultPrompt"),
                   ...Object.fromEntries(
@@ -1076,18 +1088,39 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
               />
             ) : null}
             {kind === "pages" && !editing ? (
-              <>
-                <Input
-                  label="Template ID (optional)"
-                  value={form.templateId}
-                  onChange={(e) => setForm({ ...form, templateId: e.target.value })}
-                />
-                <Input
-                  label="Template version ID (optional)"
-                  value={form.versionId}
-                  onChange={(e) => setForm({ ...form, versionId: e.target.value })}
-                />
-              </>
+              <Select
+                label={t("template")}
+                value={form.templateId || "none"}
+                className="w-full"
+                items={{
+                  none: t("noneTemplate"),
+                  ...Object.fromEntries(
+                    (templatesListQuery.data?.items ?? []).map((tpl) => [
+                      tpl.id,
+                      tpl.title ? `${tpl.title} (${tpl.key})` : tpl.key,
+                    ]),
+                  ),
+                }}
+                onValueChange={(value) => {
+                  if (typeof value === "string")
+                    setForm({ ...form, templateId: value === "none" ? "" : value });
+                }}
+              />
+            ) : null}
+            {kind === "pages" && editing && editing.sourceTemplate?.templateId ? (
+              <Input
+                label={t("sourceTemplate")}
+                value={
+                  (templatesListQuery.data?.items ?? []).find(
+                    (tpl) => tpl.id === editing.sourceTemplate?.templateId,
+                  )?.title ??
+                  (templatesListQuery.data?.items ?? []).find(
+                    (tpl) => tpl.id === editing.sourceTemplate?.templateId,
+                  )?.key ??
+                  editing.sourceTemplate.templateId
+                }
+                disabled
+              />
             ) : null}
           </div>
           <div className="flex justify-end gap-2">
@@ -1245,6 +1278,14 @@ function ResourceDetailView() {
     <>
       <PageHeader title={resource.title} description={resource.description}>
         <StatusBadge status={resource.status} />
+        {kind === "page" && pageResource?.sourceTemplate?.templateId ? (
+          <Badge variant="neutral">
+            {t("template")}:{" "}
+            {templateQuery.data?.title
+              ? `${templateQuery.data.title} (${templateQuery.data.key})`
+              : (templateQuery.data?.key ?? pageResource.sourceTemplate.templateId)}
+          </Badge>
+        ) : null}
         <Button
           loading={studio.isPending}
           onClick={() => {
@@ -1322,6 +1363,7 @@ function ResourceDetailView() {
             <Select
               label={t("pageDefaultPrompt")}
               value={((resource as Record<string, unknown>)?.defaultPromptId as string) ?? "none"}
+              className="w-full"
               items={{
                 none: t("noneDefaultPrompt"),
                 ...Object.fromEntries(
@@ -1744,6 +1786,7 @@ function CategoriesView() {
             <Select
               label="Scope"
               value={form.scope}
+              className="w-full"
               items={{ page: t("pages"), template: t("templates"), shared: "Shared" }}
               onValueChange={(value) => {
                 if (typeof value === "string") setForm({ ...form, scope: value });

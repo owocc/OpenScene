@@ -755,19 +755,26 @@ export async function createResource(
   if (body.sourceTemplate) {
     if (kind !== "page") throw validation("Only Pages can be initialized from a Template");
     const template = await getResourceRow(db, appId, "template", body.sourceTemplate.templateId);
-    const version = await db
-      .select()
-      .from(documentVersions)
-      .where(
-        and(
-          eq(documentVersions.appId, appId),
-          eq(documentVersions.id, body.sourceTemplate.versionId),
-          eq(documentVersions.documentId, template.documentId),
-        ),
-      )
-      .get();
-    if (!version) throw notFound();
-    initialDocument = parseJson(SceneDocumentSchema, version.documentJson);
+    let documentJson: string | null = null;
+    if (body.sourceTemplate.versionId) {
+      const version = await db
+        .select()
+        .from(documentVersions)
+        .where(
+          and(
+            eq(documentVersions.appId, appId),
+            eq(documentVersions.id, body.sourceTemplate.versionId),
+            eq(documentVersions.documentId, template.documentId),
+          ),
+        )
+        .get();
+      if (!version) throw notFound();
+      documentJson = version.documentJson;
+    } else {
+      const templateDoc = await getDocumentRow(db, appId, template.documentId);
+      documentJson = templateDoc.draftJson;
+    }
+    initialDocument = parseJson(SceneDocumentSchema, documentJson);
   }
   const resourceId = newId(kind);
   const documentId = newId("document");
@@ -789,7 +796,7 @@ export async function createResource(
     ? {
         ...resource,
         sourceTemplateId: body.sourceTemplate.templateId,
-        sourceTemplateVersionId: body.sourceTemplate.versionId,
+        sourceTemplateVersionId: body.sourceTemplate.versionId ?? null,
       }
     : resource;
   try {
@@ -2004,13 +2011,12 @@ function resourceRecord(row: ResourceRecordInput): unknown {
     description: row.description,
     categoryId: row.categoryId ?? null,
     documentId: row.documentId,
-    sourceTemplate:
-      row.sourceTemplateId && row.sourceTemplateVersionId
-        ? {
-            templateId: row.sourceTemplateId,
-            versionId: row.sourceTemplateVersionId,
-          }
-        : null,
+    sourceTemplate: row.sourceTemplateId
+      ? {
+          templateId: row.sourceTemplateId,
+          versionId: row.sourceTemplateVersionId ?? null,
+        }
+      : null,
     status: row.status,
     defaultPromptId: "defaultPromptId" in row ? (row.defaultPromptId ?? null) : null,
     createdAt: row.createdAt,

@@ -127,6 +127,80 @@ describe("Admin API HTTP flow", () => {
     });
   });
 
+  test("initializes Page document from Template draft when versionId is omitted", async () => {
+    const template = await call("POST", ["apps", appA.id, "templates"], {
+      key: "card-template",
+      title: "Card Template",
+    });
+    expect(template.status).toBe(201);
+    const templateBody = await template.json();
+
+    // Update template draft document with custom content
+    const customDoc = {
+      schemaVersion: "1.0.0",
+      pageInfo: {
+        title: "Custom Template",
+        description: "Template Desc",
+        keywords: [],
+        locale: "en-US",
+        metadata: {},
+      },
+      globalConfig: {},
+      spec: {
+        root: "root",
+        elements: {
+          root: { type: "View", props: { style: { padding: 16 } }, children: ["text1"] },
+          text1: { type: "Text", props: { content: "Hello from Template" }, children: [] },
+        },
+        state: {},
+      },
+    };
+    const updateDraftRes = await call(
+      "PATCH",
+      ["apps", appA.id, "documents", templateBody.documentId, "draft"],
+      { baseRevision: 0, document: customDoc },
+    );
+    expect(updateDraftRes.status).toBe(200);
+
+    // Create page from template (selecting template ID only)
+    const page = await call("POST", ["apps", appA.id, "pages"], {
+      key: "page-from-template-draft",
+      title: "Page From Template Draft",
+      sourceTemplate: { templateId: templateBody.id },
+    });
+    expect(page.status).toBe(201);
+    const pageBody = await page.json();
+    expect(pageBody.sourceTemplate).toEqual({
+      templateId: templateBody.id,
+      versionId: null,
+    });
+
+    // Verify page's initial document is copied from the template
+    const pageDraft = await call("GET", [
+      "apps",
+      appA.id,
+      "documents",
+      pageBody.documentId,
+      "draft",
+    ]);
+    expect(pageDraft.status).toBe(200);
+    const pageDraftBody = await pageDraft.json();
+    expect(pageDraftBody.document).toEqual(customDoc);
+
+    // Verify sourceTemplate cannot be modified via PATCH
+    const patchRes = await call("PATCH", ["apps", appA.id, "pages", pageBody.id], {
+      title: "Updated Title",
+      sourceTemplate: { templateId: "other-template" },
+    });
+    expect(patchRes.status).toBe(200);
+    const patchedPage = await patchRes.json();
+    expect(patchedPage.title).toBe("Updated Title");
+    expect(patchedPage.sourceTemplate).toEqual({
+      templateId: templateBody.id,
+      versionId: null,
+    });
+  });
+
   test("creates a short-lived Studio Session and Bootstrap", async () => {
     const session = await call("POST", ["apps", appA.id, "studio-sessions"], {
       resourceKind: "page",

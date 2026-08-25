@@ -86,7 +86,9 @@ export const ResourceSchema = z.object({
   description: z.string(),
   categoryId: IdSchema.nullable(),
   documentId: IdSchema,
-  sourceTemplate: z.object({ templateId: IdSchema, versionId: IdSchema }).nullable(),
+  sourceTemplate: z
+    .object({ templateId: IdSchema, versionId: IdSchema.nullable().optional() })
+    .nullable(),
   status: ResourceStatusSchema,
   defaultPromptId: IdSchema.nullable().optional(),
   createdAt: IsoDateSchema,
@@ -312,7 +314,9 @@ export const ResourceCreateSchema = z.object({
   description: z.string().default(""),
   categoryId: IdSchema.optional(),
   status: ResourceStatusSchema.default("draft"),
-  sourceTemplate: z.object({ templateId: IdSchema, versionId: IdSchema }).optional(),
+  sourceTemplate: z
+    .object({ templateId: IdSchema, versionId: IdSchema.nullable().optional() })
+    .optional(),
   defaultPromptId: IdSchema.nullable().optional(),
 });
 export const ResourcePatchSchema = ResourceCreateSchema.partial()

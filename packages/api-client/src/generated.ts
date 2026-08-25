@@ -50,6 +50,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/ai/prompt-preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["previewAppSystemPrompt"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/ai/system-prompt": {
     parameters: {
       query?: never;
@@ -1250,7 +1266,7 @@ export interface components {
       documentId: string;
       sourceTemplate: {
         templateId: string;
-        versionId: string;
+        versionId?: string | null;
       } | null;
       /** @enum {string} */
       status: "active" | "disabled" | "draft" | "published";
@@ -1995,6 +2011,178 @@ export interface operations {
             ok: boolean;
             model?: string;
             error?: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  previewAppSystemPrompt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @description App ID whose prompt configuration is inspected */
+          appId?: string;
+          /** @description Optional prompt module key to use. Defaults to the app's default prompt. */
+          promptKey?: string;
+          /** @description Optional prompt module id to use. */
+          promptId?: string;
+          /** @description Target selected element context from the canvas for fine-grained editing */
+          selectedElement?: {
+            nodeId: string;
+            type: string;
+            props?: {
+              [key: string]: unknown;
+            };
+            children?: string[];
+            slots?: {
+              [key: string]: string[];
+            };
+          };
+          /** @description Optional extra request-level system instructions. */
+          system?: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @description Full concatenated system prompt */
+            systemPrompt: string;
+            /** @description System prompt assembled breakdown parts */
+            breakdown?: {
+              globalPrompt?: string;
+              appSystem?: string;
+              sections?: string[];
+              componentsText?: string;
+              openApiText?: string;
+              selectedElementText?: string;
+              requestSystem?: string;
+            };
           };
         };
       };
@@ -8609,7 +8797,7 @@ export interface operations {
               documentId: string;
               sourceTemplate: {
                 templateId: string;
-                versionId: string;
+                versionId?: string | null;
               } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
@@ -8763,7 +8951,7 @@ export interface operations {
           status?: "active" | "disabled" | "draft" | "published";
           sourceTemplate?: {
             templateId: string;
-            versionId: string;
+            versionId?: string | null;
           };
           defaultPromptId?: string | null;
         };
@@ -8786,7 +8974,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -8942,7 +9130,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -9249,7 +9437,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -11300,7 +11488,7 @@ export interface operations {
               documentId: string;
               sourceTemplate: {
                 templateId: string;
-                versionId: string;
+                versionId?: string | null;
               } | null;
               /** @enum {string} */
               status: "active" | "disabled" | "draft" | "published";
@@ -11454,7 +11642,7 @@ export interface operations {
           status?: "active" | "disabled" | "draft" | "published";
           sourceTemplate?: {
             templateId: string;
-            versionId: string;
+            versionId?: string | null;
           };
           defaultPromptId?: string | null;
         };
@@ -11477,7 +11665,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -11633,7 +11821,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -11940,7 +12128,7 @@ export interface operations {
             documentId: string;
             sourceTemplate: {
               templateId: string;
-              versionId: string;
+              versionId?: string | null;
             } | null;
             /** @enum {string} */
             status: "active" | "disabled" | "draft" | "published";
@@ -13211,6 +13399,9 @@ export interface operations {
             /** Format: uri */
             returnUrl: string;
             prompts?: {
+              [key: string]: unknown;
+            }[];
+            locales?: {
               [key: string]: unknown;
             }[];
             chatSessions?: {
