@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { studioSessions } from "../../../../server/db/schema";
+import { studioSessions, user } from "../../../../server/db/schema";
 import {
   assertAppContext,
   assertManagementCsrf,
@@ -188,6 +188,16 @@ async function handleRequest(
           headers: { "set-cookie": clearUiSessionCookie(request) },
         });
       throw notFound();
+    }
+    if (path.length === 2 && path[0] === "auth" && path[1] === "setup-status" && method === "GET") {
+      const userCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(user)
+        .get();
+      const count = userCount?.count ?? 0;
+      return json({ initialized: count > 0, hasUsers: count > 0 }, 200, {
+        "cache-control": "no-store",
+      });
     }
     if (path.length === 1 && path[0] === "health" && method === "GET") {
       const database = await checkDatabaseHealth(runtimeDb);
