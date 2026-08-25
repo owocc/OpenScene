@@ -190,6 +190,7 @@ const en_US: Translation = {
       serverLocalesTitle: "App Locales from Server",
       noLocalesFound: "No matching languages found.",
       addLangVariable: "Add Language Variable (lang)",
+      addAssetBaseUrlVariable: "Add Asset Base URL (asset_base_url)",
       langBadge: "Protected",
       langVariableDesc: "Current runtime language code, selectable from app locales",
       confirmDeleteLang: "Are you sure you want to remove the language variable (lang) from state?",

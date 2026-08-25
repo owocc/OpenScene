@@ -727,6 +727,10 @@ type RootTranslation = {
        */
       addLangVariable: string;
       /**
+       * 添​加​资​源​路​径​变​量​ ​(​a​s​s​e​t​_​b​a​s​e​_​u​r​l​)
+       */
+      addAssetBaseUrlVariable: string;
+      /**
        * 系​统​保​护
        */
       langBadge: string;
@@ -1927,6 +1931,10 @@ export type TranslationFunctions = {
        * 添加语言变量 (lang)
        */
       addLangVariable: () => LocalizedString;
+      /**
+       * 添加资源路径变量 (asset_base_url)
+       */
+      addAssetBaseUrlVariable: () => LocalizedString;
       /**
        * 系统保护
        */

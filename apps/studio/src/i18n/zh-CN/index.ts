@@ -187,6 +187,7 @@ const zh_CN: BaseTranslation = {
       serverLocalesTitle: "服务器应用语言",
       noLocalesFound: "未找到匹配的语言",
       addLangVariable: "添加语言变量 (lang)",
+      addAssetBaseUrlVariable: "添加资源路径变量 (asset_base_url)",
       langBadge: "系统保护",
       langVariableDesc: "当前运行时的语言代码，仅可选择应用支持的语言",
       confirmDeleteLang: "确定要从状态中移除语言变量 (lang) 吗？",

@@ -86,6 +86,7 @@ export interface ServerLocaleOption {
 }
 
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -608,59 +609,56 @@ export function VariablesPanel({
             </Badge>
           </div>
           {activeTab === "variables" && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              {!hasLangVariable && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  className="h-6 gap-1 px-1.5 text-[11px] border-sky-500/30 bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10"
-                  onClick={() => {
-                    const initialCode = locale || effectiveLocales[0]?.code || "en-US";
-                    setVariable("lang", initialCode);
-                    onLocaleChange(initialCode);
-                  }}
-                  title={LL.panels.variables.addLangVariable()}
-                >
-                  <Globe className="size-3" />
-                  <span>{LL.panels.variables.addLangVariable()}</span>
-                </Button>
-              )}
-              {!hasAssetBaseUrlVariable && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  className="h-6 gap-1 px-1.5 text-[11px] border-rose-500/30 bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
-                  onClick={() => {
-                    const defaultUrl = bootstrap?.preview?.url
-                      ? new URL(bootstrap.preview.url).origin
-                      : "";
-                    setVariable("asset_base_url", defaultUrl);
-                  }}
-                  title="添加资源基础路径 (asset_base_url)"
-                >
-                  <ImageIcon className="size-3" />
-                  <span>+ asset_base_url</span>
-                </Button>
-              )}
-              <Button
-                size="xs"
-                variant="default"
-                className="h-6 gap-1 px-2 text-xs"
-                onClick={openAddDialog}
-              >
-                <Plus className="size-3" />
+            <ButtonGroup className="shrink-0">
+              <Button variant="default" onClick={openAddDialog}>
+                <Plus />
                 <span>{LL.panels.variables.addVariable()}</span>
               </Button>
-            </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="default"
+                      className="px-2 border-l border-primary-foreground/20"
+                      aria-label="More variable options"
+                    >
+                      <ChevronDown />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" className="w-56 text-xs">
+                  <DropdownMenuItem
+                    disabled={hasLangVariable}
+                    onClick={() => {
+                      if (hasLangVariable) return;
+                      const initialCode = locale || effectiveLocales[0]?.code || "en-US";
+                      setVariable("lang", initialCode);
+                      onLocaleChange(initialCode);
+                    }}
+                  >
+                    <Globe className="size-4 mr-2" />
+                    <span>{LL.panels.variables.addLangVariable()}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={hasAssetBaseUrlVariable}
+                    onClick={() => {
+                      if (hasAssetBaseUrlVariable) return;
+                      const defaultUrl = bootstrap?.preview?.url
+                        ? new URL(bootstrap.preview.url).origin
+                        : "";
+                      setVariable("asset_base_url", defaultUrl);
+                    }}
+                  >
+                    <ImageIcon className="size-4 mr-2" />
+                    <span>{LL.panels.variables.addAssetBaseUrlVariable()}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
           )}
           {activeTab === "locales" && (
-            <Button
-              size="xs"
-              variant="default"
-              className="h-6 gap-1 px-2 text-xs"
-              onClick={openAddI18nDialog}
-            >
-              <Plus className="size-3" />
+            <Button variant="default" onClick={openAddI18nDialog}>
+              <Plus />
               <span>{LL.panels.variables.addI18nKey()}</span>
             </Button>
           )}
