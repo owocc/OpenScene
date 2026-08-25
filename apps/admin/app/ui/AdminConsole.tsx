@@ -3189,6 +3189,7 @@ function AssetsView() {
       <Surface className="mb-4 p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
           <Input
+            aria-label="搜索文件名、文件夹或标签"
             placeholder="搜索文件名、文件夹或标签..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -3479,6 +3480,7 @@ function AssetsView() {
               <label className="text-xs font-medium block mb-1">文件夹分类</label>
               <div className="flex gap-2">
                 <Input
+                  aria-label="文件夹分类"
                   value={uploadFolder}
                   onChange={(e) => setUploadFolder(e.target.value)}
                   placeholder="/images, /icons, /audio"
@@ -3503,6 +3505,7 @@ function AssetsView() {
               <label className="text-xs font-medium block mb-1">标签 (Tags)</label>
               <div className="flex gap-2">
                 <Input
+                  aria-label="标签"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -3579,6 +3582,7 @@ function AssetsView() {
             <div>
               <label className="text-xs font-medium block mb-1">文件夹分类</label>
               <Input
+                aria-label="文件夹分类"
                 value={editFolder}
                 onChange={(e) => setEditFolder(e.target.value)}
                 placeholder="/images, /icons, /audio"
@@ -3589,6 +3593,7 @@ function AssetsView() {
               <label className="text-xs font-medium block mb-1">标签 (Tags)</label>
               <div className="flex gap-2">
                 <Input
+                  aria-label="标签"
                   value={editTagInput}
                   onChange={(e) => setEditTagInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -4115,10 +4120,10 @@ function MetaView() {
           </div>
           <div className="flex items-center gap-2">
             <Input
+              aria-label={t("search")}
               placeholder={t("search")}
               value={componentSearch}
               onChange={(e) => setComponentSearch(e.target.value)}
-              className="w-48 sm:w-64"
             />
             {selectedComponentData && (
               <Button size="sm" variant="secondary" onClick={copyComponentJson}>
