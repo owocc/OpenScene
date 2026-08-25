@@ -41,9 +41,5 @@
     "jsdom": "^27.0.0",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
-  },
-  "inlinedDependencies": {
-    "csstype": "3.2.3",
-    "solid-js": "1.9.15"
   }
 }
