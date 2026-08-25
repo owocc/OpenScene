@@ -19,7 +19,7 @@ import {
   webUnits,
   type SizeValue,
   type UnitValue,
-} from "./index.js";
+} from "./index";
 
 describe("unit schema", () => {
   it("defaults to the web unit list including viewport and px units", () => {

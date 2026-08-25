@@ -1,10 +1,6 @@
 import { APP_TYPE_WEB } from "@openscene/constants";
 import { z } from "zod";
-import {
-  SCENE_DOCUMENT_SCHEMA_VERSION,
-  SceneDocumentSchema,
-  type SceneDocument,
-} from "./document.js";
+import { SCENE_DOCUMENT_SCHEMA_VERSION, SceneDocumentSchema, type SceneDocument } from "./document";
 
 /** Stable browser protocol identifier shared by Studio and renderer SDKs. */
 export const STUDIO_BRIDGE_PROTOCOL = "openscene-studio" as const;

@@ -1,4 +1,4 @@
-import { isInputSchemaBase, type InputSchemaBase, type JsonValue } from "./schema.js";
+import { isInputSchemaBase, type InputSchemaBase, type JsonValue } from "./schema";
 
 /**
  * HTTP methods an OpenAPI operation can declare. Lowercase to match the

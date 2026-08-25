@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { SceneDocumentSchema, type SceneDocument } from "./document.js";
+import { SceneDocumentSchema, type SceneDocument } from "./document";
 
 /**
  * A locally persisted document draft, keyed by the Studio session id.

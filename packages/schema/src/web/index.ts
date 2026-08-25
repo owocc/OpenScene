@@ -1,8 +1,8 @@
-import { isSizeSchema, type SizeSchema } from "./size.js";
-import { isUnitSchema, type UnitSchema } from "./unit.js";
-import { isKeyValueSchema, type KeyValueSchema } from "./keyValue.js";
-import { isStyleSchema, type StyleSchema } from "./style.js";
-import { isOpenApiSchema, type OpenApiSchema } from "../openapi.js";
+import { isSizeSchema, type SizeSchema } from "./size";
+import { isUnitSchema, type UnitSchema } from "./unit";
+import { isKeyValueSchema, type KeyValueSchema } from "./keyValue";
+import { isStyleSchema, type StyleSchema } from "./style";
+import { isOpenApiSchema, type OpenApiSchema } from "../openapi";
 /**
  * Web board: input schemas for web-platform properties.
  *
@@ -10,11 +10,11 @@ import { isOpenApiSchema, type OpenApiSchema } from "../openapi.js";
  * entire family at once: `WebInputSchema` is the union the editor switches
  * on to pick an input widget.
  */
-export * from "./unit.js";
-export * from "./size.js";
-export * from "./keyValue.js";
-export * from "./style.js";
-export * from "../openapi.js";
+export * from "./unit";
+export * from "./size";
+export * from "./keyValue";
+export * from "./style";
+export * from "../openapi";
 /** Every input schema defined by the web board. */
 export type WebInputSchema = UnitSchema | SizeSchema | KeyValueSchema | StyleSchema | OpenApiSchema;
 

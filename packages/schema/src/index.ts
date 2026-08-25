@@ -1,3 +1,3 @@
-export * from "./schema.js";
-export * from "./openapi.js";
-export * from "./web/index.js";
+export * from "./schema";
+export * from "./openapi";
+export * from "./web/index";

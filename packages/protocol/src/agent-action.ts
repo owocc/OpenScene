@@ -4,7 +4,7 @@ import {
   SceneDocumentSchema,
   type SceneDocument,
   type UIElement,
-} from "./document.js";
+} from "./document";
 
 const nonEmptyString = z.string().min(1);
 const unknownRecord = z.record(z.string(), z.unknown());
