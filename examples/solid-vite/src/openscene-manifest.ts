@@ -8,7 +8,7 @@ import {
   defineOpenSceneSolidAction,
   defineOpenApiRequestAction,
   defineAppManifest,
-} from "@openscene-ai/solid";
+} from "@openscene-ai/solid/v2";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------

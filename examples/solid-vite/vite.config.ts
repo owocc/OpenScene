@@ -1,4 +1,4 @@
-import { openSceneManifestPlugin } from "@openscene-ai/solid/vite";
+import { openSceneManifestPlugin } from "@openscene-ai/solid/v2/vite";
 import solid from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";

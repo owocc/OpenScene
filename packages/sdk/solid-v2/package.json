@@ -1,12 +1,15 @@
 {
-  "name": "@openscene-ai/solid",
+  "name": "@openscene-ai/solid-v2",
   "version": "0.0.0",
-  "description": "Solid adapters for OpenScene.",
+  "private": true,
+  "description": "SolidJS v2 adapter implementation for OpenScene.",
   "license": "MIT",
   "files": [
     "dist"
   ],
   "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
@@ -14,46 +17,28 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
-    "./v2": {
-      "types": "./dist/v2.d.mts",
-      "import": "./dist/v2.mjs",
-      "default": "./dist/v2.mjs"
-    },
     "./vite": {
       "types": "./dist/vite.d.mts",
       "import": "./dist/vite.mjs",
       "default": "./dist/vite.mjs"
-    },
-    "./package.json": "./package.json",
-    "./v2/vite": {
-      "types": "./dist/v2-vite.d.mts",
-      "import": "./dist/v2-vite.mjs",
-      "default": "./dist/v2-vite.mjs"
     }
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "scripts": {
     "build": "vp pack --from-vite",
     "dev": "vp pack --from-vite --watch",
-    "test": "vp test",
     "check": "vp check",
-    "prepublishOnly": "vp run build"
+    "test": "vp test"
   },
   "dependencies": {
-    "@json-render/core": "^0.20.0",
-    "@json-render/solid": "^0.20.0",
     "@openscene-ai/constants": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
     "@openscene-ai/protocol": "workspace:*",
-    "@openscene-ai/schema": "workspace:*",
-    "@openscene-ai/solid-v2": "workspace:*"
+    "@openscene-ai/schema": "workspace:*"
   },
   "devDependencies": {
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "catalog:",
-    "solid-js": "^1.9.14",
+    "solid-js": "^2.0.0-rc.2",
     "typescript": "catalog:",
     "vite-plugin-solid": "^2.11.14",
     "vite-plus": "catalog:",
@@ -61,7 +46,7 @@
   },
   "peerDependencies": {
     "@solidjs/web": ">=2.0.0-rc.0 <3",
-    "solid-js": "^1.9.0 || >=2.0.0-rc.0 <3",
+    "solid-js": ">=2.0.0-rc.0 <3",
     "zod": "^4.0.0"
   }
 }

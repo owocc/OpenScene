@@ -1,5 +1,5 @@
 import { createContext, useContext } from "solid-js";
-import type { JSX } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import { useOpenScene } from "./context.js";
 
@@ -18,11 +18,11 @@ export function OpenSceneNodeProvider(props: {
   children: JSX.Element;
 }): JSX.Element {
   return (
-    <OpenSceneNodeContext.Provider
+    <OpenSceneNodeContext
       value={{ nodeId: props.nodeId, nodeAttrs: { "data-node-id": props.nodeId } }}
     >
       {props.children}
-    </OpenSceneNodeContext.Provider>
+    </OpenSceneNodeContext>
   );
 }
 

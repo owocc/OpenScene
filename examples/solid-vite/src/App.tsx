@@ -6,7 +6,7 @@ import {
   OpenSceneProvider,
   installDevManifest,
   type OpenSceneClient,
-} from "@openscene-ai/solid";
+} from "@openscene-ai/solid/v2";
 import { app } from "./openscene.tsx";
 import "./index.css";
 

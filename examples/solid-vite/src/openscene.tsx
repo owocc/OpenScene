@@ -1,4 +1,4 @@
-import { defineOpenSceneSolidApp, defineOpenSceneSolidComponent } from "@openscene-ai/solid";
+import { defineOpenSceneSolidApp, defineOpenSceneSolidComponent } from "@openscene-ai/solid/v2";
 import {
   GuildCardMeta,
   StatBlockMeta,
