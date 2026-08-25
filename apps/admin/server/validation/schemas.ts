@@ -25,6 +25,8 @@ export const IdSchema = z.string().min(1).max(256);
 export const KeySchema = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/);
 export const IsoDateSchema = z.string().datetime({ offset: true });
 export const ResourceKindSchema = z.enum(["page", "template"]);
+export const PageStatusSchema = z.enum(["active", "disabled", "draft", "published"]);
+export const TemplateStatusSchema = z.enum(["draft", "disabled", "published"]);
 export const ResourceStatusSchema = z.enum(["active", "disabled", "draft", "published"]);
 
 export const AppSchema = z.object({
@@ -320,15 +322,21 @@ export const ResourceCreateSchema = z.object({
     .optional(),
   defaultPromptId: IdSchema.nullable().optional(),
 });
-export const ResourcePatchSchema = ResourceCreateSchema.extend({
-  currentVersionId: IdSchema.nullable().optional(),
-})
-  .partial()
-  .omit({ sourceTemplate: true })
-  .refine((value) => value.key === undefined, {
+export const ResourcePatchSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().optional(),
+    categoryId: IdSchema.nullable().optional(),
+    status: ResourceStatusSchema.optional(),
+    defaultPromptId: IdSchema.nullable().optional(),
+    currentVersionId: IdSchema.nullable().optional(),
+  })
+  .passthrough()
+  .refine((value) => (value as { key?: unknown }).key === undefined, {
     message: "Resource key cannot be changed",
     path: ["key"],
-  });
+  })
+  .openapi({ description: "Patch a resource" });
 export const DraftPatchSchema = z.object({
   baseRevision: z.number().int().nonnegative().optional(),
   document: SceneDocumentSchema,

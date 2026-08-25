@@ -219,7 +219,7 @@ export const templates = sqliteTable(
     categoryId: text("category_id").references(() => categories.id, { onDelete: "restrict" }),
     documentId: text("document_id").notNull(),
     currentVersionId: text("current_version_id"),
-    status: text("status", { enum: ["active", "disabled", "draft", "published"] }).notNull(),
+    status: text("status", { enum: ["draft", "disabled", "published"] }).notNull(),
     ...timestamps,
   },
   (table) => [

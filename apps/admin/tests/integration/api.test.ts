@@ -98,6 +98,7 @@ describe("Admin API HTTP flow", () => {
     const template = await call("POST", ["apps", appA.id, "templates"], {
       key: "section",
       title: "Section",
+      status: "published",
     });
     expect(template.status).toBe(201);
     const templateBody = await template.json();
@@ -131,6 +132,7 @@ describe("Admin API HTTP flow", () => {
     const template = await call("POST", ["apps", appA.id, "templates"], {
       key: "card-template",
       title: "Card Template",
+      status: "published",
     });
     expect(template.status).toBe(201);
     const templateBody = await template.json();
@@ -201,10 +203,34 @@ describe("Admin API HTTP flow", () => {
     });
   });
   test("templates cannot be published as releases and support version management", async () => {
-    // 1. Create a template
+    // 0. Active status is not allowed for templates
+    const invalidStatus = await call("POST", ["apps", appA.id, "templates"], {
+      key: "tpl-invalid",
+      title: "Template Invalid",
+      status: "active",
+    });
+    expect(invalidStatus.status).toBe(422);
+
+    // 0b. Draft templates cannot be used to create pages
+    const draftTpl = await (
+      await call("POST", ["apps", appA.id, "templates"], {
+        key: "tpl-draft",
+        title: "Template Draft",
+        status: "draft",
+      })
+    ).json();
+    const draftPageAttempt = await call("POST", ["apps", appA.id, "pages"], {
+      key: "page-from-draft",
+      title: "Page From Draft",
+      sourceTemplate: { templateId: draftTpl.id },
+    });
+    expect(draftPageAttempt.status).toBe(422);
+
+    // 1. Create a published template
     const tplRes = await call("POST", ["apps", appA.id, "templates"], {
       key: "tpl-versioned",
       title: "Template Versioned",
+      status: "published",
     });
     expect(tplRes.status).toBe(201);
     const tpl = await tplRes.json();
@@ -236,15 +262,14 @@ describe("Admin API HTTP flow", () => {
     expect((await setCurRes.json()).currentVersionId).toBe(v2.id);
 
     // 5. Create a page choosing the template without versionId -> automatically uses template currentVersion (v2)
-    const pageAutoV2 = await (
-      await call("POST", ["apps", appA.id, "pages"], {
-        key: "page-auto-v2",
-        title: "Page Auto V2",
-        sourceTemplate: { templateId: tpl.id },
-      })
-    ).json();
+    const pageAutoV2Res = await call("POST", ["apps", appA.id, "pages"], {
+      key: "page-auto-v2",
+      title: "Page Auto V2",
+      sourceTemplate: { templateId: tpl.id },
+    });
+    const pageAutoV2 = await pageAutoV2Res.json();
+    expect(pageAutoV2Res.status).toBe(201);
     expect(pageAutoV2.sourceTemplate.versionId).toBe(v2.id);
-
     // 6. Create a page explicitly choosing v1
     const pageWithV1 = await (
       await call("POST", ["apps", appA.id, "pages"], {

@@ -52,6 +52,7 @@ import {
   CategoryCreateSchema,
   CategoryPatchSchema,
   CategorySchema,
+  DocumentSchema,
   DraftPatchSchema,
   LocaleCreateSchema,
   LocalePatchSchema,
@@ -757,11 +758,23 @@ export async function createResource(
   const app = await getAppRow(db, appId);
   if (app.status === "disabled") throw conflict("Disabled Apps cannot create new resources");
   const body = ResourceCreateSchema.parse(input);
+  if (kind === "template" && body.status === "active") {
+    throw validation(
+      "Templates only support draft, disabled, and published statuses. Active status is not supported for templates.",
+      [{ path: "status", message: "Invalid status for template" }],
+    );
+  }
   if (body.categoryId) await getCategoryRow(db, appId, body.categoryId);
   let initialDocument: SceneDocument = EmptyDocument;
   if (body.sourceTemplate) {
     if (kind !== "page") throw validation("Only Pages can be initialized from a Template");
     const template = await getResourceRow(db, appId, "template", body.sourceTemplate.templateId);
+    if (template.status !== "published") {
+      throw validation(
+        "Only published templates can be used to create pages. Draft and disabled templates cannot be used.",
+        [{ path: "sourceTemplate.templateId", message: "Template is not published" }],
+      );
+    }
     let documentJson: string | null = null;
     let resolvedVersionId: string | null = body.sourceTemplate.versionId ?? null;
     if (resolvedVersionId) {
@@ -844,7 +857,14 @@ export async function createResource(
         })
         .run();
       if (kind === "page") await tx.insert(pages).values(persistedResource).run();
-      else await tx.insert(templates).values(resource).run();
+      else
+        await tx
+          .insert(templates)
+          .values({
+            ...resource,
+            status: body.status as "draft" | "disabled" | "published",
+          })
+          .run();
     });
   } catch (error) {
     if (isConstraintError(error))
@@ -874,6 +894,12 @@ export async function updateResource(
 ): Promise<unknown> {
   const existing = await getResourceRow(db, appId, kind, resourceId);
   const body = ResourcePatchSchema.parse(input);
+  if (kind === "template" && body.status === "active") {
+    throw validation(
+      "Templates only support draft, disabled, and published statuses. Active status is not supported for templates.",
+      [{ path: "status", message: "Invalid status for template" }],
+    );
+  }
   if (body.categoryId) await getCategoryRow(db, appId, body.categoryId);
   if (kind === "template" && body.currentVersionId) {
     const version = await db
@@ -896,7 +922,7 @@ export async function updateResource(
       title: body.title ?? existing.title,
       description: body.description ?? existing.description,
       categoryId: body.categoryId === undefined ? existing.categoryId : body.categoryId,
-      status: body.status ?? existing.status,
+      status: (body.status ?? existing.status) as "draft" | "disabled" | "published",
       ...(kind === "page"
         ? {
             defaultPromptId:
@@ -928,24 +954,42 @@ export async function deleteResource(
   resourceId: string,
 ): Promise<void> {
   const resource = await getResourceRow(db, appId, kind, resourceId);
-  const version = await db
-    .select({ id: documentVersions.id })
-    .from(documentVersions)
+  const activeRelease = await db
+    .select({ id: releases.id })
+    .from(releases)
     .where(
-      and(eq(documentVersions.appId, appId), eq(documentVersions.documentId, resource.documentId)),
+      and(
+        eq(releases.appId, appId),
+        eq(releases.documentId, resource.documentId),
+        eq(releases.status, "active"),
+      ),
     )
     .limit(1)
     .get();
-  const release = await db
-    .select({ id: releases.id })
-    .from(releases)
-    .where(and(eq(releases.appId, appId), eq(releases.documentId, resource.documentId)))
-    .limit(1)
-    .get();
-  if (version || release)
-    throw conflict("Resource has immutable versions or releases and cannot be deleted");
+  if (activeRelease) throw conflict("Resource has active releases and cannot be deleted");
+
   const table = kind === "page" ? pages : templates;
   await db.transaction(async (tx) => {
+    if (kind === "template") {
+      await tx
+        .update(pages)
+        .set({ sourceTemplateId: null, sourceTemplateVersionId: null })
+        .where(and(eq(pages.appId, appId), eq(pages.sourceTemplateId, resourceId)))
+        .run();
+    }
+    await tx
+      .delete(releases)
+      .where(and(eq(releases.appId, appId), eq(releases.documentId, resource.documentId)))
+      .run();
+    await tx
+      .delete(documentVersions)
+      .where(
+        and(
+          eq(documentVersions.appId, appId),
+          eq(documentVersions.documentId, resource.documentId),
+        ),
+      )
+      .run();
     await tx
       .delete(table)
       .where(and(eq(table.appId, appId), eq(table.id, resourceId)))
@@ -956,14 +1000,13 @@ export async function deleteResource(
       .run();
   });
 }
-
 export async function getDocument(
   db: AppDatabase,
   appId: string,
   documentId: string,
 ): Promise<unknown> {
   const row = await getDocumentRow(db, appId, documentId);
-  return documentRecord(row);
+  return DocumentSchema.parse(documentRecord(row));
 }
 
 export async function getDraft(

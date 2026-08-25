@@ -781,9 +781,14 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
     },
     { enabled: Boolean(context.appId) && kind === "pages" },
   );
-  const selectedTemplate = (templatesListQuery.data?.items ?? []).find(
-    (tpl) => tpl.id === form.templateId,
+  const publishedTemplates = useMemo(
+    () =>
+      (templatesListQuery.data?.items ?? []).filter(
+        (tpl) => tpl.status === "published" || tpl.status === "active",
+      ),
+    [templatesListQuery.data?.items],
   );
+  const selectedTemplate = publishedTemplates.find((tpl) => tpl.id === form.templateId);
   const templateVersionsQuery = api.useQuery(
     "get",
     "/api/v1/apps/{appId}/documents/{documentId}/versions",
@@ -834,12 +839,36 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       toast.add({ title: t("deleted") });
       void queryClient.invalidateQueries();
     },
+    onError: (error) => {
+      setDeleteId(null);
+      toast.add({
+        title: t("requestFailed"),
+        description:
+          error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String(error.message)
+              : undefined,
+      });
+    },
   });
   const deleteTemplate = api.useMutation("delete", "/api/v1/apps/{appId}/templates/{templateId}", {
     onSuccess: () => {
       setDeleteId(null);
       toast.add({ title: t("deleted") });
       void queryClient.invalidateQueries();
+    },
+    onError: (error) => {
+      setDeleteId(null);
+      toast.add({
+        title: t("requestFailed"),
+        description:
+          error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String(error.message)
+              : undefined,
+      });
     },
   });
   const profilesQuery = api.useQuery("get", "/api/v1/apps/{appId}/preview-profiles", {
@@ -989,12 +1018,20 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
         <Select
           aria-label={t("status")}
           placeholder={t("status")}
-          items={{
-            active: t("active"),
-            disabled: t("disabled"),
-            draft: t("draft"),
-            published: t("published"),
-          }}
+          items={
+            kind === "pages"
+              ? {
+                  active: t("active"),
+                  disabled: t("disabled"),
+                  draft: t("draft"),
+                  published: t("published"),
+                }
+              : {
+                  draft: t("draft"),
+                  published: t("published"),
+                  disabled: t("disabled"),
+                }
+          }
           onValueChange={(value) => {
             if (typeof value === "string") {
               setStatusFilter(value);
@@ -1136,12 +1173,20 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
               label={t("status")}
               value={form.status}
               className="w-full"
-              items={{
-                active: t("active"),
-                disabled: t("disabled"),
-                draft: t("draft"),
-                published: t("published"),
-              }}
+              items={
+                kind === "pages"
+                  ? {
+                      draft: t("draft"),
+                      active: t("active"),
+                      published: t("published"),
+                      disabled: t("disabled"),
+                    }
+                  : {
+                      draft: t("draft"),
+                      published: t("published"),
+                      disabled: t("disabled"),
+                    }
+              }
               onValueChange={(value) => {
                 if (typeof value === "string") setForm({ ...form, status: value });
               }}
@@ -1172,7 +1217,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
                   items={{
                     none: t("noneTemplate"),
                     ...Object.fromEntries(
-                      (templatesListQuery.data?.items ?? []).map((tpl) => [
+                      publishedTemplates.map((tpl) => [
                         tpl.id,
                         tpl.title ? `${tpl.title} (${tpl.key})` : tpl.key,
                       ]),
@@ -1760,12 +1805,20 @@ function ResourceDetailView() {
             <Select
               label={t("status")}
               value={editForm.status}
-              items={{
-                draft: t("draft"),
-                active: t("active"),
-                published: t("published"),
-                disabled: t("disabled"),
-              }}
+              items={
+                kind === "page"
+                  ? {
+                      draft: t("draft"),
+                      active: t("active"),
+                      published: t("published"),
+                      disabled: t("disabled"),
+                    }
+                  : {
+                      draft: t("draft"),
+                      published: t("published"),
+                      disabled: t("disabled"),
+                    }
+              }
               onValueChange={(val) => {
                 if (typeof val === "string") setEditForm({ ...editForm, status: val });
               }}

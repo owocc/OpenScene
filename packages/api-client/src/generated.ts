@@ -9661,18 +9661,15 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          key?: string;
           title?: string;
-          /** @default  */
           description?: string;
           categoryId?: string | null;
-          /**
-           * @default draft
-           * @enum {string}
-           */
+          /** @enum {string} */
           status?: "active" | "disabled" | "draft" | "published";
           defaultPromptId?: string | null;
           currentVersionId?: string | null;
+        } & {
+          [key: string]: unknown;
         };
       };
     };
@@ -13121,18 +13118,15 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          key?: string;
           title?: string;
-          /** @default  */
           description?: string;
           categoryId?: string | null;
-          /**
-           * @default draft
-           * @enum {string}
-           */
+          /** @enum {string} */
           status?: "active" | "disabled" | "draft" | "published";
           defaultPromptId?: string | null;
           currentVersionId?: string | null;
+        } & {
+          [key: string]: unknown;
         };
       };
     };
