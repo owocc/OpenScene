@@ -555,6 +555,30 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
             onRenameVariable={(oldKey, newKey) =>
               dispatch({ type: "state.renameVariable", oldKey, newKey })
             }
+            onSetI18nValue={(loc, key, value, defaultLoc, allLocs) =>
+              dispatch({
+                type: "i18n.setValue",
+                locale: loc,
+                key,
+                value,
+                defaultLocale: defaultLoc,
+                allLocales: allLocs,
+              })
+            }
+            onAddI18nKey={(key, value, currLoc, defaultLoc, allLocs) =>
+              dispatch({
+                type: "i18n.addKey",
+                key,
+                value,
+                currentLocale: currLoc,
+                defaultLocale: defaultLoc,
+                allLocales: allLocs,
+              })
+            }
+            onDeleteI18nKey={(key) => dispatch({ type: "i18n.deleteKey", key })}
+            onRenameI18nKey={(oldKey, newKey) =>
+              dispatch({ type: "i18n.renameKey", oldKey, newKey })
+            }
           />
         )}
         {/* 4. Right Properties Panel (hidden when nothing is selected; resizable, max 60vw) */}

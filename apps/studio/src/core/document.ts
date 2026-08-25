@@ -571,3 +571,276 @@ export function renameVariableInDocument(
     },
   };
 }
+
+export function getI18nDictionary(
+  state: Record<string, unknown> | undefined,
+): Record<string, Record<string, string>> {
+  const i18n = state?.i18n;
+  if (!isRecord(i18n)) return {};
+  const result: Record<string, Record<string, string>> = {};
+  for (const [locale, dict] of Object.entries(i18n)) {
+    if (isRecord(dict)) {
+      result[locale] = {};
+      for (const [k, v] of Object.entries(dict)) {
+        if (typeof v === "string") {
+          result[locale][k] = v;
+        } else if (typeof v === "number" || typeof v === "boolean") {
+          result[locale][k] = String(v);
+        } else if (v !== null && v !== undefined) {
+          result[locale][k] = JSON.stringify(v);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+export function getI18nKeys(
+  state: Record<string, unknown> | undefined,
+  defaultLocale = "en-US",
+): string[] {
+  const dicts = getI18nDictionary(state);
+  const defaultDict = dicts[defaultLocale] ?? {};
+  const defaultKeys = Object.keys(defaultDict);
+  const otherKeys = Object.values(dicts).flatMap((d) => Object.keys(d));
+  return Array.from(new Set([...defaultKeys, ...otherKeys]));
+}
+
+export function setI18nValueInDocument(
+  document: SceneDocument,
+  locale: string,
+  key: string,
+  value: string,
+  defaultLocale = "en-US",
+  allLocales: string[] = [],
+): SceneDocument {
+  const currentSpec = document.spec;
+  const currentState = { ...((currentSpec.state ?? {}) as Record<string, unknown>) };
+  const rawI18n = isRecord(currentState.i18n)
+    ? { ...(currentState.i18n as Record<string, unknown>) }
+    : {};
+
+  const knownLocales = Array.from(
+    new Set([defaultLocale, locale, ...allLocales, ...Object.keys(rawI18n)]),
+  );
+  const newI18n: Record<string, Record<string, string>> = {};
+
+  for (const loc of knownLocales) {
+    const locDict = isRecord(rawI18n[loc]) ? { ...(rawI18n[loc] as Record<string, string>) } : {};
+    if (loc === locale) {
+      locDict[key] = value;
+    } else if (!(key in locDict)) {
+      locDict[key] = "";
+    }
+    newI18n[loc] = locDict;
+  }
+
+  return {
+    ...document,
+    spec: {
+      ...currentSpec,
+      state: {
+        ...currentState,
+        i18n: newI18n,
+      },
+    },
+  };
+}
+
+export function addI18nKeyInDocument(
+  document: SceneDocument,
+  key: string,
+  value: string,
+  currentLocale = "en-US",
+  defaultLocale = "en-US",
+  allLocales: string[] = [],
+): SceneDocument {
+  const currentSpec = document.spec;
+  const currentState = { ...((currentSpec.state ?? {}) as Record<string, unknown>) };
+  const rawI18n = isRecord(currentState.i18n)
+    ? { ...(currentState.i18n as Record<string, unknown>) }
+    : {};
+
+  const knownLocales = Array.from(
+    new Set([defaultLocale, currentLocale, ...allLocales, ...Object.keys(rawI18n)]),
+  );
+  const newI18n: Record<string, Record<string, string>> = {};
+
+  for (const loc of knownLocales) {
+    const locDict = isRecord(rawI18n[loc]) ? { ...(rawI18n[loc] as Record<string, string>) } : {};
+    locDict[key] = loc === currentLocale ? value : (locDict[key] ?? "");
+    newI18n[loc] = locDict;
+  }
+
+  return {
+    ...document,
+    spec: {
+      ...currentSpec,
+      state: {
+        ...currentState,
+        i18n: newI18n,
+      },
+    },
+  };
+}
+
+export function deleteI18nKeyInDocument(document: SceneDocument, key: string): SceneDocument {
+  const currentSpec = document.spec;
+  const currentState = { ...((currentSpec.state ?? {}) as Record<string, unknown>) };
+  if (!isRecord(currentState.i18n)) return document;
+
+  const rawI18n = { ...(currentState.i18n as Record<string, unknown>) };
+  const newI18n: Record<string, Record<string, string>> = {};
+
+  for (const [loc, dict] of Object.entries(rawI18n)) {
+    if (isRecord(dict)) {
+      const locDict = { ...(dict as Record<string, string>) };
+      delete locDict[key];
+      newI18n[loc] = locDict;
+    }
+  }
+
+  return {
+    ...document,
+    spec: {
+      ...currentSpec,
+      state: {
+        ...currentState,
+        i18n: newI18n,
+      },
+    },
+  };
+}
+
+export function renameI18nKeyInDocument(
+  document: SceneDocument,
+  oldKey: string,
+  newKey: string,
+): SceneDocument {
+  if (oldKey === newKey) return document;
+  const currentSpec = document.spec;
+  const currentState = { ...((currentSpec.state ?? {}) as Record<string, unknown>) };
+  const rawI18n = isRecord(currentState.i18n)
+    ? { ...(currentState.i18n as Record<string, unknown>) }
+    : {};
+  const newI18n: Record<string, Record<string, string>> = {};
+
+  for (const [loc, dict] of Object.entries(rawI18n)) {
+    if (isRecord(dict)) {
+      const locDict = { ...(dict as Record<string, string>) };
+      if (oldKey in locDict) {
+        const val = locDict[oldKey];
+        delete locDict[oldKey];
+        locDict[newKey] = val;
+      }
+      newI18n[loc] = locDict;
+    }
+  }
+
+  const normalizedOld = oldKey.replace(/^\/+/, "");
+  const oldI18nPath = normalizeI18nPath(oldKey);
+  const newI18nPath = normalizeI18nPath(newKey);
+
+  const updateI18nPath = (path: string) => {
+    if (path === oldI18nPath || path === oldKey || path === `/i18n/$lang/${normalizedOld}`) {
+      return newI18nPath;
+    }
+    return path;
+  };
+
+  const transformValue = (val: unknown): unknown => {
+    if (val === null || val === undefined) return val;
+    if (isDynamicValue(val)) {
+      if ("$t" in val && typeof val.$t === "string") {
+        return { ...val, $t: updateI18nPath(val.$t) };
+      }
+      return val;
+    }
+    if (Array.isArray(val)) {
+      return val.map((item) => transformValue(item));
+    }
+    if (isRecord(val)) {
+      const updated: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(val)) {
+        updated[k] = transformValue(v);
+      }
+      return updated;
+    }
+    return val;
+  };
+
+  const elements = { ...currentSpec.elements };
+  for (const [elementId, element] of Object.entries(elements)) {
+    elements[elementId] = {
+      ...element,
+      props: (element.props ? transformValue(element.props) : {}) as Record<string, unknown>,
+      ...(element.visible ? { visible: transformValue(element.visible) } : {}),
+      ...(element.repeat ? { repeat: transformValue(element.repeat) } : {}),
+      ...(element.watch ? { watch: transformValue(element.watch) as Record<string, unknown> } : {}),
+      ...(element.on ? { on: transformValue(element.on) as Record<string, unknown> } : {}),
+    } as typeof element;
+  }
+
+  return {
+    ...document,
+    spec: {
+      ...currentSpec,
+      state: {
+        ...currentState,
+        i18n: newI18n,
+      },
+      elements,
+    },
+  };
+}
+
+export function findI18nReferences(document: SceneDocument, i18nKey: string): VariableReference[] {
+  const references: VariableReference[] = [];
+  const normalizedKey = i18nKey.replace(/^\/+/, "");
+  if (!normalizedKey) return references;
+  const targetPath = normalizeI18nPath(normalizedKey);
+
+  const matchesI18n = (path: string) => {
+    return path === targetPath || path === normalizedKey || path === `/i18n/$lang/${normalizedKey}`;
+  };
+
+  const scanValue = (val: unknown, elementId: string, elementType: string, currentPath: string) => {
+    if (val === null || val === undefined) return;
+    if (isDynamicValue(val)) {
+      if ("$t" in val && typeof val.$t === "string" && matchesI18n(val.$t)) {
+        references.push({
+          elementId,
+          elementType,
+          property: currentPath,
+          kind: "$t" as unknown as VariableReference["kind"],
+        });
+      }
+      return;
+    }
+    if (Array.isArray(val)) {
+      val.forEach((item, index) => {
+        scanValue(item, elementId, elementType, `${currentPath}[${index}]`);
+      });
+    } else if (isRecord(val)) {
+      for (const [propKey, childVal] of Object.entries(val)) {
+        scanValue(
+          childVal,
+          elementId,
+          elementType,
+          currentPath ? `${currentPath}.${propKey}` : propKey,
+        );
+      }
+    }
+  };
+
+  const elements = document.spec.elements ?? {};
+  for (const [elementId, element] of Object.entries(elements)) {
+    if (element.props) scanValue(element.props, elementId, element.type, "props");
+    if (element.visible) scanValue(element.visible, elementId, element.type, "visible");
+    if (element.repeat) scanValue(element.repeat, elementId, element.type, "repeat");
+    if (element.watch) scanValue(element.watch, elementId, element.type, "watch");
+    if (element.on) scanValue(element.on, elementId, element.type, "on");
+  }
+
+  return references;
+}

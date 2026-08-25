@@ -35,6 +35,22 @@ export interface StudioStoreState extends EditorState {
   deleteVariable: (key: string) => void;
   renameVariable: (oldKey: string, newKey: string) => void;
   updateState: (state: Record<string, unknown>) => void;
+  setI18nValue: (
+    locale: string,
+    key: string,
+    value: string,
+    defaultLocale?: string,
+    allLocales?: string[],
+  ) => void;
+  addI18nKey: (
+    key: string,
+    value: string,
+    currentLocale?: string,
+    defaultLocale?: string,
+    allLocales?: string[],
+  ) => void;
+  deleteI18nKey: (key: string) => void;
+  renameI18nKey: (oldKey: string, newKey: string) => void;
   undo: () => void;
   redo: () => void;
 }
@@ -97,6 +113,12 @@ export const useStudioStore = create<StudioStoreState>()((set, get) => ({
   renameVariable: (oldKey, newKey) =>
     get().dispatch({ type: "state.renameVariable", oldKey, newKey }),
   updateState: (state) => get().dispatch({ type: "state.update", state }),
+  setI18nValue: (locale, key, value, defaultLocale, allLocales) =>
+    get().dispatch({ type: "i18n.setValue", locale, key, value, defaultLocale, allLocales }),
+  addI18nKey: (key, value, currentLocale, defaultLocale, allLocales) =>
+    get().dispatch({ type: "i18n.addKey", key, value, currentLocale, defaultLocale, allLocales }),
+  deleteI18nKey: (key) => get().dispatch({ type: "i18n.deleteKey", key }),
+  renameI18nKey: (oldKey, newKey) => get().dispatch({ type: "i18n.renameKey", oldKey, newKey }),
   undo: () => get().dispatch({ type: "history.undo" }),
   redo: () => get().dispatch({ type: "history.redo" }),
 }));

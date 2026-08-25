@@ -683,7 +683,7 @@ type RootTranslation = {
        */
       variableCount: RequiredParams<"count">;
       /**
-       * 语​言​变​量​ ​(​i​1​8​n​)
+       * i​1​8​n​ ​文​本
        */
       localesTab: string;
       /**
@@ -738,6 +738,99 @@ type RootTranslation = {
        * 确​定​要​从​状​态​中​移​除​语​言​变​量​ ​(​l​a​n​g​)​ ​吗​？
        */
       confirmDeleteLang: string;
+      /**
+       * 新​建​键
+       */
+      addI18nKey: string;
+      /**
+       * 编​辑​键
+       */
+      editI18nKey: string;
+      /**
+       * 重​命​名​键
+       */
+      renameI18nKey: string;
+      /**
+       * 删​除​键
+       */
+      deleteI18nKey: string;
+      /**
+       * 文​本​键​名
+       */
+      i18nKeyName: string;
+      /**
+       * 文​本​内​容
+       */
+      i18nKeyValue: string;
+      /**
+       * 例​如​ ​g​r​e​e​t​i​n​g​,​ ​h​o​m​e​.​t​i​t​l​e
+       */
+      i18nKeyPlaceholder: string;
+      /**
+       * 输​入​当​前​语​言​的​文​本​内​容​.​.​.
+       */
+      i18nValuePlaceholder: string;
+      /**
+       * 暂​无​ ​i​1​8​n​ ​文​本​键
+       */
+      emptyI18nTitle: string;
+      /**
+       * 创​建​ ​i​1​8​n​ ​文​本​键​，​支​持​多​语​言​动​态​切​换​与​翻​译​文​本​管​理​。
+       */
+      emptyI18nDesc: string;
+      /**
+       * 搜​索​键​名​或​文​本​内​容​.​.​.
+       */
+      searchI18nPlaceholder: string;
+      /**
+       * 当​前​编​辑​语​言
+       */
+      currentLocale: string;
+      /**
+       * 默​认​语​言
+       */
+      defaultLocaleHint: string;
+      /**
+       * 默​认​值​:​ ​{​v​a​l​}
+       * @param {unknown} val
+       */
+      fallbackHint: RequiredParams<"val">;
+      /**
+       * 未​翻​译
+       */
+      untranslated: string;
+      /**
+       * 确​认​删​除​ ​i​1​8​n​ ​键
+       */
+      confirmDeleteI18nTitle: string;
+      /**
+       * 确​定​要​从​所​有​语​言​中​删​除​键​“​{​k​e​y​}​”​吗​？
+       * @param {unknown} key
+       */
+      confirmDeleteI18n: RequiredParams<"key">;
+      /**
+       * 键​“​{​k​e​y​}​”​当​前​正​被​ ​{​c​o​u​n​t​}​ ​处​组​件​引​用​。​删​除​可​能​导​致​翻​译​缺​失​。​确​定​继​续​吗​？
+       * @param {unknown} count
+       * @param {unknown} key
+       */
+      confirmDeleteI18nWithRefs: RequiredParams<"count" | "key">;
+      /**
+       * {​c​o​u​n​t​}​ ​个​键
+       * @param {unknown} count
+       */
+      i18nKeyCount: RequiredParams<"count">;
+      /**
+       * 复​制​ ​i​1​8​n​ ​绑​定​表​达​式​ ​(​$​t​)
+       */
+      copyI18nPath: string;
+      /**
+       * 已​复​制​ ​i​1​8​n​ ​表​达​式
+       */
+      i18nPathCopied: string;
+      /**
+       * 选​择​语​言
+       */
+      selectLocale: string;
     };
   };
   toolbar: {
@@ -1791,7 +1884,7 @@ export type TranslationFunctions = {
        */
       variableCount: (arg: { count: unknown }) => LocalizedString;
       /**
-       * 语言变量 (i18n)
+       * i18n 文本
        */
       localesTab: () => LocalizedString;
       /**
@@ -1846,6 +1939,94 @@ export type TranslationFunctions = {
        * 确定要从状态中移除语言变量 (lang) 吗？
        */
       confirmDeleteLang: () => LocalizedString;
+      /**
+       * 新建键
+       */
+      addI18nKey: () => LocalizedString;
+      /**
+       * 编辑键
+       */
+      editI18nKey: () => LocalizedString;
+      /**
+       * 重命名键
+       */
+      renameI18nKey: () => LocalizedString;
+      /**
+       * 删除键
+       */
+      deleteI18nKey: () => LocalizedString;
+      /**
+       * 文本键名
+       */
+      i18nKeyName: () => LocalizedString;
+      /**
+       * 文本内容
+       */
+      i18nKeyValue: () => LocalizedString;
+      /**
+       * 例如 greeting, home.title
+       */
+      i18nKeyPlaceholder: () => LocalizedString;
+      /**
+       * 输入当前语言的文本内容...
+       */
+      i18nValuePlaceholder: () => LocalizedString;
+      /**
+       * 暂无 i18n 文本键
+       */
+      emptyI18nTitle: () => LocalizedString;
+      /**
+       * 创建 i18n 文本键，支持多语言动态切换与翻译文本管理。
+       */
+      emptyI18nDesc: () => LocalizedString;
+      /**
+       * 搜索键名或文本内容...
+       */
+      searchI18nPlaceholder: () => LocalizedString;
+      /**
+       * 当前编辑语言
+       */
+      currentLocale: () => LocalizedString;
+      /**
+       * 默认语言
+       */
+      defaultLocaleHint: () => LocalizedString;
+      /**
+       * 默认值: {val}
+       */
+      fallbackHint: (arg: { val: unknown }) => LocalizedString;
+      /**
+       * 未翻译
+       */
+      untranslated: () => LocalizedString;
+      /**
+       * 确认删除 i18n 键
+       */
+      confirmDeleteI18nTitle: () => LocalizedString;
+      /**
+       * 确定要从所有语言中删除键“{key}”吗？
+       */
+      confirmDeleteI18n: (arg: { key: unknown }) => LocalizedString;
+      /**
+       * 键“{key}”当前正被 {count} 处组件引用。删除可能导致翻译缺失。确定继续吗？
+       */
+      confirmDeleteI18nWithRefs: (arg: { count: unknown; key: unknown }) => LocalizedString;
+      /**
+       * {count} 个键
+       */
+      i18nKeyCount: (arg: { count: unknown }) => LocalizedString;
+      /**
+       * 复制 i18n 绑定表达式 ($t)
+       */
+      copyI18nPath: () => LocalizedString;
+      /**
+       * 已复制 i18n 表达式
+       */
+      i18nPathCopied: () => LocalizedString;
+      /**
+       * 选择语言
+       */
+      selectLocale: () => LocalizedString;
     };
   };
   toolbar: {

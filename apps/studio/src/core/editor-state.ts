@@ -1,8 +1,12 @@
 import type { SceneDocument, UIElement } from "@openscene/protocol";
 
 import {
+  addI18nKeyInDocument,
+  deleteI18nKeyInDocument,
   deleteVariableInDocument,
+  renameI18nKeyInDocument,
   renameVariableInDocument,
+  setI18nValueInDocument,
   setVariableInDocument,
 } from "./document";
 import {
@@ -60,7 +64,25 @@ export type EditorAction =
   | { type: "state.setVariable"; key: string; value: unknown }
   | { type: "state.deleteVariable"; key: string }
   | { type: "state.renameVariable"; oldKey: string; newKey: string }
-  | { type: "state.update"; state: Record<string, unknown> };
+  | { type: "state.update"; state: Record<string, unknown> }
+  | {
+      type: "i18n.setValue";
+      locale: string;
+      key: string;
+      value: string;
+      defaultLocale?: string;
+      allLocales?: string[];
+    }
+  | {
+      type: "i18n.addKey";
+      key: string;
+      value: string;
+      currentLocale?: string;
+      defaultLocale?: string;
+      allLocales?: string[];
+    }
+  | { type: "i18n.deleteKey"; key: string }
+  | { type: "i18n.renameKey"; oldKey: string; newKey: string };
 function selectedForDocument(
   document: SceneDocument,
   nodeIds: readonly string[],
@@ -259,6 +281,36 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
           state: action.state,
         },
       });
+    }
+    case "i18n.setValue": {
+      const nextDoc = setI18nValueInDocument(
+        state.document,
+        action.locale,
+        action.key,
+        action.value,
+        action.defaultLocale ?? state.document.pageInfo?.locale ?? "en-US",
+        action.allLocales,
+      );
+      return commit(state, nextDoc);
+    }
+    case "i18n.addKey": {
+      const nextDoc = addI18nKeyInDocument(
+        state.document,
+        action.key,
+        action.value,
+        action.currentLocale ?? state.locale ?? "en-US",
+        action.defaultLocale ?? state.document.pageInfo?.locale ?? "en-US",
+        action.allLocales,
+      );
+      return commit(state, nextDoc);
+    }
+    case "i18n.deleteKey": {
+      const nextDoc = deleteI18nKeyInDocument(state.document, action.key);
+      return commit(state, nextDoc);
+    }
+    case "i18n.renameKey": {
+      const nextDoc = renameI18nKeyInDocument(state.document, action.oldKey, action.newKey);
+      return commit(state, nextDoc);
     }
   }
 }

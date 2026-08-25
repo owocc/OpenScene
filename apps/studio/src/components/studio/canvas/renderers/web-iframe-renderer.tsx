@@ -102,8 +102,27 @@ export function WebIframeRenderer({
     const frame = frameRef.current;
     if (!frame) return undefined;
     const sessionId = sessionIdRef.current;
+    const targetOrigin = (
+      allowedOrigin ||
+      (() => {
+        try {
+          return new URL(url, window.location.href).origin;
+        } catch {
+          return "*";
+        }
+      })()
+    ).replace(/\/$/, "");
+
     const receiveReady = (event: MessageEvent<unknown>) => {
-      if (event.source !== frame.contentWindow || event.origin !== allowedOrigin) return;
+      const isAllowedOrigin =
+        event.origin === targetOrigin ||
+        event.origin === allowedOrigin ||
+        targetOrigin === "*" ||
+        (targetOrigin.startsWith("http://localhost:") &&
+          event.origin.startsWith("http://localhost:")) ||
+        (targetOrigin.startsWith("http://127.0.0.1:") &&
+          event.origin.startsWith("http://127.0.0.1:"));
+      if (event.source !== frame.contentWindow || !isAllowedOrigin) return;
       if (!isRendererReadyForSession(event.data, sessionId, appType)) return;
       const parsed = RendererWindowMessageSchema.safeParse(event.data);
       if (!parsed.success) return;
@@ -165,7 +184,7 @@ export function WebIframeRenderer({
       console.log(`[OpenScene Studio] Connecting to iframe renderer (session: ${sessionId})`);
       frame.contentWindow?.postMessage(
         createBridgeEnvelope(sessionId, "STUDIO_CONNECT", undefined),
-        { targetOrigin: allowedOrigin, transfer: [channel.port2] },
+        { targetOrigin: event.origin || targetOrigin, transfer: [channel.port2] },
       );
       const initMessage = createBridgeEnvelope(sessionId, "DOCUMENT_SET", {
         document: documentRef.current,

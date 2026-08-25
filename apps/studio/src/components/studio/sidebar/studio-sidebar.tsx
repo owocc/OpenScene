@@ -51,6 +51,10 @@ export function StudioSidebar({
   onSetVariable,
   onDeleteVariable,
   onRenameVariable,
+  onSetI18nValue,
+  onAddI18nKey,
+  onDeleteI18nKey,
+  onRenameI18nKey,
 }: StudioSidebarProps) {
   const { LL } = useI18n();
   const queryPanel = useQueryStore((s) => s.panel);
@@ -306,6 +310,10 @@ export function StudioSidebar({
                         onSetVariable={onSetVariable}
                         onDeleteVariable={onDeleteVariable}
                         onRenameVariable={onRenameVariable}
+                        onSetI18nValue={onSetI18nValue}
+                        onAddI18nKey={onAddI18nKey}
+                        onDeleteI18nKey={onDeleteI18nKey}
+                        onRenameI18nKey={onRenameI18nKey}
                         onSelectNode={onSelectNode}
                         bootstrap={bootstrap}
                       />

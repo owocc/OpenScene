@@ -127,9 +127,10 @@ export class OpenSceneController implements OpenSceneClient {
   private state: OpenSceneClientState = emptyState();
   private editorConnection: EditorConnection | null = null;
   private port: MessagePort | null = null;
+  private readyInterval: ReturnType<typeof setInterval> | null = null;
   private abortController: AbortController | null = null;
   private destroyed = false;
-  private pageKey: string;
+  private pageKey?: string;
   private readonly onWindowMessage = (event: MessageEvent<unknown>) =>
     this.handleWindowMessage(event);
   private readonly onPortMessage = (event: MessageEvent<unknown>) => this.handlePortMessage(event);
@@ -174,8 +175,9 @@ export class OpenSceneController implements OpenSceneClient {
     const controller = new AbortController();
     this.abortController = controller;
     this.setState({ status: "loading", error: null });
+    const targetPageKey = pageKey ?? this.options.pageKey ?? "";
     try {
-      const response = await fetch(runtimeUrl(this.options, pageKey), {
+      const response = await fetch(runtimeUrl(this.options, targetPageKey), {
         method: "GET",
         headers: { accept: "application/json" },
         signal: controller.signal,
@@ -281,6 +283,10 @@ export class OpenSceneController implements OpenSceneClient {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.readyInterval) {
+      clearInterval(this.readyInterval);
+      this.readyInterval = null;
+    }
     this.abortController?.abort();
     this.abortController = null;
     this.targetWindow?.removeEventListener("message", this.onWindowMessage);
@@ -289,7 +295,6 @@ export class OpenSceneController implements OpenSceneClient {
     this.port = null;
     this.listeners.clear();
   }
-
   private announceRendererReady(): void {
     if (!this.targetWindow || !this.editorConnection) return;
     const envelope = createBridgeEnvelope(this.editorConnection.sessionId, "RENDERER_READY", {
@@ -298,10 +303,40 @@ export class OpenSceneController implements OpenSceneClient {
     const parsed = RendererWindowMessageSchema.safeParse(envelope);
     if (!parsed.success) return;
     const parent = this.targetWindow.parent;
-    if (parent && parent !== this.targetWindow)
-      parent.postMessage(parsed.data, this.editorConnection.studioOrigin);
-  }
+    if (!parent || parent === this.targetWindow) {
+      console.warn(
+        `[OpenScene] Editor query parameters were detected, but this window is not running inside an iframe (window.parent === window). Waiting for Studio parent window at ${this.editorConnection.studioOrigin}...`,
+      );
+      return;
+    }
 
+    const send = () => {
+      if (this.port || this.destroyed || !this.editorConnection) {
+        if (this.readyInterval) {
+          clearInterval(this.readyInterval);
+          this.readyInterval = null;
+        }
+        return;
+      }
+      parent.postMessage(parsed.data, this.editorConnection.studioOrigin);
+    };
+
+    send();
+    if (!this.readyInterval) {
+      let attempts = 0;
+      this.readyInterval = setInterval(() => {
+        attempts += 1;
+        if (attempts > 40 || this.port || this.destroyed) {
+          if (this.readyInterval) {
+            clearInterval(this.readyInterval);
+            this.readyInterval = null;
+          }
+          return;
+        }
+        send();
+      }, 250);
+    }
+  }
   private handleWindowMessage(event: MessageEvent<unknown>): void {
     if (!this.editorConnection || this.destroyed || !this.targetWindow) return;
     if (
@@ -319,12 +354,15 @@ export class OpenSceneController implements OpenSceneClient {
       });
       return;
     }
+    if (this.readyInterval) {
+      clearInterval(this.readyInterval);
+      this.readyInterval = null;
+    }
     this.port?.close();
     this.port = port;
     this.port.addEventListener("message", this.onPortMessage);
     this.port.start();
   }
-
   private handlePortMessage(event: MessageEvent<unknown>): void {
     if (!this.editorConnection || !this.port || this.destroyed) return;
     const envelope = BridgeEnvelopeSchema.safeParse(event.data);

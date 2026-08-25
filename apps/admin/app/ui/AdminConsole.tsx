@@ -14,6 +14,7 @@ import {
   Plus,
   Star,
   Trash,
+  Eye,
 } from "@phosphor-icons/react";
 import {
   APP_TYPE_FLUTTER,
@@ -46,6 +47,7 @@ import type { components } from "@openscene/api-client";
 import { api, fetchClient } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import { isAppScopedPath } from "./navigation";
+import { OpenApiDocDetailView } from "./OpenApiDocDetailView";
 
 type App = components["schemas"]["App"];
 
@@ -164,6 +166,7 @@ export function AdminConsole() {
   if (pathname === "/locales") return <LocalesView />;
   if (pathname === "/assets") return <AssetsView />;
   if (pathname === "/openapi-docs") return <OpenApiDocsView />;
+  if (pathname.startsWith("/openapi-docs/")) return <OpenApiDocDetailView />;
   if (pathname === "/manifest" || pathname === "/meta") return <MetaView />;
   if (pathname === "/components") return <ComponentsView />;
   if (pathname.startsWith("/components/")) return <ComponentDetailView />;
@@ -1856,7 +1859,15 @@ function OpenApiDocsView() {
           <Table.Body>
             {items.map((item) => (
               <Table.Row key={item.id}>
-                <Table.Cell>{item.name}</Table.Cell>
+                <Table.Cell>
+                  <button
+                    type="button"
+                    onClick={() => context.router.push(context.href(`/openapi-docs/${item.id}`))}
+                    className="text-left font-medium text-kumo-link hover:underline cursor-pointer"
+                  >
+                    {item.name}
+                  </button>
+                </Table.Cell>
                 <Table.Cell>
                   {
                     Object.keys((item.json as { paths?: Record<string, unknown> })?.paths ?? {})
@@ -1881,6 +1892,14 @@ function OpenApiDocsView() {
                       }
                     />
                     <DropdownMenu.Content>
+                      <DropdownMenu.Item
+                        icon={Eye}
+                        onClick={() =>
+                          context.router.push(context.href(`/openapi-docs/${item.id}`))
+                        }
+                      >
+                        {t("viewDetails")}
+                      </DropdownMenu.Item>
                       <DropdownMenu.Item
                         icon={PencilSimple}
                         onClick={() => {

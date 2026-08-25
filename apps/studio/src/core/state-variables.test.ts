@@ -2,14 +2,21 @@ import { describe, expect, it } from "vite-plus/test";
 import { createEmptySceneDocument, type SceneDocument } from "@openscene/protocol";
 
 import {
+  addI18nKeyInDocument,
   convertVariableValue,
+  deleteI18nKeyInDocument,
   deleteVariableInDocument,
+  findI18nReferences,
   findVariableReferences,
   getDefaultVariableValue,
+  getI18nDictionary,
+  getI18nKeys,
   getStateVariables,
   inferVariableType,
   isValidVariableKey,
+  renameI18nKeyInDocument,
   renameVariableInDocument,
+  setI18nValueInDocument,
   setVariableInDocument,
 } from "./document";
 import { createEditorState, editorReducer } from "./editor-state";
@@ -212,5 +219,127 @@ describe("State variables logic for json-render", () => {
     // 7. Redo add
     const redoneAdd = editorReducer(undoneAdd, { type: "history.redo" });
     expect(redoneAdd.document.spec.state?.theme).toBe("dark");
+  });
+
+  it("extracts i18n keys and dictionary with default locale priority", () => {
+    const state = {
+      i18n: {
+        "en-US": { welcome: "Welcome", title: "My Title" },
+        "zh-CN": { welcome: "欢迎", extra: "附加内容" },
+      },
+    };
+    const dict = getI18nDictionary(state);
+    expect(dict["en-US"]?.welcome).toBe("Welcome");
+    expect(dict["zh-CN"]?.welcome).toBe("欢迎");
+
+    const keys = getI18nKeys(state, "en-US");
+    expect(keys).toEqual(["welcome", "title", "extra"]);
+  });
+
+  it("adds, edits, renames, and deletes i18n keys across all locales", () => {
+    const doc: SceneDocument = {
+      ...baseDoc,
+      spec: {
+        ...baseDoc.spec,
+        elements: {
+          ...baseDoc.spec.elements,
+          "card-1": {
+            ...baseDoc.spec.elements["card-1"],
+            props: {
+              header: { $t: "/i18n/$lang/welcome" },
+            },
+          },
+        },
+        state: {
+          i18n: {
+            "en-US": { welcome: "Welcome" },
+            "zh-CN": { welcome: "欢迎" },
+          },
+        },
+      },
+    };
+
+    // 1. Check references
+    const refs = findI18nReferences(doc, "welcome");
+    expect(refs.length).toBe(1);
+    expect(refs[0].elementId).toBe("card-1");
+
+    // 2. Add key across all locales
+    const docWithNewKey = addI18nKeyInDocument(doc, "button.save", "Save", "en-US", "en-US", [
+      "zh-CN",
+    ]);
+    const dictAfterAdd = getI18nDictionary(docWithNewKey.spec.state);
+    expect(dictAfterAdd["en-US"]?.["button.save"]).toBe("Save");
+    expect(dictAfterAdd["zh-CN"]?.["button.save"]).toBe("");
+
+    // 3. Edit translation in zh-CN
+    const docEdited = setI18nValueInDocument(
+      docWithNewKey,
+      "zh-CN",
+      "button.save",
+      "保存",
+      "en-US",
+      ["zh-CN"],
+    );
+    const dictAfterEdit = getI18nDictionary(docEdited.spec.state);
+    expect(dictAfterEdit["zh-CN"]?.["button.save"]).toBe("保存");
+    expect(dictAfterEdit["en-US"]?.["button.save"]).toBe("Save");
+
+    // 4. Rename key -> updates all locales and element dynamic value references
+    const docRenamed = renameI18nKeyInDocument(docEdited, "welcome", "greeting.welcome");
+    const dictAfterRename = getI18nDictionary(docRenamed.spec.state);
+    expect(dictAfterRename["en-US"]?.welcome).toBeUndefined();
+    expect(dictAfterRename["en-US"]?.["greeting.welcome"]).toBe("Welcome");
+    expect(dictAfterRename["zh-CN"]?.["greeting.welcome"]).toBe("欢迎");
+
+    const updatedProps = docRenamed.spec.elements["card-1"]?.props as Record<
+      string,
+      { $t?: string }
+    >;
+    expect(updatedProps?.header?.$t).toBe("/i18n/$lang/greeting.welcome");
+
+    // 5. Delete key -> removes from all locales
+    const docDeleted = deleteI18nKeyInDocument(docRenamed, "greeting.welcome");
+    const dictAfterDelete = getI18nDictionary(docDeleted.spec.state);
+    expect(dictAfterDelete["en-US"]?.["greeting.welcome"]).toBeUndefined();
+    expect(dictAfterDelete["zh-CN"]?.["greeting.welcome"]).toBeUndefined();
+  });
+
+  it("supports editorReducer actions for i18n CRUD with undo/redo", () => {
+    const state = createEditorState(baseDoc, 1);
+
+    // 1. Add i18n key
+    const state1 = editorReducer(state, {
+      type: "i18n.addKey",
+      key: "login.btn",
+      value: "Log In",
+      currentLocale: "en-US",
+      defaultLocale: "en-US",
+      allLocales: ["en-US", "zh-CN"],
+    });
+    const dict1 = getI18nDictionary(state1.document.spec.state);
+    expect(dict1["en-US"]?.["login.btn"]).toBe("Log In");
+    expect(dict1["zh-CN"]?.["login.btn"]).toBe("");
+
+    // 2. Set translation in zh-CN
+    const state2 = editorReducer(state1, {
+      type: "i18n.setValue",
+      locale: "zh-CN",
+      key: "login.btn",
+      value: "登录",
+      defaultLocale: "en-US",
+    });
+    const dict2 = getI18nDictionary(state2.document.spec.state);
+    expect(dict2["zh-CN"]?.["login.btn"]).toBe("登录");
+
+    // 3. Undo set translation
+    const undone = editorReducer(state2, { type: "history.undo" });
+    const dictUndone = getI18nDictionary(undone.document.spec.state);
+    expect(dictUndone["zh-CN"]?.["login.btn"]).toBe("");
+
+    // 4. Redo set translation
+    const redone = editorReducer(undone, { type: "history.redo" });
+    const dictRedone = getI18nDictionary(redone.document.spec.state);
+    expect(dictRedone["zh-CN"]?.["login.btn"]).toBe("登录");
   });
 });

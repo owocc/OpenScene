@@ -132,8 +132,23 @@ export interface StudioSidebarProps {
   onSetVariable?: (key: string, value: unknown) => void;
   onDeleteVariable?: (key: string) => void;
   onRenameVariable?: (oldKey: string, newKey: string) => void;
+  onSetI18nValue?: (
+    locale: string,
+    key: string,
+    value: string,
+    defaultLocale?: string,
+    allLocales?: string[],
+  ) => void;
+  onAddI18nKey?: (
+    key: string,
+    value: string,
+    currentLocale?: string,
+    defaultLocale?: string,
+    allLocales?: string[],
+  ) => void;
+  onDeleteI18nKey?: (key: string) => void;
+  onRenameI18nKey?: (oldKey: string, newKey: string) => void;
 }
-
 export const navTabs: Array<{
   id: SidebarTab;
   label: string;
