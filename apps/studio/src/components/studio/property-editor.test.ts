@@ -3,7 +3,11 @@ import {
   resolveControlRenderer,
   controlRegistry,
   DynamicValueInput,
+  VariableCombobox,
+  TemplateMentionInput,
   MODE_CONFIGS,
+  findMentionMatch,
+  applyMention,
 } from "./property-editor";
 import {
   dynamicMode,
@@ -248,5 +252,49 @@ describe("Dynamic mode and path handling", () => {
     const state = { isVisible: true, isHidden: false };
     expect(resolveDynamicValue({ $state: "/isVisible" }, state, "en-US")).toBe(true);
     expect(resolveDynamicValue({ $state: "/isHidden" }, state, "en-US")).toBe(false);
+  });
+
+  it("detects and filters @mention variables in template strings", () => {
+    const variables = [
+      { key: "counter", path: "/counter", type: "number", value: 42 },
+      { key: "userName", path: "/userName", type: "string", value: "Alice" },
+      { key: "theme", path: "/theme", type: "string", value: "dark" },
+    ];
+
+    // No mention active
+    const matchNone = findMentionMatch("Hello world", 11, variables);
+    expect(matchNone.isMentioning).toBe(false);
+    expect(matchNone.matches.length).toBe(0);
+
+    // Trailing '@' trigger
+    const matchAll = findMentionMatch("Hello @", 7, variables);
+    expect(matchAll.isMentioning).toBe(true);
+    expect(matchAll.query).toBe("");
+    expect(matchAll.matches.length).toBe(3);
+    expect(matchAll.matchStart).toBe(6);
+    expect(matchAll.matchEnd).toBe(7);
+
+    // Filtered query '@cou'
+    const matchFilter = findMentionMatch("Count is @cou", 13, variables);
+    expect(matchFilter.isMentioning).toBe(true);
+    expect(matchFilter.query).toBe("cou");
+    expect(matchFilter.matches.length).toBe(1);
+    expect(matchFilter.matches[0].key).toBe("counter");
+    expect(matchFilter.matchStart).toBe(9);
+    expect(matchFilter.matchEnd).toBe(13);
+  });
+
+  it("applies @mention variable into ${/varName} template syntax", () => {
+    const variable = { key: "counter", path: "/counter", type: "number", value: 42 };
+    const original = "Current: @cou items";
+    // '@cou' is from index 9 to 13
+    const result = applyMention(original, 9, 13, variable);
+    expect(result.nextText).toBe("Current: ${/counter} items");
+    expect(result.nextCursor).toBe(9 + "${/counter}".length);
+  });
+
+  it("exports VariableCombobox and TemplateMentionInput components", () => {
+    expect(VariableCombobox).toBeDefined();
+    expect(TemplateMentionInput).toBeDefined();
   });
 });

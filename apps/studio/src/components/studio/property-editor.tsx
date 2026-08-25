@@ -17,7 +17,7 @@ import type { ComponentMeta, EditorMeta, PropMeta } from "@/core/meta";
 import { useI18n } from "@/i18n";
 import { useQueryStore } from "@/stores";
 import { useStudioStore } from "@/stores/studio-store";
-import { DynamicModeDropdown, DynamicValueInput } from "./dynamic-value-input";
+import { DynamicModeDropdown, DynamicValueInput, VariableCombobox } from "./dynamic-value-input";
 import { StyleControl } from "./property-editor/style";
 import { Button } from "@/components/ui/button";
 
@@ -1374,23 +1374,18 @@ export function PropertyEditor({
                           <label className="text-[10px] text-muted-foreground">
                             {LL.properties.selectVariable()}
                           </label>
-                          <select
-                            className="h-6.5 w-full font-mono text-xs bg-muted/40 rounded-md border border-border/60 px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                            value={targetVarKey}
-                            onChange={(e) => {
-                              const newKey = e.target.value;
+                          <VariableCombobox
+                            value={targetVarKey ? `/${targetVarKey}` : ""}
+                            statePaths={statePaths}
+                            placeholder={LL.properties.selectVariable()}
+                            onChange={(newPath) => {
+                              const newKey = newPath.replace(/^\/+/, "");
                               onUpdateOn?.(name, {
                                 action: "setState",
                                 params: { [newKey]: "__toggle__" },
                               });
                             }}
-                          >
-                            {stateKeys.map((key) => (
-                              <option key={key} value={key}>
-                                /{key}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
 
                         <div className="grid gap-1">

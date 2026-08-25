@@ -18,6 +18,7 @@ import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { isRecord } from "@/core/document";
 import { Button } from "@/components/ui/button";
+import { VariableCombobox } from "@/components/studio/variable-combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -604,17 +605,12 @@ export function ActionsPanel({
                   <label className="text-[11px] font-medium text-foreground">
                     {LL.panels.actions.targetVariable()}
                   </label>
-                  <select
-                    className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                    value={formTargetVar}
-                    onChange={(e) => setFormTargetVar(e.target.value)}
-                  >
-                    {stateKeys.map((key) => (
-                      <option key={key} value={key}>
-                        /{key}
-                      </option>
-                    ))}
-                  </select>
+                  <VariableCombobox
+                    value={formTargetVar ? `/${formTargetVar}` : ""}
+                    placeholder={LL.panels.actions.targetVariable()}
+                    onChange={(newPath) => setFormTargetVar(newPath.replace(/^\/+/, ""))}
+                    buttonClassName="h-8"
+                  />
                 </div>
 
                 <div className="grid gap-1">
@@ -722,17 +718,12 @@ export function ActionsPanel({
                   <label className="text-[11px] font-medium text-foreground">
                     {LL.panels.actions.targetVariable()}
                   </label>
-                  <select
-                    className="h-7 w-full font-mono text-xs bg-background rounded-lg border border-input px-2 text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                    value={formTargetVar}
-                    onChange={(e) => setFormTargetVar(e.target.value)}
-                  >
-                    {stateKeys.map((key) => (
-                      <option key={key} value={key}>
-                        /{key}
-                      </option>
-                    ))}
-                  </select>
+                  <VariableCombobox
+                    value={formTargetVar ? `/${formTargetVar}` : ""}
+                    placeholder={LL.panels.actions.targetVariable()}
+                    onChange={(newPath) => setFormTargetVar(newPath.replace(/^\/+/, ""))}
+                    buttonClassName="h-8"
+                  />
                 </div>
 
                 <div className="grid gap-1">

@@ -26,7 +26,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useStudioStore } from "@/stores/studio-store";
 import { cn } from "@/lib/utils";
+import { VariableCombobox } from "./variable-combobox";
+import { TemplateMentionInput } from "./composer-mentions";
 
+export { VariableCombobox } from "./variable-combobox";
+export {
+  ComposerMenu,
+  ComposerMentionItem,
+  TemplateMentionInput,
+  applyMention,
+  findMentionMatch,
+} from "./composer-mentions";
 function stringValue(value: JsonValue | undefined): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
@@ -243,27 +253,16 @@ export function DynamicValueInput({
   if (activeMode === "state" || activeMode === "bindState") {
     const rawVal = isDynamicValue(value) ? dynamicValueText(value) : "";
     return (
-      <div className="grid gap-1 min-w-0 flex-1">
-        <InputGroup className={cn("h-8", className)}>
-          <InputGroupAddon align="inline-start" className="pe-1 text-primary">
-            <VariableIcon className="size-3.5" />
-          </InputGroupAddon>
-          <InputGroupInput
-            list={datalistId}
-            value={rawVal}
-            placeholder={statePaths[0] ?? "/variableName"}
-            onChange={(event) => onChange(dynamicValue(activeMode, event.target.value))}
-            className={cn("font-mono text-xs", customInputClassName)}
-            disabled={disabled}
-            autoFocus={autoFocus}
-          />
-          {modeDropdown && <InputGroupAddon align="inline-end">{modeDropdown}</InputGroupAddon>}
-        </InputGroup>
-        <datalist id={datalistId}>
-          {statePaths.map((path) => (
-            <option key={path} value={path} />
-          ))}
-        </datalist>
+      <div className={cn("flex items-center gap-1 min-w-0 flex-1", className)}>
+        <VariableCombobox
+          value={rawVal}
+          statePaths={statePaths}
+          placeholder={statePaths[0] ?? "/variableName"}
+          onChange={(newPath) => onChange(dynamicValue(activeMode, newPath))}
+          disabled={disabled}
+          buttonClassName={customInputClassName}
+          addonEnd={modeDropdown}
+        />
       </div>
     );
   }
@@ -271,20 +270,17 @@ export function DynamicValueInput({
   if (activeMode === "template") {
     const rawVal = isDynamicValue(value) ? dynamicValueText(value) : "";
     return (
-      <InputGroup className={cn("h-8", className)}>
-        <InputGroupAddon align="inline-start" className="pe-1 text-amber-500">
-          <Code2 className="size-3.5" />
-        </InputGroupAddon>
-        <InputGroupInput
-          value={rawVal}
-          placeholder={placeholder ?? "Hello, ${/name}!"}
-          onChange={(event) => onChange({ $template: event.target.value })}
-          className={cn("font-mono text-xs", customInputClassName)}
-          disabled={disabled}
-          autoFocus={autoFocus}
-        />
-        {modeDropdown && <InputGroupAddon align="inline-end">{modeDropdown}</InputGroupAddon>}
-      </InputGroup>
+      <TemplateMentionInput
+        value={rawVal}
+        onChange={(nextVal) => onChange({ $template: nextVal })}
+        placeholder={placeholder ?? "Hello, ${/name}!"}
+        className={className}
+        inputClassName={customInputClassName}
+        statePaths={statePaths}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        addonEnd={modeDropdown}
+      />
     );
   }
 
