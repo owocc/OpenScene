@@ -7,19 +7,19 @@
     "dist"
   ],
   "type": "module",
-  "main": "./src/index.tsx",
-  "types": "./src/index.tsx",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./src/index.tsx",
-      "node": "./src/server.ts",
-      "import": "./src/index.tsx",
-      "default": "./src/index.tsx"
+      "types": "./dist/index.d.mts",
+      "node": "./dist/server.mjs",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./vite": {
-      "types": "./src/vite.ts",
-      "import": "./src/vite.ts",
-      "default": "./src/vite.ts"
+      "types": "./dist/vite.d.mts",
+      "import": "./dist/vite.mjs",
+      "default": "./dist/vite.mjs"
     },
     "./package.json": "./package.json"
   },

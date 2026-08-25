@@ -15,7 +15,8 @@
     "prepare": "vp config"
   },
   "dependencies": {
-    "@json-render/react": "^0.20.0"
+    "@json-render/react": "^0.20.0",
+    "undici": "^7.0.0"
   },
   "devDependencies": {
     "@typescript/native-preview": "7.0.0-dev.20260605.1",

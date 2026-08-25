@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AppManifestSchema, type AppManifest } from "@openscene/protocol";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export interface OpenSceneManifestPluginOptions {
   manifest: AppManifest;
@@ -74,8 +75,14 @@ async function responseError(response: Response): Promise<Error> {
   return new Error(`OpenScene manifest push failed (HTTP ${response.status})${detail}`);
 }
 
-async function getFetchDispatcher(): Promise<unknown> {
+function getFetchDispatcher(env?: Record<string, string>): unknown {
   const proxy =
+    env?.https_proxy ||
+    env?.HTTPS_PROXY ||
+    env?.http_proxy ||
+    env?.HTTP_PROXY ||
+    env?.all_proxy ||
+    env?.ALL_PROXY ||
     process.env.https_proxy ||
     process.env.HTTPS_PROXY ||
     process.env.http_proxy ||
@@ -84,7 +91,6 @@ async function getFetchDispatcher(): Promise<unknown> {
     process.env.ALL_PROXY;
   if (!proxy) return undefined;
   try {
-    const { ProxyAgent } = await import("undici");
     return new ProxyAgent(proxy);
   } catch {
     return undefined;
@@ -117,10 +123,11 @@ export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions)
       if (!adminUrl || !appId || !appKey) throw configurationError();
       const parsedManifest = AppManifestSchema.parse(manifest);
 
-      const dispatcher = await getFetchDispatcher();
+      const dispatcher = getFetchDispatcher(env);
+      const fetchFn = dispatcher ? undiciFetch : globalThis.fetch;
       let response: Response;
       try {
-        response = await fetch(
+        response = await (fetchFn as typeof fetch)(
           `${adminUrl.replace(/\/+$/u, "")}/api/v1/apps/${encodeURIComponent(appId)}/manifest/push`,
           {
             method: "POST",
