@@ -723,10 +723,12 @@ function StudioEditor({ bootstrap }: { bootstrap: StudioBootstrap }) {
           <div className="absolute bottom-3 left-3 z-40 max-w-sm rounded-xl border border-destructive/30 bg-background/95 p-3 text-[10px] shadow-lg">
             <div className="font-semibold text-destructive">{LL.panels.agents.diagnostics()}</div>
             {[
-              ...diagnostics.map((issue) => issue.message),
+              ...diagnostics.map((issue) =>
+                issue.path ? `${issue.path}: ${issue.message}` : issue.message,
+              ),
               ...validation.issues.slice(0, 2).map((issue) => `${issue.path}: ${issue.message}`),
-            ].map((message) => (
-              <p key={message} className="mt-1 text-muted-foreground">
+            ].map((message, index) => (
+              <p key={`${message}-${index}`} className="mt-1 text-muted-foreground">
                 {message}
               </p>
             ))}

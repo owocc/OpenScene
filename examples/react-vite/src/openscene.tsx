@@ -177,7 +177,7 @@ const Image = defineOpenSceneReactComponent({
 
 /** A composition example: use the shared View primitive as the component root. */
 const Callout = defineOpenSceneReactComponent({
-  type: "ReactViteCallout",
+  type: "Callout",
   schema: calloutProps,
   title: "Callout",
   description: "A styled container composed from the OpenScene View primitive.",
@@ -205,7 +205,7 @@ const Callout = defineOpenSceneReactComponent({
 
 /** A hook example: attach the editor identity to a semantic custom root. */
 const StatusCard = defineOpenSceneReactComponent({
-  type: "ReactViteStatusCard",
+  type: "StatusCard",
   schema: statusCardProps,
   title: "Status card",
   description: "A semantic custom root using useOpenSceneNode for editor identity.",
@@ -337,7 +337,7 @@ function OpenApiProviderRenderer(props: {
 
 /** Requests an OpenAPI operation (from a self-contained document snapshot) and renders the response. */
 const OpenApiProvider = defineOpenSceneReactComponent({
-  type: "ReactViteOpenApiProvider",
+  type: "OpenApiProvider",
   schema: openApiProviderProps,
   title: "OpenAPI Provider",
   description: "根据 OpenAPI 文档请求接口并渲染响应。",
