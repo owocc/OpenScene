@@ -61,16 +61,16 @@ jobs:
           fi
 
           echo "Publishing @openscene-ai/constants..."
-          cd packages/constants && npm publish --access public $EXTRA_ARGS
+          cd packages/constants && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
 
           echo "Publishing @openscene-ai/protocol..."
-          cd ../protocol && npm publish --access public $EXTRA_ARGS
+          cd ../protocol && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
 
           echo "Publishing @openscene-ai/schema..."
-          cd ../schema && npm publish --access public $EXTRA_ARGS
+          cd ../schema && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
 
           echo "Publishing @openscene-ai/javascript..."
-          cd ../sdk/javascript && npm publish --access public $EXTRA_ARGS
+          cd ../sdk/javascript && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
 
           echo "Publishing @openscene-ai/react..."
-          cd ../react && npm publish --access public $EXTRA_ARGS
+          cd ../react && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS

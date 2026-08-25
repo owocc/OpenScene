@@ -1,6 +1,6 @@
 {
   "name": "@openscene-ai/schema",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Input schemas for OpenScene property editors, grouped by platform (web: unit, size, …).",
   "license": "MIT",
   "files": [

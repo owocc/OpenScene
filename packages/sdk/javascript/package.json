@@ -1,6 +1,6 @@
 {
   "name": "@openscene-ai/javascript",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Framework-neutral OpenScene runtime client and Vite manifest publisher.",
   "homepage": "https://github.com/author/library#readme",
   "bugs": {

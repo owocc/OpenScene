@@ -1,6 +1,6 @@
 {
   "name": "@openscene-ai/protocol",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Versioned browser protocol for OpenScene Studio and renderers.",
   "license": "MIT",
   "files": [
