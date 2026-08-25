@@ -205,7 +205,7 @@
     },
     "packages/constants": {
       "name": "@openscene-ai/constants",
-      "version": "0.0.2",
+      "version": "0.0.3-alpha.0",
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -214,7 +214,7 @@
     },
     "packages/protocol": {
       "name": "@openscene-ai/protocol",
-      "version": "0.0.2",
+      "version": "0.0.3-alpha.0",
       "dependencies": {
         "@json-render/core": "^0.20.0",
         "@openscene-ai/constants": "workspace:*",
@@ -228,7 +228,7 @@
     },
     "packages/schema": {
       "name": "@openscene-ai/schema",
-      "version": "0.0.2",
+      "version": "0.0.3-alpha.0",
       "devDependencies": {
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -237,7 +237,7 @@
     },
     "packages/sdk/javascript": {
       "name": "@openscene-ai/javascript",
-      "version": "0.0.2",
+      "version": "0.0.3-alpha.0",
       "dependencies": {
         "@json-render/core": "^0.20.0",
         "@openscene-ai/protocol": "workspace:*",
@@ -254,7 +254,7 @@
     },
     "packages/sdk/react": {
       "name": "@openscene-ai/react",
-      "version": "0.0.2",
+      "version": "0.0.3-alpha.0",
       "dependencies": {
         "@json-render/core": "^0.20.0",
         "@json-render/react": "^0.20.0",
@@ -282,7 +282,7 @@
     },
     "packages/sdk/solid": {
       "name": "@openscene-ai/solid",
-      "version": "0.0.0",
+      "version": "0.0.1-alpha.0",
       "dependencies": {
         "@json-render/core": "^0.20.0",
         "@json-render/solid": "^0.20.0",
