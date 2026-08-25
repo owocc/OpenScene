@@ -1,131 +1,133 @@
 # OpenScene
 
-OpenScene 是一套现代化的、可自部署的可视化内容编排与页面搭建系统。基于 **JSON Render + 独立 Studio 编辑器 + 框架适配器（UI Adapter）** 架构设计，支持跨框架（React / Solid / Vue）、跨端业务组件无缝接入与低代码可视化搭建。
+English | [简体中文](./README-ZH.md)
+
+OpenScene is a modern, self-hostable visual content orchestration and page-building system. Built upon the **JSON Render + Independent Studio Editor + Framework UI Adapter** architecture, OpenScene enables seamless integration of business UI components across frameworks (React / Solid / Vue) with low-code visual editing and real-time canvas preview.
 
 ---
 
-## 目录结构
+## Repository Structure
 
 ```text
 openscene/
 ├── apps/
-│   ├── admin/       # @openscene/admin: Next.js 管理后台服务 (多 App、页面版本发布、素材库、Studio 会话)
-│   ├── studio/      # @openscene/studio: React SPA 可视化画布编辑器
-│   └── docs/        # @openscene/docs: 官方文档站点 (Astro / Nimbus)
+│   ├── admin/       # @openscene/admin: Next.js management service (Multi-app, Releases, Assets, Studio Sessions)
+│   ├── studio/      # @openscene/studio: React SPA visual canvas editor
+│   └── docs/        # @openscene/docs: Documentation site (Astro / Nimbus)
 ├── packages/
 │   ├── sdk/
-│   │   ├── react/        # @openscene/react: React 19 UI Adapter 与运行时组件库
-│   │   ├── solid/        # @openscene/solid: SolidJS UI Adapter
-│   │   └── javascript/   # @openscene/javascript: 框架中立的运行时 Client 与 Vite Manifest 插件
-│   ├── protocol/         # @openscene/protocol: 协议定义、Document Schema、Bridge 规范
-│   ├── schema/           # @openscene/schema: 样式、尺寸、OpenAPI 契约定义
-│   ├── constants/        # @openscene/constants: 共享常量与状态定义
-│   └── api-client/       # @openscene/api-client: 自动生成的 Admin REST API Client
+│   │   ├── react/        # @openscene/react: React 19 UI adapter and runtime components
+│   │   ├── solid/        # @openscene/solid: SolidJS UI adapter
+│   │   └── javascript/   # @openscene/javascript: Framework-neutral runtime client and Vite manifest plugin
+│   ├── protocol/         # @openscene/protocol: Document schema, protocol v2 bridge definitions
+│   ├── schema/           # @openscene/schema: Styles, layout, OpenAPI schema contracts
+│   ├── constants/        # @openscene/constants: Shared constants and status enums
+│   └── api-client/       # @openscene/api-client: Generated TypeScript Admin REST API client
 ├── examples/
-│   ├── react-vite/       # React 19 + Vite 业务接入示例
-│   └── solid-v1/         # SolidJS + Vite 业务接入示例
-└── docs/                 # 详细集成与部署指南
+│   ├── react-vite/       # React 19 + Vite integration example
+│   └── solid-v1/         # SolidJS + Vite integration example
+└── docs/                 # Detailed architecture and integration guides
 ```
 
 ---
 
-## 快速上手与本地开发
+## Quick Start & Local Development
 
-本项目采用统一前端工具链 **Vite+ (`vp`)** 与 **Bun** 作为包管理器。
+This repository uses **Vite+ (`vp`)** with **Bun** as the unified package manager and toolchain.
 
-### 1. 环境准备
+### 1. Prerequisites
 
 - **Node.js**: `>= 22.18.0`
 - **Vite+ / Bun**: `bun >= 1.4.0`
 
 ```bash
-# 全局安装 Vite+ (若未安装)
+# Install Vite+ globally if needed
 npm install -g vite-plus
 
-# 安装依赖并链接 Workspace
+# Install dependencies and link workspaces
 vp install
 
-# 运行全量代码检查与构建准备
+# Run full project checks and preparations
 vp run ready
 ```
 
-### 2. 本地全链路联调启动
+### 2. Running Local Services
 
-本地开发通常需要同时启动三个服务：
+Local development typically involves three concurrent services:
 
 ```bash
-# 终端 1：启动 Admin 服务 (默认端口 3000)
+# Terminal 1: Start Admin backend (default: http://localhost:3000)
 vp -C apps/admin dev
 
-# 终端 2：启动 Studio 画布编辑器 (默认端口 5173)
+# Terminal 2: Start Studio canvas editor (default: http://localhost:5173)
 vp -C apps/studio dev
 
-# 终端 3：启动业务渲染端 (以 React 示例为例，指定端口 5174)
+# Terminal 3: Start Host app renderer (e.g. React Vite on port 5174)
 vp -C examples/react-vite dev -- --port 5174
 ```
 
-启动后：
+Workflow:
 
-1. 访问 `http://localhost:3000` 进入 Admin 后台。
-2. 在应用下的 **Preview profiles（预览配置）** 中配置 `http://localhost:5174/` 为默认预览地址。
-3. 在页面详情点击 **Open in Studio**，即可在 Studio 中实时拖拽编排并双向预览 React 组件。
+1. Open `http://localhost:3000` to access the Admin Console.
+2. In your App's **Preview profiles** (`/preview-profiles`), add `http://localhost:5174/` as the default preview URL.
+3. Open any page and click **Open in Studio** to start visual editing and real-time drag-and-drop orchestration.
 
 ---
 
-## 部署 Admin 服务 (`apps/admin`)
+## Deploying Admin Service (`apps/admin`)
 
-`apps/admin` 是一个全栈 **Next.js** 应用，包含管理后台 UI、RESTful Management API、Runtime 交付接口及 Studio 会话授权。
+`apps/admin` is a full-stack **Next.js** application providing the management console, RESTful management APIs, runtime document delivery, and Studio session authentication.
 
-### 1. 环境变量配置 (`.env`)
+### 1. Environment Variables (`.env`)
 
-复制 `apps/admin/.env.example` 为 `.env` 并配置生产参数：
+Copy `apps/admin/.env.example` to `apps/admin/.env` and configure production settings:
 
 ```bash
-# 1. 数据库连接 (支持本地 SQLite 或远程 LibSQL/Turso)
+# 1. Database connection (Local SQLite or remote LibSQL / Turso)
 OPENSCENE_DATABASE_URL=file:./data/openscene.db
 OPENSCENE_DATABASE_AUTH_TOKEN=
 
-# 2. 身份认证与会话秘钥 (必须使用随机生成的长字符串)
+# 2. Authentication and session secrets (Must use strong random strings in production)
 BETTER_AUTH_SECRET=your-random-32-character-secret-key-here
 BETTER_AUTH_URL=https://admin.yourdomain.com
 
-# 3. 部署服务公网地址
+# 3. Public service base URLs
 OPENSCENE_API_PUBLIC_BASE_URL=https://admin.yourdomain.com
 OPENSCENE_STUDIO_PUBLIC_BASE_URL=https://studio.yourdomain.com
 
-# 4. 敏感数据与凭证加密秘钥 (S3 密钥、AI Provider API Key 加密)
+# 4. Secrets encryption key (Encrypts S3 credentials and AI provider keys)
 OPENSCENE_ENCRYPTION_KEY=your-secure-encryption-key-for-secrets
 
-# 5. 会话与上传限制
+# 5. Session and upload constraints
 OPENSCENE_SESSION_TTL_SECONDS=1800
 OPENSCENE_UI_SESSION_TTL_SECONDS=28800
 OPENSCENE_MAX_UPLOAD_BYTES=52428800
 OPENSCENE_ALLOWED_MIME_TYPES=image/jpeg,image/png,image/webp,image/gif,application/pdf
 ```
 
-### 2. 数据库迁移
+### 2. Database Migrations
 
-Admin 支持自动运行数据库迁移，也可在发布流水线中显式执行：
+Admin runs migrations on startup, or you can run them explicitly in your deployment pipeline:
 
 ```bash
 cd apps/admin
 vp run migrate
 ```
 
-### 3. 构建与启动
+### 3. Build & Run
 
-#### 方式 A：Node.js / PM2 直接运行
+#### Option A: Node.js / PM2 Runtime
 
 ```bash
-# 1. 构建全量 Workspace
+# 1. Build workspace packages and apps
 vp run build
 
-# 2. 启动 Admin 生产服务
+# 2. Start Next.js production server
 cd apps/admin
 next start -p 3000
 ```
 
-使用 PM2 守护进程配置示例 (`ecosystem.config.cjs`)：
+PM2 configuration example (`ecosystem.config.cjs`):
 
 ```js
 module.exports = {
@@ -143,25 +145,25 @@ module.exports = {
 };
 ```
 
-#### 方式 B：Docker 容器化部署
+#### Option B: Docker Container Deployment
 
-在项目根目录构建 Docker 镜像：
+Build from repository root:
 
 ```dockerfile
 FROM oven/bun:1.4-alpine AS base
 WORKDIR /app
 
-# 安装依赖
+# Install dependencies
 COPY package.json bun.lock ./
 COPY packages ./packages
 COPY apps ./apps
 COPY examples ./examples
 RUN bun install --frozen-lockfile
 
-# 构建生产产物
+# Build production artifacts
 RUN bun run build
 
-# 运行镜像
+# Production runner image
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -177,43 +179,43 @@ CMD ["node", "apps/admin/server.js"]
 
 ---
 
-## 部署 Studio 编辑器 (`apps/studio`)
+## Deploying Studio Editor (`apps/studio`)
 
-`apps/studio` 是一个纯客户端 **React SPA**，完全无状态，通过 API 与 Admin 交互并通过 Bridge 协议驱动业务 iframe。
+`apps/studio` is a client-side **React SPA** (Vite). It is stateless and interacts with Admin via REST APIs while driving the host iframe over the Protocol v2 Bridge.
 
-### 1. 构建产物
+### 1. Build Static Artifacts
 
 ```bash
-# 构建 Studio 静态资源
+# Build Studio bundle
 vp -C apps/studio build
 ```
 
-构建完成后，静态文件将输出到 `apps/studio/dist` 目录。
+The output bundle is generated in `apps/studio/dist`.
 
-### 2. 静态托管与 Nginx 配置
+### 2. Static Hosting with Nginx
 
-将 `apps/studio/dist` 部署到任意静态托管平台（如 Nginx、Cloudflare Pages、Vercel、AWS S3 + CloudFront 等）。
+Deploy `apps/studio/dist` to any static hosting provider (Nginx, Cloudflare Pages, Vercel, AWS S3 + CloudFront).
 
-#### Nginx 配置示例
+#### Nginx Configuration Example
 
 ```nginx
 server {
     listen 80;
     server_name studio.yourdomain.com;
 
-    # 开启 gzip 压缩
+    # Gzip compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
 
     root /var/www/openscene-studio/dist;
     index index.html;
 
-    # SPA 路由 fallback
+    # SPA routing fallback
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # 静态资源长期缓存
+    # Static assets cache headers
     location ~* \.(?:ico|css|js|gif|jpe?g|png|woff2?|eot|ttf|svg)$ {
         expires 1y;
         add_header Cache-Control "public, max-age=31536000, immutable";
@@ -221,67 +223,65 @@ server {
 }
 ```
 
-### 3. 生产通信与跨域设置
+### 3. Production Cross-Origin & Bridge Setup
 
-为了确保 Studio 正常与 Admin 及预览应用通信：
-
-1. **Admin 端配置**：在 Admin 的 `.env` 中确保 `OPENSCENE_STUDIO_PUBLIC_BASE_URL` 填写了正确的 Studio 公网域名（如 `https://studio.yourdomain.com`）。
-2. **预览配置白名单**：在 Admin 的 **Preview profiles（预览配置）** 中，将生产 Studio 域名填入 `allowedOrigins`（如 `["https://studio.yourdomain.com"]`）。
+1. **Admin Config**: Set `OPENSCENE_STUDIO_PUBLIC_BASE_URL` in Admin's `.env` to your production Studio domain (e.g. `https://studio.yourdomain.com`).
+2. **Preview Profile Whitelist**: In Admin Console **Preview profiles** (`/preview-profiles`), add your production Studio origin to `allowedOrigins` (e.g. `["https://studio.yourdomain.com"]`).
 
 ---
 
-## 部署业务渲染应用（以 React Vite 为例）
+## Deploying Host Renderer App (e.g. React Vite)
 
-业务应用（如 `examples/react-vite`）既是终端页面的宿主，也是 Studio 内部加载的 iframe 目标。
+The host app (such as `examples/react-vite`) renders published pages for end users and serves as the canvas iframe inside Studio.
 
-### 1. 环境变量配置 (`.env`)
+### 1. Environment Configuration (`.env`)
 
 ```bash
-# 浏览器端运行时地址
+# Browser runtime config
 VITE_OPENSCENE_ADMIN_URL=https://admin.yourdomain.com
 VITE_OPENSCENE_APP_KEY=your-app-key
 
-# CI/CD 构建时自动推送组件元数据清单 (可选)
+# CI/CD build-time manifest publish config (optional)
 OPENSCENE_ADMIN_URL=https://admin.yourdomain.com
 OPENSCENE_APP_ID=app_xxxxxxxxxxxxxxxxx
 OPENSCENE_APP_KEY=appkey_xxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-### 2. 构建与部署
+### 2. Build & Deploy
 
 ```bash
-# 执行构建 (Vite 插件会在 closeBundle 自动将 Manifest 发布至 Admin)
+# Build static bundle (Vite plugin automatically publishes manifest to Admin during closeBundle)
 vp -C examples/react-vite build
 ```
 
-打包产物输出至 `examples/react-vite/dist`，部署为静态站点或托管于 CDN 即可。
+Deploy the generated `examples/react-vite/dist` to your web server or CDN.
 
 ---
 
-## 常用命令参考
+## Useful Commands Reference
 
 ```bash
-# 全局依赖安装
+# Install workspace dependencies
 vp install
 
-# 运行各包单元测试
+# Run test suites
 vp test packages/sdk/react
 vp test examples/react-vite
 vp run -r test
 
-# 代码风格与类型检查
+# Code quality and type checks
 vp check
 vp check --fix
 
-# 全量构建
+# Build all packages and apps
 vp run build
 
-# 文档参考
-# 详细 React 与 json-render 集成说明请查看 docs/react-json-render-studio-integration.md
+# Integration guide
+# See docs/react-json-render-studio-integration.md for detailed React + json-render guide
 ```
 
 ---
 
-## 开源协议
+## License
 
-本项目基于 [MIT 协议](LICENSE) 开源。
+This project is licensed under the [MIT License](LICENSE).
