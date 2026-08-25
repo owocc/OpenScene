@@ -1,6 +1,6 @@
 {
   "name": "@openscene/javascript",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Framework-neutral OpenScene runtime client and Vite manifest publisher.",
   "homepage": "https://github.com/author/library#readme",
   "bugs": {

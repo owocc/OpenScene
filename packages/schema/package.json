@@ -1,6 +1,6 @@
 {
   "name": "@openscene/schema",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Input schemas for OpenScene property editors, grouped by platform (web: unit, size, …).",
   "license": "MIT",
   "files": [

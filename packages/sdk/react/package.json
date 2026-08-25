@@ -1,6 +1,6 @@
 {
   "name": "@openscene/react",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "React adapter for OpenScene and json-render.",
   "license": "MIT",
   "files": [

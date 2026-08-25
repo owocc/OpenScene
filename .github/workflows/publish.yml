@@ -1,0 +1,78 @@
+name: Publish Packages to NPM
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (do not actually publish to npm)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install global Vite+ CLI
+        run: bun install -g vite-plus
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Build packages
+        run: |
+          cd packages/constants && vp run build
+          cd ../protocol && vp run build
+          cd ../schema && vp run build
+          cd ../sdk/javascript && vp run build
+          cd ../react && vp run build
+
+      - name: Run Tests
+        run: |
+          cd packages/sdk/react && vp test
+
+      - name: Publish to NPM
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          EXTRA_ARGS=""
+          if [ "$DRY_RUN" = "true" ]; then
+            EXTRA_ARGS="--dry-run"
+          fi
+
+          echo "Publishing @openscene/constants..."
+          cd packages/constants && npm publish --access public $EXTRA_ARGS
+
+          echo "Publishing @openscene/protocol..."
+          cd ../protocol && npm publish --access public $EXTRA_ARGS
+
+          echo "Publishing @openscene/schema..."
+          cd ../schema && npm publish --access public $EXTRA_ARGS
+
+          echo "Publishing @openscene/javascript..."
+          cd ../sdk/javascript && npm publish --access public $EXTRA_ARGS
+
+          echo "Publishing @openscene/react..."
+          cd ../react && npm publish --access public $EXTRA_ARGS
