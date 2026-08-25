@@ -27,13 +27,6 @@
   "overrides": {
     "vite": "catalog:"
   },
-  "devEngines": {
-    "packageManager": {
-      "name": "bun",
-      "version": "1.4.0",
-      "onFail": "download"
-    }
-  },
   "engines": {
     "node": ">=22.18.0"
   },
