@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { installOpenScene } from "@openscene-ai/javascript";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import "./index.css";
 import App from "./App.tsx";
 import { createManifest, createSolidApp } from "./openscene.tsx";

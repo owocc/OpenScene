@@ -1,6 +1,7 @@
-import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
+import type { JSX } from "@solidjs/web";
 import type { SelectionReport } from "@openscene-ai/javascript";
-import { useOpenScene } from "./provider.js";
+import { useOpenScene } from "./context.ts";
 
 interface Point {
   x: number;
@@ -274,21 +275,24 @@ export function SelectionCanvas(props: { children: JSX.Element }): JSX.Element {
       >
         {(() => {
           const box = overlayBox();
-          return box ? (
+          if (!box) return null;
+          const { height, width, x, y } = box as SelectionBox;
+
+          return (
             <div
               data-open-scene-marquee="true"
               style={{
                 position: "absolute",
-                left: `${box.x}px`,
-                top: `${box.y}px`,
-                width: `${box.width}px`,
-                height: `${box.height}px`,
+                left: `${x}px`,
+                top: `${y}px`,
+                width: `${width}px`,
+                height: `${height}px`,
                 border: "1px dashed #0d8aff",
                 background: "rgba(13, 138, 255, .12)",
                 "pointer-events": "none",
               }}
             />
-          ) : null;
+          );
         })()}
       </div>
     </div>

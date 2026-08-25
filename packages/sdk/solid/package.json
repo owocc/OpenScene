@@ -1,17 +1,25 @@
 {
   "name": "@openscene-ai/solid",
-  "version": "0.0.0",
-  "description": "Solid adapter for OpenScene and json-render.",
+  "version": "0.0.1",
+  "description": "SolidJS v2 adapter for OpenScene.",
   "license": "MIT",
   "files": [
     "dist"
   ],
   "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.mts",
       "node": "./dist/server.mjs",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.mts",
+      "import": "./dist/vite.mjs",
+      "default": "./dist/vite.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -21,27 +29,27 @@
   "scripts": {
     "build": "vp pack --from-vite",
     "dev": "vp pack --from-vite --watch",
-    "test": "vp test",
     "check": "vp check",
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
-    "@json-render/core": "^0.20.0",
-    "@json-render/solid": "^0.20.0",
     "@openscene-ai/constants": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
-    "@openscene-ai/protocol": "workspace:*"
+    "@openscene-ai/protocol": "workspace:*",
+    "@openscene-ai/schema": "workspace:*"
   },
   "devDependencies": {
+    "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "catalog:",
-    "solid-js": "^1.9.14",
+    "solid-js": "^2.0.0-rc.0",
     "typescript": "catalog:",
-    "vite-plugin-solid": "^2.11.14",
+    "vite-plugin-solid": "^2.11.0",
     "vite-plus": "catalog:",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "solid-js": "^1.9.0",
+    "@solidjs/web": ">=2.0.0-rc.0 <3",
+    "solid-js": ">=2.0.0-rc.0 <3",
     "zod": "^4.0.0"
   }
 }

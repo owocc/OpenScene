@@ -1,65 +1,31 @@
-import { defineCatalog, type Catalog } from "@json-render/core";
-import { schema } from "@json-render/solid/schema";
 import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
+import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
+import type { JSX } from "@solidjs/web";
 import { z } from "zod";
-import type { JSX } from "solid-js";
-import type { ComponentRenderProps } from "@json-render/solid";
-import { defineRegistry as defineRegistryUntyped } from "@json-render/solid";
-import { Button, Text, View } from "./node.js";
 
-const defineRegistry = defineRegistryUntyped;
+// ---------------------------------------------------------------------------
+// Renderer type
+// ---------------------------------------------------------------------------
 
-type RegistryResult = {
-  registry: Record<string, unknown>;
-  handlers: unknown;
-};
-
-function createRegistry(catalog: Catalog, options: Record<string, unknown>): RegistryResult {
-  return defineRegistry(catalog, options) as RegistryResult;
-}
-
-function mergeComponentDefinitions(
-  custom:
-    | OpenSceneSolidComponentDefinition[]
-    | Record<string, OpenSceneSolidComponentDefinition>
-    | undefined,
-): Record<string, OpenSceneSolidComponentDefinition> {
-  if (!custom) return { ...baseSolidComponents };
-  if (Array.isArray(custom)) {
-    return {
-      ...baseSolidComponents,
-      ...Object.fromEntries(custom.map((definition) => [definition.type, definition])),
-    };
-  }
-  return { ...baseSolidComponents, ...custom };
-}
-
-function mergeActionDefinitions(
-  custom:
-    | OpenSceneSolidActionDefinition[]
-    | Record<string, OpenSceneSolidActionDefinition>
-    | undefined,
-): Record<string, OpenSceneSolidActionDefinition> {
-  if (!custom) return { ...baseSolidActions };
-  if (Array.isArray(custom)) {
-    return {
-      ...baseSolidActions,
-      ...Object.fromEntries(custom.map((definition) => [definition.key, definition])),
-    };
-  }
-  return { ...baseSolidActions, ...custom };
-}
-
+/**
+ * A Solid component that renders a scene element.
+ * Receives resolved props (dynamic bindings already evaluated) plus children.
+ */
 export type SolidRenderer<P = Record<string, unknown>> = (
-  props: ComponentRenderProps<P>,
+  props: P & { children?: JSX.Element },
 ) => JSX.Element;
+
+// ---------------------------------------------------------------------------
+// Definition interfaces
+// ---------------------------------------------------------------------------
 
 export interface OpenSceneSolidComponentDefinition<
   P extends Record<string, unknown> = Record<string, unknown>,
 > {
   type: string;
-  /** Zod props schema. `props` is accepted as an alias for schema. */
+  /** Zod schema for props. `props` is an alias. */
   schema?: z.ZodType<P>;
   props?: z.ZodType<P>;
   title: string;
@@ -71,7 +37,7 @@ export interface OpenSceneSolidComponentDefinition<
   children?: unknown;
   slots?: readonly string[];
   capabilities?: Record<string, unknown>;
-  /** Solid renderer. `renderer` is accepted as an alias for render. */
+  /** Solid renderer function. `renderer` is an alias. */
   render?: SolidRenderer<P>;
   renderer?: SolidRenderer<P>;
 }
@@ -88,140 +54,121 @@ export interface OpenSceneSolidActionDefinition {
     state: Record<string, unknown>,
   ) => Promise<void> | void;
 }
-export type OpenSceneHandlerFactory = (
-  getSetState: () =>
-    | ((updater: (previous: Record<string, unknown>) => Record<string, unknown>) => void)
-    | undefined,
-  getState: () => Record<string, unknown>,
-) => Record<string, (params: Record<string, unknown>) => Promise<void>>;
 
 export interface OpenSceneSolidApp {
   readonly appType: AppType;
-  readonly catalog: Catalog;
-  readonly registry: Record<string, unknown>;
-  readonly handlers: OpenSceneHandlerFactory;
-  readonly componentDefinitions: Record<string, OpenSceneSolidComponentDefinition>;
+  /** type → Solid component function */
+  readonly registry: Record<string, SolidRenderer>;
+  /** key → action handler factory (needs setState injected by provider) */
   readonly actionDefinitions: Record<string, OpenSceneSolidActionDefinition>;
+  readonly componentDefinitions: Record<string, OpenSceneSolidComponentDefinition>;
   readonly manifest: AppManifest;
 }
 
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
 function zodJsonSchema(value: z.ZodType): Record<string, unknown> {
-  const converter = (z as unknown as { toJSONSchema?: (schema: z.ZodType) => unknown })
-    .toJSONSchema;
+  const converter = (z as unknown as { toJSONSchema?: (s: z.ZodType) => unknown }).toJSONSchema;
   if (typeof converter !== "function") return {};
   try {
     const result = converter(value);
     if (result && typeof result === "object") return result as Record<string, unknown>;
   } catch {
-    // A manifest must still be serializable when a non-JSON-compatible Zod extension is used.
+    // schema not serializable – return empty
   }
   return {};
 }
 
-function normalizeComponents(
-  values: OpenSceneSolidComponentDefinition[] | Record<string, OpenSceneSolidComponentDefinition>,
+function mergeComponents(
+  input:
+    | OpenSceneSolidComponentDefinition<any>[]
+    | Record<string, OpenSceneSolidComponentDefinition<any>>
+    | undefined,
 ): Record<string, OpenSceneSolidComponentDefinition> {
-  const entries = Array.isArray(values)
-    ? values.map((value) => [value.type, value] as const)
-    : Object.entries(values);
-  const result: Record<string, OpenSceneSolidComponentDefinition> = {};
-  for (const [type, definition] of entries) {
-    if (!definition || definition.type !== type) {
-      throw new Error(`OpenScene Solid component key "${type}" does not match its type`);
-    }
-    const propSchema = definition.schema ?? definition.props;
-    if (!propSchema) throw new Error(`OpenScene Solid component "${type}" requires a props schema`);
-    if (!(definition.render ?? definition.renderer)) {
-      throw new Error(`OpenScene Solid component "${type}" requires a renderer`);
-    }
-    const namedSlots = (definition.slots ?? []).filter((slot) => slot.length > 0);
-    if (namedSlots.length > 0) {
-      throw new Error(
-        `OpenScene Solid renderer does not support named slot "${namedSlots[0]}" on component "${type}"`,
-      );
-    }
-    result[type] = definition;
-  }
-  return result;
+  if (!input) return {};
+  if (Array.isArray(input)) return Object.fromEntries(input.map((d) => [d.type, d]));
+  return { ...input };
 }
 
-function normalizeActions(
-  values:
+function mergeActions(
+  input:
     | OpenSceneSolidActionDefinition[]
     | Record<string, OpenSceneSolidActionDefinition>
     | undefined,
 ): Record<string, OpenSceneSolidActionDefinition> {
-  if (!values) return {};
-  const entries = Array.isArray(values)
-    ? values.map((value) => [value.key, value] as const)
-    : Object.entries(values);
-  const result: Record<string, OpenSceneSolidActionDefinition> = {};
-  for (const [key, definition] of entries) {
-    if (!definition || definition.key !== key) {
-      throw new Error(`OpenScene Solid action key "${key}" does not match its key`);
-    }
-    if (!definition.handler) throw new Error(`OpenScene Solid action "${key}" requires a handler`);
-    result[key] = definition;
-  }
-  return result;
+  if (!input) return {};
+  if (Array.isArray(input)) return Object.fromEntries(input.map((d) => [d.key, d]));
+  return { ...input };
 }
 
-export function defineOpenSceneSolidComponent<
-  P extends Record<string, unknown> = Record<string, unknown>,
->(definition: OpenSceneSolidComponentDefinition<P>): OpenSceneSolidComponentDefinition<P> {
-  const components = normalizeComponents({
-    [definition.type]: definition as unknown as OpenSceneSolidComponentDefinition,
-  });
-  return components[definition.type] as OpenSceneSolidComponentDefinition<P>;
-}
-
-export function defineOpenSceneSolidAction(
-  definition: OpenSceneSolidActionDefinition,
-): OpenSceneSolidActionDefinition {
-  return normalizeActions({ [definition.key]: definition })[definition.key];
-}
-
-function createManifest(
+function buildManifest(
   appKey: string,
   appType: AppType,
-  components: Record<string, OpenSceneSolidComponentDefinition>,
+  components: Record<string, OpenSceneSolidComponentDefinition<any>>,
   actions: Record<string, OpenSceneSolidActionDefinition>,
 ): AppManifest {
   const componentManifest: Record<string, ComponentManifest> = {};
-  for (const [type, definition] of Object.entries(components)) {
-    const propSchema = definition.schema ?? definition.props;
-    if (!propSchema) throw new Error(`OpenScene Solid component "${type}" requires a props schema`);
+  for (const [type, def] of Object.entries(components)) {
+    const schema = def.schema ?? def.props;
+    if (!schema) throw new Error(`OpenScene Solid component "${type}" requires a schema`);
     componentManifest[type] = {
-      title: definition.title,
-      ...(definition.description === undefined ? {} : { description: definition.description }),
-      ...(definition.category === undefined ? {} : { category: definition.category }),
-      ...(definition.tags === undefined ? {} : { tags: definition.tags }),
-      props: zodJsonSchema(propSchema),
-      ...(definition.editor === undefined ? {} : { editor: definition.editor }),
-      ...(definition.events === undefined ? {} : { events: definition.events }),
-      ...(definition.children === undefined ? {} : { children: definition.children }),
-      ...(definition.slots === undefined
-        ? {}
-        : { slots: Object.fromEntries((definition.slots ?? []).map((slot) => [slot, {}])) }),
-      ...(definition.capabilities === undefined ? {} : { capabilities: definition.capabilities }),
+      title: def.title,
+      ...(def.description !== undefined && { description: def.description }),
+      ...(def.category !== undefined && { category: def.category }),
+      ...(def.tags !== undefined && { tags: def.tags }),
+      props: zodJsonSchema(schema),
+      ...(def.editor !== undefined && { editor: def.editor }),
+      ...(def.events !== undefined && { events: def.events }),
+      ...(def.children !== undefined && { children: def.children }),
+      ...(def.slots !== undefined && {
+        slots: Object.fromEntries(def.slots.map((s) => [s, {}])),
+      }),
+      ...(def.capabilities !== undefined && { capabilities: def.capabilities }),
     };
   }
   const actionManifest: Record<string, unknown> = {};
-  for (const [key, definition] of Object.entries(actions)) {
+  for (const [key, def] of Object.entries(actions)) {
     actionManifest[key] = {
-      ...(definition.title === undefined ? {} : { title: definition.title }),
-      ...(definition.description === undefined ? {} : { description: definition.description }),
-      ...(definition.editor === undefined ? {} : { editor: definition.editor }),
-      params: definition.params ? zodJsonSchema(definition.params) : {},
+      ...(def.title !== undefined && { title: def.title }),
+      ...(def.description !== undefined && { description: def.description }),
+      ...(def.editor !== undefined && { editor: def.editor }),
+      params: def.params ? zodJsonSchema(def.params) : {},
     };
   }
   return {
     protocolVersion: "2",
     app: { key: appKey, type: appType },
     components: componentManifest,
-    ...(Object.keys(actionManifest).length === 0 ? {} : { actions: actionManifest }),
+    ...(Object.keys(actionManifest).length > 0 && { actions: actionManifest }),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Public factory functions
+// ---------------------------------------------------------------------------
+
+export function defineOpenSceneSolidComponent<
+  P extends Record<string, unknown> = Record<string, unknown>,
+>(definition: OpenSceneSolidComponentDefinition<P>): OpenSceneSolidComponentDefinition<P> {
+  if (!(definition.schema ?? definition.props)) {
+    throw new Error(`OpenScene Solid component "${definition.type}" requires a schema`);
+  }
+  return definition;
+}
+
+export function defineOpenSceneSolidAction(
+  definition: OpenSceneSolidActionDefinition,
+): OpenSceneSolidActionDefinition {
+  if (!definition.handler) {
+    throw new Error(`OpenScene Solid action "${definition.key}" requires a handler`);
+  }
+  return definition;
+}
+
+export const defineOpenSceneComponent = defineOpenSceneSolidComponent;
+export const defineOpenSceneAction = defineOpenSceneSolidAction;
 
 export interface DefineOpenSceneSolidAppOptions {
   appKey?: string;
@@ -238,142 +185,145 @@ export function defineOpenSceneSolidApp(
 ): OpenSceneSolidApp {
   const appKey = options.app?.key ?? options.appKey ?? "openscene-solid";
   const appType = options.app?.type ?? options.appType ?? APP_TYPE_WEB;
-  const components = normalizeComponents(mergeComponentDefinitions(options.components));
-  const actions = normalizeActions(mergeActionDefinitions(options.actions));
-  const catalogData = {
-    components: Object.fromEntries(
-      Object.entries(components).map(([type, definition]) => [
-        type,
-        {
-          props: definition.schema ?? definition.props ?? z.object({}),
-          slots: ["default"],
-          description: definition.description ?? definition.title,
-        },
-      ]),
-    ),
-    actions: Object.fromEntries(
-      Object.entries(actions).map(([key, definition]) => [
-        key,
-        {
-          params: definition.params ?? z.object({}),
-          description: definition.description ?? definition.title ?? key,
-        },
-      ]),
-    ),
-  };
-  const catalog = defineCatalog(schema, catalogData as never);
-  const componentFns = Object.fromEntries(
-    Object.entries(components).map(([type, definition]) => [
-      type,
-      definition.render ?? definition.renderer,
-    ]),
-  );
-  const actionFns = Object.fromEntries(
-    Object.entries(actions).map(([key, definition]) => [key, definition.handler]),
-  );
-  const registryResult =
-    Object.keys(actions).length > 0
-      ? createRegistry(catalog, { components: componentFns, actions: actionFns })
-      : createRegistry(catalog, { components: componentFns });
-  const manifest = createManifest(appKey, appType, components, actions);
+  const components = mergeComponents(options.components);
+  const actions = mergeActions(options.actions);
+
+  const registry: Record<string, SolidRenderer> = {};
+  for (const [type, def] of Object.entries(components)) {
+    const fn = def.render ?? def.renderer;
+    if (fn) registry[type] = fn as SolidRenderer;
+  }
+
+  const manifest = buildManifest(appKey, appType, components, actions);
   return {
     appType,
-    catalog,
-    registry: registryResult.registry,
-    handlers: registryResult.handlers as OpenSceneHandlerFactory,
-    componentDefinitions: components,
+    registry,
     actionDefinitions: actions,
+    componentDefinitions: components,
     manifest,
   };
 }
 
-const viewSchema = z
-  .object({
-    class: z.string().optional(),
-    className: z.string().optional(),
-    style: z
-      .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "style", type: "style" } })
-      .optional(),
-  })
-  .passthrough();
-const textSchema = z
-  .object({
-    text: z.string().optional(),
-    class: z.string().optional(),
-    className: z.string().optional(),
-    style: z
-      .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "style", type: "style" } })
-      .optional(),
-  })
-  .passthrough();
-const buttonSchema = z
-  .object({
-    label: z.string().optional(),
-    text: z.string().optional(),
-    disabled: z.boolean().optional(),
-    type: z.string().optional(),
-    class: z.string().optional(),
-    className: z.string().optional(),
-    style: z
-      .record(z.string(), z.unknown())
-      .meta({ "x-editor": { control: "style", type: "style" } })
-      .optional(),
-  })
-  .passthrough();
-export const baseSolidComponents: Record<string, OpenSceneSolidComponentDefinition> = {
-  View: {
-    type: "View",
-    schema: viewSchema,
-    title: "View",
-    description: "A layout container.",
-    category: "layout",
-    children: true,
-    render: View as unknown as SolidRenderer,
-  },
-  Text: {
-    type: "Text",
-    schema: textSchema,
-    title: "Text",
-    description: "Text content.",
-    category: "content",
-    children: true,
-    render: Text as unknown as SolidRenderer,
-  },
-  Button: {
-    type: "Button",
-    schema: buttonSchema,
-    title: "Button",
-    description: "An interactive button.",
-    category: "interactive",
-    children: true,
-    events: { press: { title: "Press" } },
-    render: Button as unknown as SolidRenderer,
-  },
-};
+export const defineOpenSceneApp = defineOpenSceneSolidApp;
 
-export const baseSolidActions: Record<string, OpenSceneSolidActionDefinition> = {
-  setState: {
-    key: "setState",
-    title: "Set State",
-    description: "Update state values",
-    params: z.record(z.string(), z.unknown()),
-    handler: (params, setState) => {
-      console.log(`[OpenScene Action] Triggered "setState" action with params:`, params);
-      if (!params) return;
-      setState((prev) => {
-        const next = { ...prev };
-        for (const [k, v] of Object.entries(params)) {
-          if (v === "__toggle__" || v === "!current") {
-            next[k] = !prev[k];
-          } else {
-            next[k] = v;
-          }
-        }
-        console.log(`[OpenScene Action] "setState" completed:`, { before: prev, after: next });
-        return next;
-      });
+// ---------------------------------------------------------------------------
+// OpenAPI request utilities (framework-agnostic, same as React SDK)
+// ---------------------------------------------------------------------------
+
+export interface OpenApiRequest {
+  url: string;
+  method: string;
+  body?: unknown;
+  headers: Record<string, string>;
+}
+
+export function buildOpenApiRequest(
+  value: OpenApiValue | undefined,
+  state: Record<string, unknown> = {},
+): OpenApiRequest | null {
+  if (!value?.json || !value.path || !value.method) return null;
+
+  const rawServers = value.json["servers"] as unknown;
+  const serverList = Array.isArray(rawServers) ? rawServers : [];
+  const base = typeof serverList[0]?.url === "string" ? serverList[0].url.replace(/\/+$/, "") : "";
+  let path = value.path;
+
+  const params = evaluateDynamicValue(value.params ?? {}, state) as {
+    path?: Record<string, unknown>;
+    query?: Record<string, unknown>;
+    body?: unknown;
+  };
+
+  // Path params
+  if (params.path) {
+    for (const [name, val] of Object.entries(params.path)) {
+      path = path.replace(`{${name}}`, encodeURIComponent(String(val)));
+    }
+  }
+
+  // Query params
+  const stringifyQueryValue = (queryValue: unknown) => {
+    if (
+      typeof queryValue === "string" ||
+      typeof queryValue === "number" ||
+      typeof queryValue === "boolean" ||
+      typeof queryValue === "bigint"
+    ) {
+      return String(queryValue);
+    }
+    return JSON.stringify(queryValue) ?? "";
+  };
+
+  const searchParams = new URLSearchParams();
+  if (params.query) {
+    for (const [k, v] of Object.entries(params.query)) {
+      if (v !== undefined && v !== null) searchParams.set(k, stringifyQueryValue(v));
+    }
+  }
+  const qs = searchParams.toString();
+  const url = `${base}${path}${qs ? `?${qs}` : ""}`;
+
+  return {
+    url,
+    method: value.method,
+    body: params.body,
+    headers: { "Content-Type": "application/json" },
+  };
+}
+
+export async function executeOpenApiRequest(request: OpenApiRequest): Promise<unknown> {
+  const hasBody =
+    request.body !== undefined && !["GET", "HEAD"].includes(request.method.toUpperCase());
+  const response = await fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    ...(hasBody && { body: JSON.stringify(request.body) }),
+  });
+  if (!response.ok) throw new Error(`${request.method} ${request.url} → ${response.status}`);
+  return response.json();
+}
+
+export function defineOpenApiRequestAction(options: {
+  key: string;
+  title?: string;
+  description?: string;
+}): OpenSceneSolidActionDefinition {
+  return defineOpenSceneSolidAction({
+    key: options.key,
+    title: options.title ?? options.key,
+    description:
+      options.description ??
+      "Execute an OpenAPI request. Configure the endpoint in Studio via the openapi prop control.",
+    params: z.object({
+      openapi: z
+        .object({
+          json: z.record(z.string(), z.unknown()),
+          path: z.string(),
+          method: z.enum([...openApiMethods]),
+          params: z
+            .object({
+              path: z.record(z.string(), z.unknown()).optional(),
+              query: z.record(z.string(), z.unknown()).optional(),
+              body: z.unknown().optional(),
+            })
+            .optional(),
+        })
+        .meta({ "x-editor": { control: "openapi" } })
+        .optional(),
+      resultKey: z.string().optional(),
+      errorKey: z.string().optional(),
+    }),
+    handler: async (params, setState, state) => {
+      const request = buildOpenApiRequest(params?.["openapi"] as OpenApiValue | undefined, state);
+      if (!request) return;
+      try {
+        const result = await executeOpenApiRequest(request);
+        const resultKey = params?.["resultKey"] as string | undefined;
+        if (resultKey) setState((prev) => ({ ...prev, [resultKey]: result }));
+      } catch (err) {
+        const errorKey = params?.["errorKey"] as string | undefined;
+        if (errorKey) setState((prev) => ({ ...prev, [errorKey]: String(err) }));
+      }
     },
-  },
-};
+  });
+}

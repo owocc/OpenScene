@@ -1,30 +1,26 @@
-import { createRequire } from "node:module";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import solid from "vite-plugin-solid";
+import type { Plugin } from "vite-plus";
 
-const require = createRequire(import.meta.url);
-// Force the browser build of solid-js/web: require.resolve() follows the
-// node condition and returns the server entry (server.cjs / server.js),
-// which would ship the server runtime to the browser.
-const solidWeb = require
-  .resolve("solid-js/package.json")
-  .replace(/package\.json$/, "web/dist/web.js");
+/**
+ * vite-plugin-solid (Solid v1) compiles JSX using helpers from "solid-js/web".
+ * Solid v2 moved those helpers to "@solidjs/web".
+ * Rewrite the string in every transformed file so the SDK output is v2-compatible.
+ */
+const solidV2Compat: Plugin = {
+  name: "openscene:solid-v2-compat",
+  enforce: "post",
+  transform(code) {
+    if (!code.includes("solid-js/web")) return null;
+    return { code: code.replaceAll('"solid-js/web"', '"@solidjs/web"'), map: null };
+  },
+};
 
 export default defineConfig({
-  plugins: lazyPlugins(() => [solid()]),
-  resolve: {
-    alias: {
-      "solid-js/web": solidWeb,
-    },
-  },
-  ssr: {
-    noExternal: ["@json-render/solid"],
-  },
+  plugins: lazyPlugins(() => [solid(), solidV2Compat]),
   pack: {
-    entry: ["src/index.tsx", "src/server.ts"],
-    dts: {
-      tsgo: true,
-    },
+    entry: ["src/index.tsx", "src/server.ts", "src/vite.ts"],
+    dts: true,
   },
   lint: {
     options: {

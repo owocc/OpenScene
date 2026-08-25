@@ -1,5 +1,5 @@
-import { createComponent, createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
-import { Dynamic } from "solid-js/web";
+import { createComponent, createEffect, createMemo, onCleanup, untrack } from "solid-js";
+import { Dynamic } from "@solidjs/web";
 import { APP_TYPE_WEB } from "@openscene-ai/constants";
 import { defineAppManifest } from "@openscene-ai/javascript";
 import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
@@ -10,7 +10,6 @@ import {
   defineOpenSceneSolidComponent,
   type OpenSceneSolidApp,
   useOpenSceneNode,
-  View,
 } from "@openscene-ai/solid";
 import { z } from "zod";
 const baseViewProps = {
@@ -180,14 +179,10 @@ const Callout = defineOpenSceneSolidComponent({
   render: (renderProps) => {
     const elementProps = getComponentProps<z.infer<typeof calloutProps>>(renderProps);
     const tone = typeof elementProps.tone === "string" ? elementProps.tone : "info";
-    return createComponent(View, {
-      props: {
-        ...elementProps,
-        className: `solid-v1-callout solid-v1-callout-${tone}`,
-      },
+    return createComponent(Dynamic, {
+      component: "div",
+      class: `solid-v1-callout solid-v1-callout-${tone}`,
       children: renderProps.children,
-      emit: renderProps.emit,
-      on: renderProps.on,
     });
   },
 });
@@ -326,15 +321,16 @@ const OpenApiProvider = defineOpenSceneSolidComponent({
         cancelled = true;
       });
     });
-    return Show({
-      get when() {
-        return request();
-      },
-      fallback: createComponent(Dynamic, {
+    if (!request()) {
+      return createComponent(Dynamic, {
         component: "span",
         class: "solid-v1-openapi-missing",
         children: "OpenAPI not configured",
-      }),
+      });
+    }
+
+    return createComponent(Dynamic, {
+      component: "div",
       children: [
         createComponent(Dynamic, {
           component: "pre",
@@ -348,7 +344,6 @@ const OpenApiProvider = defineOpenSceneSolidComponent({
     });
   },
 });
-
 export function createSolidApp(appKey: string): OpenSceneSolidApp {
   return defineOpenSceneSolidApp({
     app: { key: appKey, type: APP_TYPE_WEB },

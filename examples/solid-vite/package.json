@@ -1,24 +1,25 @@
 {
-  "name": "example-v1",
+  "name": "@openscene-ai/example-solid-vite",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vp dev",
-    "build": "tsc -b && vp build",
-    "preview": "vp preview"
+    "build": "vp build",
+    "preview": "vp preview",
+    "check": "vp check"
   },
   "dependencies": {
-    "@openscene-ai/constants": "workspace:*",
-    "@openscene-ai/javascript": "workspace:*",
-    "@openscene-ai/schema": "workspace:*",
     "@openscene-ai/solid": "workspace:*",
     "@solidjs/web": "^2.0.0-rc.0",
-    "solid-js": "^2.0.0-rc.2",
-    "zod": "^4.0.0"
+    "solid-js": "^2.0.0-rc.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@solidjs/vite-plugin": "^3.0.0-next.29",
+    "@tailwindcss/vite": "^4",
     "@types/node": "catalog:",
+    "tailwindcss": "^4",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
