@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowSquareOut,
   CaretDown,
   CaretRight,
   ClipboardText,
@@ -27,6 +28,7 @@ import { useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Code } from "@cloudflare/kumo/components/code";
+import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
@@ -820,6 +822,45 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       void queryClient.invalidateQueries();
     },
   });
+  const profilesQuery = api.useQuery("get", "/api/v1/apps/{appId}/preview-profiles", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const studioWindow = useRef<Window | null>(null);
+  const studio = api.useMutation("post", "/api/v1/apps/{appId}/studio-sessions", {
+    onSuccess: (data) => {
+      const launchWindow = studioWindow.current;
+      studioWindow.current = null;
+      if (!data?.launchUrl) {
+        launchWindow?.close();
+        return;
+      }
+      if (launchWindow && !launchWindow.closed) {
+        launchWindow.location.replace(data.launchUrl);
+        return;
+      }
+      window.location.assign(data.launchUrl);
+    },
+    onError: () => {
+      studioWindow.current?.close();
+      studioWindow.current = null;
+    },
+  });
+
+  function openStudio(resource: Resource) {
+    const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
+    if (!profile) return;
+    studioWindow.current = window.open("", "_blank");
+    if (studioWindow.current) studioWindow.current.opener = null;
+    studio.mutate({
+      params: { path: { appId: context.appId ?? "" } },
+      body: {
+        resourceKind: kind === "pages" ? "page" : "template",
+        resourceId: resource.id,
+        previewProfileId: profile.id,
+        returnUrl: window.location.href,
+      },
+    });
+  }
   const promptsQuery = api.useQuery("get", "/api/v1/apps/{appId}/prompts", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -1002,6 +1043,12 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
                         }
                       />
                       <DropdownMenu.Content>
+                        <DropdownMenu.Item
+                          icon={ArrowSquareOut}
+                          onClick={() => openStudio(resource)}
+                        >
+                          {t("studio")}
+                        </DropdownMenu.Item>
                         <DropdownMenu.Item icon={PencilSimple} onClick={() => openEdit(resource)}>
                           {t("edit")}
                         </DropdownMenu.Item>
@@ -1306,54 +1353,7 @@ function ResourceDetailView() {
           {t("studio")}
         </Button>
       </PageHeader>
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Surface className="grid gap-3 p-4">
-          <Text variant="heading" as="h2">
-            {t("draft")}
-          </Text>
-          <Code code={json} lang="jsonc" />
-        </Surface>
-        <Surface className="grid gap-4 p-4">
-          <Text variant="heading" as="h2">
-            {t("versions")}
-          </Text>
-          <Button
-            onClick={() =>
-              version.mutate({
-                params: { path: { appId: context.appId ?? "", documentId: resource.documentId } },
-                body: { message: versionMessage },
-              })
-            }
-          >
-            {t("create")}
-          </Button>
-          <Input
-            label="Message"
-            value={versionMessage}
-            onChange={(e) => setVersionMessage(e.target.value)}
-          />
-          {(versionsQuery.data ?? []).map((item) => (
-            <div key={item.id} className="flex justify-between border-b border-kumo-line py-2">
-              <Text>
-                v{item.versionNumber} · {item.message || "—"}
-              </Text>
-              <Button
-                size="sm"
-                onClick={() =>
-                  release.mutate({
-                    params: {
-                      path: { appId: context.appId ?? "", documentId: resource.documentId },
-                    },
-                    body: { versionId: item.id, channel },
-                  })
-                }
-              >
-                {t("releases")}
-              </Button>
-            </div>
-          ))}
-          <Input label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)} />
-        </Surface>
+      <div className="flex flex-col gap-4">
         {kind === "page" && (
           <Surface className="grid gap-3 p-4">
             <Text variant="heading" as="h2">
@@ -1381,18 +1381,79 @@ function ResourceDetailView() {
             />
           </Surface>
         )}
-      </div>
-      <Surface className="mt-4 grid gap-2 p-4">
-        <Text variant="heading" as="h2">
-          {t("releases")}
-        </Text>
-        {(releasesQuery.data ?? []).map((item) => (
-          <div key={item.id} className="flex justify-between">
-            <Text>{item.channel}</Text>
-            <StatusBadge status={item.status} />
+        <Surface className="grid gap-4 p-4">
+          <Text variant="heading" as="h2">
+            {t("versions")}
+          </Text>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[200px]">
+              <Input
+                label="Message"
+                value={versionMessage}
+                onChange={(e) => setVersionMessage(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="primary"
+              loading={version.isPending}
+              onClick={() =>
+                version.mutate({
+                  params: { path: { appId: context.appId ?? "", documentId: resource.documentId } },
+                  body: { message: versionMessage },
+                })
+              }
+            >
+              {t("create")}
+            </Button>
           </div>
-        ))}
-      </Surface>
+          {(versionsQuery.data ?? []).map((item) => (
+            <div key={item.id} className="flex justify-between border-b border-kumo-line py-2">
+              <Text>
+                v{item.versionNumber} · {item.message || "—"}
+              </Text>
+              <Button
+                size="sm"
+                onClick={() =>
+                  release.mutate({
+                    params: {
+                      path: { appId: context.appId ?? "", documentId: resource.documentId },
+                    },
+                    body: { versionId: item.id, channel },
+                  })
+                }
+              >
+                {t("releases")}
+              </Button>
+            </div>
+          ))}
+          <div className="max-w-xs">
+            <Input label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)} />
+          </div>
+        </Surface>
+        <Surface className="grid gap-2 p-4">
+          <Text variant="heading" as="h2">
+            {t("releases")}
+          </Text>
+          {(releasesQuery.data ?? []).map((item) => (
+            <div key={item.id} className="flex justify-between">
+              <Text>{item.channel}</Text>
+              <StatusBadge status={item.status} />
+            </div>
+          ))}
+        </Surface>
+        <Collapsible.Root defaultOpen={false}>
+          <Surface className="p-4">
+            <Collapsible.DefaultTrigger className="w-full justify-between">
+              <Text variant="heading" as="h2">
+                {t("draft")}
+              </Text>
+            </Collapsible.DefaultTrigger>
+            <Collapsible.Panel className="pt-3">
+              <Code code={json} lang="jsonc" />
+            </Collapsible.Panel>
+          </Surface>
+        </Collapsible.Root>
+      </div>
     </>
   );
 }
