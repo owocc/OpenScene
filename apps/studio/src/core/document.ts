@@ -226,7 +226,14 @@ export function resolveDynamicValue(
   );
 }
 
-export type StateVariableType = "string" | "number" | "boolean" | "object" | "array" | "null";
+export type StateVariableType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "object"
+  | "array"
+  | "asset"
+  | "null";
 
 export interface StateVariable {
   key: string;
@@ -243,6 +250,21 @@ export interface VariableReference {
   kind: "$state" | "$bindState" | "$template" | "other";
 }
 
+export function isAssetPath(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (
+    trimmed.startsWith("/api/v1/apps/") ||
+    trimmed.startsWith("/assets/") ||
+    trimmed.startsWith("/storage/")
+  ) {
+    return true;
+  }
+  return /\.(png|jpe?g|webp|gif|svg|avif|ico|bmp|mp3|wav|ogg|aac|flac|m4a|mp4|webm|mov|mkv|pdf|json|woff2?|ttf|otf|gltf|glb)$/i.test(
+    trimmed,
+  );
+}
+
 export function isValidVariableKey(key: string): boolean {
   const trimmed = key.trim();
   if (!trimmed) return false;
@@ -255,7 +277,10 @@ export function inferVariableType(value: unknown): StateVariableType {
   if (Array.isArray(value)) return "array";
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";
-  if (typeof value === "string") return "string";
+  if (typeof value === "string") {
+    if (isAssetPath(value)) return "asset";
+    return "string";
+  }
   if (typeof value === "object") return "object";
   return "string";
 }
@@ -272,6 +297,8 @@ export function getDefaultVariableValue(type: StateVariableType): JsonValue {
       return {};
     case "array":
       return [];
+    case "asset":
+      return "";
     case "null":
       return null;
   }
@@ -318,6 +345,10 @@ export function convertVariableValue(value: unknown, targetType: StateVariableTy
     }
     return [];
   }
+  if (targetType === "asset") {
+    if (typeof value === "string") return value;
+    return "";
+  }
   return getDefaultVariableValue(targetType);
 }
 
@@ -335,8 +366,18 @@ export function getStateVariables(state: Record<string, unknown> | undefined): S
     });
   }
 
+  if ("asset_base_url" in state && typeof state.asset_base_url === "string") {
+    variables.push({
+      key: "asset_base_url",
+      value: state.asset_base_url as JsonValue,
+      type: "string",
+      path: "/asset_base_url",
+      isProtected: true,
+    });
+  }
+
   for (const [key, value] of Object.entries(state)) {
-    if (!isReservedStateRoot(key)) {
+    if (key !== "lang" && key !== "asset_base_url" && !isReservedStateRoot(key)) {
       variables.push({
         key,
         value: value as JsonValue,

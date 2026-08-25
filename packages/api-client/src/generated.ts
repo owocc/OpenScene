@@ -159,7 +159,7 @@ export interface paths {
     delete: operations["deleteAsset"];
     options?: never;
     head?: never;
-    patch?: never;
+    patch: operations["patchAsset"];
     trace?: never;
   };
   "/api/v1/apps/{appId}/assets/{assetId}/complete": {
@@ -172,6 +172,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["completeAsset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/apps/{appId}/assets/folders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listAssetFolders"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -738,6 +754,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/studio-sessions/{sessionId}/assets": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listSessionAssets"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/studio-sessions/{sessionId}/assets/{assetId}/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["completeSessionAsset"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/studio-sessions/{sessionId}/assets/folders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listSessionAssetFolders"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/studio-sessions/{sessionId}/assets/upload-intents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["createSessionUploadIntent"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/studio-sessions/{sessionId}/bootstrap": {
     parameters: {
       query?: never;
@@ -1145,8 +1225,18 @@ export interface components {
     /** @description App object storage configuration */
     AppStorageConfig: {
       appId: string;
-      /** @enum {string} */
+      /**
+       * @default database
+       * @enum {string}
+       */
       driver: "database" | "s3" | "memory";
+      /**
+       * @default database
+       * @enum {string}
+       */
+      pageDriver: "database" | "s3" | "memory";
+      /** @default false */
+      s3Enabled: boolean;
       endpoint?: string | null;
       region?: string | null;
       bucket?: string | null;
@@ -1165,8 +1255,18 @@ export interface components {
       /** @description App object storage configuration */
       config?: {
         appId: string;
-        /** @enum {string} */
+        /**
+         * @default database
+         * @enum {string}
+         */
         driver: "database" | "s3" | "memory";
+        /**
+         * @default database
+         * @enum {string}
+         */
+        pageDriver: "database" | "s3" | "memory";
+        /** @default false */
+        s3Enabled: boolean;
         endpoint?: string | null;
         region?: string | null;
         bucket?: string | null;
@@ -1187,6 +1287,13 @@ export interface components {
        * @enum {string}
        */
       driver: "database" | "s3" | "memory";
+      /**
+       * @default database
+       * @enum {string}
+       */
+      pageDriver: "database" | "s3" | "memory";
+      /** @default false */
+      s3Enabled: boolean;
       /** Format: uri */
       endpoint?: string | null;
       region?: string | null;
@@ -3727,9 +3834,19 @@ export interface operations {
             mimeType: string;
             size: number;
             storageKey: string;
-            checksum: string | null;
-            width: number | null;
-            height: number | null;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3880,9 +3997,19 @@ export interface operations {
             mimeType: string;
             size: number;
             storageKey: string;
-            checksum: string | null;
-            width: number | null;
-            height: number | null;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -4141,7 +4268,7 @@ export interface operations {
       };
     };
   };
-  completeAsset: {
+  patchAsset: {
     parameters: {
       query?: never;
       header?: never;
@@ -4154,9 +4281,15 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
-          checksum?: string;
+          fileName?: string;
+          folder?: string;
+          tags?: string[];
+          metadata?: {
+            [key: string]: unknown;
+          };
           width?: number;
           height?: number;
+          duration?: number;
         };
       };
     };
@@ -4176,14 +4309,337 @@ export interface operations {
             mimeType: string;
             size: number;
             storageKey: string;
-            checksum: string | null;
-            width: number | null;
-            height: number | null;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
           };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  completeAsset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          checksum?: string;
+          folder?: string;
+          tags?: string[];
+          metadata?: {
+            [key: string]: unknown;
+          };
+          width?: number;
+          height?: number;
+          duration?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            /** @enum {string} */
+            status: "pending" | "ready" | "failed";
+            fileName: string;
+            mimeType: string;
+            size: number;
+            storageKey: string;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  listAssetFolders: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        appId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
         };
       };
       /** @description Bad request */
@@ -4317,6 +4773,11 @@ export interface operations {
           fileName: string;
           mimeType: string;
           size: number;
+          folder?: string;
+          tags?: string[];
+          metadata?: {
+            [key: string]: unknown;
+          };
         };
       };
     };
@@ -4337,9 +4798,19 @@ export interface operations {
               mimeType: string;
               size: number;
               storageKey: string;
-              checksum: string | null;
-              width: number | null;
-              height: number | null;
+              checksum?: string | null;
+              /** @default / */
+              folder: string;
+              /** @default [] */
+              tags: string[];
+              metadata?: {
+                [key: string]: unknown;
+              } | null;
+              width?: number | null;
+              height?: number | null;
+              duration?: number | null;
+              url?: string;
+              path?: string;
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
@@ -11573,8 +12044,18 @@ export interface operations {
             /** @description App object storage configuration */
             config?: {
               appId: string;
-              /** @enum {string} */
+              /**
+               * @default database
+               * @enum {string}
+               */
               driver: "database" | "s3" | "memory";
+              /**
+               * @default database
+               * @enum {string}
+               */
+              pageDriver: "database" | "s3" | "memory";
+              /** @default false */
+              s3Enabled: boolean;
               endpoint?: string | null;
               region?: string | null;
               bucket?: string | null;
@@ -11723,6 +12204,13 @@ export interface operations {
            * @enum {string}
            */
           driver?: "database" | "s3" | "memory";
+          /**
+           * @default database
+           * @enum {string}
+           */
+          pageDriver?: "database" | "s3" | "memory";
+          /** @default false */
+          s3Enabled?: boolean;
           /** Format: uri */
           endpoint?: string | null;
           region?: string | null;
@@ -11745,8 +12233,18 @@ export interface operations {
         content: {
           "application/json": {
             appId: string;
-            /** @enum {string} */
+            /**
+             * @default database
+             * @enum {string}
+             */
             driver: "database" | "s3" | "memory";
+            /**
+             * @default database
+             * @enum {string}
+             */
+            pageDriver: "database" | "s3" | "memory";
+            /** @default false */
+            s3Enabled: boolean;
             endpoint?: string | null;
             region?: string | null;
             bucket?: string | null;
@@ -12170,6 +12668,13 @@ export interface operations {
            * @enum {string}
            */
           driver?: "database" | "s3" | "memory";
+          /**
+           * @default database
+           * @enum {string}
+           */
+          pageDriver?: "database" | "s3" | "memory";
+          /** @default false */
+          s3Enabled?: boolean;
           /** Format: uri */
           endpoint?: string | null;
           region?: string | null;
@@ -14137,6 +14642,661 @@ export interface operations {
         content: {
           "application/json": {
             [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  listSessionAssets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            /** @enum {string} */
+            status: "pending" | "ready" | "failed";
+            fileName: string;
+            mimeType: string;
+            size: number;
+            storageKey: string;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          }[];
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  completeSessionAsset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sessionId: string;
+        assetId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          checksum?: string;
+          folder?: string;
+          tags?: string[];
+          metadata?: {
+            [key: string]: unknown;
+          };
+          width?: number;
+          height?: number;
+          duration?: number;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            id: string;
+            appId: string;
+            /** @enum {string} */
+            status: "pending" | "ready" | "failed";
+            fileName: string;
+            mimeType: string;
+            size: number;
+            storageKey: string;
+            checksum?: string | null;
+            /** @default / */
+            folder: string;
+            /** @default [] */
+            tags: string[];
+            metadata?: {
+              [key: string]: unknown;
+            } | null;
+            width?: number | null;
+            height?: number | null;
+            duration?: number | null;
+            url?: string;
+            path?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  listSessionAssetFolders: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  createSessionUploadIntent: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          mimeType: string;
+          size: number;
+          folder?: string;
+          tags?: string[];
+          metadata?: {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+    responses: {
+      /** @description Successful response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            asset: {
+              id: string;
+              appId: string;
+              /** @enum {string} */
+              status: "pending" | "ready" | "failed";
+              fileName: string;
+              mimeType: string;
+              size: number;
+              storageKey: string;
+              checksum?: string | null;
+              /** @default / */
+              folder: string;
+              /** @default [] */
+              tags: string[];
+              metadata?: {
+                [key: string]: unknown;
+              } | null;
+              width?: number | null;
+              height?: number | null;
+              duration?: number | null;
+              url?: string;
+              path?: string;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            uploadUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
           };
         };
       };

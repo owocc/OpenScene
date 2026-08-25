@@ -90,8 +90,11 @@ describe("State variables logic for json-render", () => {
     expect(vars.map((v) => v.key)).toEqual(["title", "count"]);
     expect(vars.some((v) => v.key === "lang")).toBe(false);
   });
-  it("infers variable types accurately and gets default values", () => {
+  it("infers variable types accurately and gets default values including asset paths", () => {
     expect(inferVariableType("hello")).toBe("string");
+    expect(inferVariableType("/assets/ast_123/banner.png")).toBe("asset");
+    expect(inferVariableType("/api/v1/apps/app_1/assets/ast_2/raw")).toBe("asset");
+    expect(inferVariableType("https://cdn.example.com/audio.mp3")).toBe("asset");
     expect(inferVariableType(123)).toBe("number");
     expect(inferVariableType(true)).toBe("boolean");
     expect(inferVariableType({ a: 1 })).toBe("object");
@@ -99,11 +102,21 @@ describe("State variables logic for json-render", () => {
     expect(inferVariableType(null)).toBe("null");
 
     expect(getDefaultVariableValue("string")).toBe("");
+    expect(getDefaultVariableValue("asset")).toBe("");
     expect(getDefaultVariableValue("number")).toBe(0);
     expect(getDefaultVariableValue("boolean")).toBe(false);
     expect(getDefaultVariableValue("object")).toEqual({});
     expect(getDefaultVariableValue("array")).toEqual([]);
     expect(getDefaultVariableValue("null")).toBeNull();
+  });
+
+  it("extracts protected asset_base_url variable when present in state", () => {
+    const stateWithAssetBase = { asset_base_url: "http://localhost:3000", title: "App" };
+    const vars = getStateVariables(stateWithAssetBase);
+    const assetBaseVar = vars.find((v) => v.key === "asset_base_url");
+    expect(assetBaseVar).toBeDefined();
+    expect(assetBaseVar?.isProtected).toBe(true);
+    expect(assetBaseVar?.value).toBe("http://localhost:3000");
   });
 
   it("validates variable keys according to json-render identifier rules", () => {

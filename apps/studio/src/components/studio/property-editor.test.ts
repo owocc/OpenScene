@@ -297,4 +297,13 @@ describe("Dynamic mode and path handling", () => {
     expect(VariableCombobox).toBeDefined();
     expect(TemplateMentionInput).toBeDefined();
   });
+  it("resolves AssetControl for asset, resource, image, audio, video controls", () => {
+    const assetRenderer = resolveControlRenderer("asset");
+    expect(assetRenderer).toBeDefined();
+    expect(resolveControlRenderer("resource")).toBe(assetRenderer);
+    expect(resolveControlRenderer("image")).toBe(assetRenderer);
+    expect(resolveControlRenderer("audio")).toBe(assetRenderer);
+    expect(resolveControlRenderer("video")).toBe(assetRenderer);
+    expect(resolveControlRenderer("file")).toBe(assetRenderer);
+  });
 });

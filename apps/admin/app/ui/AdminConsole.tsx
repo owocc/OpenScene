@@ -6,16 +6,24 @@ import {
   ArrowSquareOut,
   CaretDown,
   CaretRight,
+  Check,
   ClipboardText,
+  Cloud,
   Copy,
+  Database,
   DotsThree,
-  Lock,
-  PencilSimple,
-  Power,
-  Plus,
-  Star,
-  Trash,
   Eye,
+  File as FileIcon,
+  Folder,
+  Lock,
+  MusicNotes,
+  PencilSimple,
+  Plus,
+  Power,
+  Star,
+  Tag,
+  Trash,
+  VideoCamera,
 } from "@phosphor-icons/react";
 import {
   APP_TYPE_FLUTTER,
@@ -47,7 +55,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { clsx as cn } from "clsx";
 import type { components } from "@openscene/api-client";
+import type { paths } from "@openscene/api-client/generated";
 import { api, fetchClient } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import { isAppScopedPath } from "./navigation";
@@ -2938,11 +2948,47 @@ function AssetsView() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const toast = useKumoToastManager();
+
+  // Filters
+  const [currentFolder, setCurrentFolder] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // Upload dialog state
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadFolder, setUploadFolder] = useState("/");
+  const [uploadTags, setUploadTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [extractedDimensions, setExtractedDimensions] = useState<{
+    width?: number;
+    height?: number;
+    duration?: number;
+  }>({});
   const [uploadError, setUploadError] = useState("");
+
+  // Edit dialog state
+  type AssetListItem =
+    paths["/api/v1/apps/{appId}/assets/{assetId}"]["get"]["responses"][200]["content"]["application/json"];
+  const [editingAsset, setEditingAsset] = useState<AssetListItem | null>(null);
+  const [editFolder, setEditFolder] = useState("/");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState("");
+
   const query = api.useQuery("get", "/api/v1/apps/{appId}/assets", {
     params: { path: { appId: context.appId ?? "" } },
   });
+  const foldersQuery = api.useQuery("get", "/api/v1/apps/{appId}/assets/folders", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const storageConfigQuery = api.useQuery("get", "/api/v1/apps/{appId}/storage", {
+    params: { path: { appId: context.appId ?? "" } },
+  });
+  const isS3Enabled = Boolean(
+    storageConfigQuery.data?.config?.s3Enabled || storageConfigQuery.data?.config?.driver === "s3",
+  );
+
   const intent = api.useMutation("post", "/api/v1/apps/{appId}/assets/upload-intents", {
     onSuccess: () => {
       toast.add({ title: t("created") });
@@ -2952,7 +2998,16 @@ function AssetsView() {
     onSuccess: () => {
       setFile(null);
       setUploadError("");
+      setIsUploadOpen(false);
+      setUploadTags([]);
       toast.add({ title: t("updated") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const patch = api.useMutation("patch", "/api/v1/apps/{appId}/assets/{assetId}", {
+    onSuccess: () => {
+      setEditingAsset(null);
+      toast.add({ title: t("assetUpdated") });
       void queryClient.invalidateQueries();
     },
   });
@@ -2962,6 +3017,53 @@ function AssetsView() {
       void queryClient.invalidateQueries();
     },
   });
+
+  // Extract dimensions when file changes
+  useEffect(() => {
+    if (!file) {
+      setExtractedDimensions({});
+      return;
+    }
+    const isImg = file.type.startsWith("image/");
+    const isAud = file.type.startsWith("audio/");
+    const isVid = file.type.startsWith("video/");
+
+    if (isImg) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        setExtractedDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => URL.revokeObjectURL(url);
+      img.src = url;
+    } else if (isAud) {
+      const url = URL.createObjectURL(file);
+      const audio = new Audio();
+      audio.onloadedmetadata = () => {
+        setExtractedDimensions({ duration: Math.round(audio.duration) });
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => URL.revokeObjectURL(url);
+      audio.src = url;
+    } else if (isVid) {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.onloadedmetadata = () => {
+        setExtractedDimensions({
+          width: video.videoWidth,
+          height: video.videoHeight,
+          duration: Math.round(video.duration),
+        });
+        URL.revokeObjectURL(url);
+      };
+      video.onerror = () => URL.revokeObjectURL(url);
+      video.src = url;
+    } else {
+      setExtractedDimensions({});
+    }
+  }, [file]);
+
   async function upload() {
     if (!file || !context.appId) return;
     setUploadError("");
@@ -2972,6 +3074,8 @@ function AssetsView() {
           fileName: file.name,
           mimeType: file.type || "application/octet-stream",
           size: file.size,
+          folder: uploadFolder,
+          tags: uploadTags,
         },
       });
       const put = await fetch(result.uploadUrl, {
@@ -2982,114 +3086,578 @@ function AssetsView() {
       if (!put.ok) throw new Error(`Upload failed (${put.status})`);
       await complete.mutateAsync({
         params: { path: { appId: context.appId, assetId: result.asset.id } },
-        body: {},
+        body: {
+          width: extractedDimensions.width,
+          height: extractedDimensions.height,
+          duration: extractedDimensions.duration,
+          folder: uploadFolder,
+          tags: uploadTags,
+        },
       });
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : t("requestFailed"));
     }
   }
+
+  // Filtered asset list
+  const filteredAssets = useMemo(() => {
+    let list = query.data ?? [];
+    if (currentFolder !== "all") {
+      list = list.filter((a) => (a.folder || "/") === currentFolder);
+    }
+    if (selectedType !== "all") {
+      if (selectedType === "image") list = list.filter((a) => a.mimeType.startsWith("image/"));
+      else if (selectedType === "audio") list = list.filter((a) => a.mimeType.startsWith("audio/"));
+      else if (selectedType === "video") list = list.filter((a) => a.mimeType.startsWith("video/"));
+      else if (selectedType === "other")
+        list = list.filter(
+          (a) =>
+            !a.mimeType.startsWith("image/") &&
+            !a.mimeType.startsWith("audio/") &&
+            !a.mimeType.startsWith("video/"),
+        );
+    }
+    if (selectedTag) {
+      list = list.filter((a) => (a.tags || []).includes(selectedTag));
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (a) =>
+          a.fileName.toLowerCase().includes(q) ||
+          (a.folder && a.folder.toLowerCase().includes(q)) ||
+          (a.tags && a.tags.some((t) => t.toLowerCase().includes(q))),
+      );
+    }
+    return list;
+  }, [query.data, currentFolder, selectedType, selectedTag, searchQuery]);
+
+  // Unique tags
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of query.data ?? []) {
+      for (const t of a.tags || []) {
+        set.add(t);
+      }
+    }
+    return Array.from(set);
+  }, [query.data]);
+
+  const folders = foldersQuery.data ?? ["/"];
+
+  if (!isS3Enabled && !storageConfigQuery.isLoading) {
+    return (
+      <>
+        <PageHeader
+          title={t("assets")}
+          description="支持图片、音频、适配文件多媒体资源存储，支持按文件夹分类与尺寸/标签管理。"
+        />
+        <Empty
+          icon={<Folder size={32} />}
+          title={t("s3StorageRequiredTitle")}
+          description={t("s3StorageRequiredDescription")}
+          contents={
+            <LinkButton href={context.href("/settings")} variant="primary">
+              {t("goToStorageSettings")}
+            </LinkButton>
+          }
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
         title={t("assets")}
-        description="Upload through a presigned browser URL and complete the asset record."
+        description="支持图片、音频、适配文件多媒体资源存储，支持按文件夹分类与尺寸/标签管理。"
       >
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-kumo-base px-3 py-2 ring ring-kumo-line">
-          <Plus size={16} />
-          {t("create")}
-          <input
-            type="file"
-            className="sr-only"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          />
-        </label>
         <Button
           variant="primary"
-          loading={intent.isPending || complete.isPending}
-          disabled={!file}
-          onClick={upload}
+          icon={Plus}
+          onClick={() => {
+            setFile(null);
+            setUploadError("");
+            setIsUploadOpen(true);
+          }}
         >
-          {t("save")}
+          {t("upload")}
         </Button>
       </PageHeader>
-      {file ? (
-        <Surface className="mb-4 grid gap-2 p-4">
-          <Text>
-            {file.name} · {file.size.toLocaleString()} bytes
-          </Text>
-          {uploadError ? <Text variant="error">{uploadError}</Text> : null}
-          <Text variant="secondary">Failed uploads keep the file selected so you can retry.</Text>
-        </Surface>
-      ) : null}
+
+      {/* Toolbar: Search, Folder Filter, Type Filter */}
+      <Surface className="mb-4 p-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+          <Input
+            placeholder="搜索文件名、文件夹或标签..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64"
+          />
+          <div className="flex items-center gap-1.5 bg-kumo-base border border-kumo-line rounded-lg px-2.5 py-1 text-xs">
+            <Folder size={14} className="text-kumo-subtle" />
+            <select
+              value={currentFolder}
+              onChange={(e) => setCurrentFolder(e.target.value)}
+              className="bg-transparent outline-none text-xs cursor-pointer"
+            >
+              <option value="all">{t("allFolders")}</option>
+              {folders.map((f) => (
+                <option key={f} value={f}>
+                  {f === "/" ? "/ (根目录)" : f}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1 bg-kumo-base border border-kumo-line rounded-lg p-0.5 text-xs">
+            {(["all", "image", "audio", "video", "other"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setSelectedType(type)}
+                className={cn(
+                  "px-2 py-1 rounded text-xs transition-colors cursor-pointer capitalize",
+                  selectedType === type
+                    ? "bg-kumo-primary text-white font-medium"
+                    : "text-kumo-subtle hover:text-kumo-base",
+                )}
+              >
+                {type === "all" ? "全部" : type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs overflow-x-auto">
+            <Tag size={13} className="text-kumo-subtle shrink-0" />
+            <button
+              type="button"
+              onClick={() => setSelectedTag(null)}
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[11px] border transition-colors cursor-pointer",
+                selectedTag === null
+                  ? "bg-kumo-primary text-white border-kumo-primary"
+                  : "bg-kumo-base text-kumo-subtle border-kumo-line",
+              )}
+            >
+              全部
+            </button>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                className={cn(
+                  "px-2 py-0.5 rounded-full text-[11px] border transition-colors cursor-pointer",
+                  selectedTag === tag
+                    ? "bg-kumo-primary text-white border-kumo-primary"
+                    : "bg-kumo-base text-kumo-subtle border-kumo-line",
+                )}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
+      </Surface>
+
       {query.error ? <ErrorState error={query.error} /> : null}
+
       <LayerCard className="w-full overflow-x-auto p-0">
         <Table layout="fixed">
           <colgroup>
+            <col style={{ width: "60px" }} />
             <col />
-            <col style={{ width: "120px" }} />
             <col style={{ width: "140px" }} />
+            <col style={{ width: "140px" }} />
+            <col style={{ width: "110px" }} />
+            <col style={{ width: "100px" }} />
             <col style={{ width: "56px" }} />
           </colgroup>
           <Table.Header>
             <Table.Row>
-              <Table.Head>File</Table.Head>
-              <Table.Head>Status</Table.Head>
-              <Table.Head>Size</Table.Head>
+              <Table.Head>预览</Table.Head>
+              <Table.Head>文件与标签</Table.Head>
+              <Table.Head>{t("folder")}</Table.Head>
+              <Table.Head>{t("dimensions")}</Table.Head>
+              <Table.Head>大小</Table.Head>
+              <Table.Head>状态</Table.Head>
               <Table.Head sticky="right">
                 <span className="sr-only">{t("actions")}</span>
               </Table.Head>
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {(query.data ?? []).map((asset) => (
-              <Table.Row key={asset.id}>
-                <Table.Cell>{asset.fileName}</Table.Cell>
-                <Table.Cell>
-                  <StatusBadge
-                    status={
-                      asset.status === "ready"
-                        ? "active"
-                        : asset.status === "failed"
-                          ? "disabled"
-                          : "draft"
-                    }
-                  />
-                </Table.Cell>
-                <Table.Cell>{asset.size.toLocaleString()} bytes</Table.Cell>
-                <Table.Cell sticky="right" className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenu.Trigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          shape="square"
-                          aria-label={t("moreOptions")}
-                        >
-                          <DotsThree weight="bold" size={16} />
-                        </Button>
+            {filteredAssets.map((asset) => {
+              const isImg = asset.mimeType.startsWith("image/");
+              const isAud = asset.mimeType.startsWith("audio/");
+              const isVid = asset.mimeType.startsWith("video/");
+              const assetUrl =
+                asset.url || asset.path || `/api/v1/apps/${context.appId}/assets/${asset.id}/raw`;
+
+              return (
+                <Table.Row key={asset.id}>
+                  {/* Preview Thumbnail */}
+                  <Table.Cell>
+                    <div className="size-9 rounded-md bg-kumo-base border border-kumo-line overflow-hidden flex items-center justify-center">
+                      {isImg ? (
+                        <img
+                          src={assetUrl}
+                          alt={asset.fileName}
+                          className="w-full h-full object-contain"
+                          loading="lazy"
+                        />
+                      ) : isAud ? (
+                        <MusicNotes size={18} className="text-amber-500" />
+                      ) : isVid ? (
+                        <VideoCamera size={18} className="text-sky-500" />
+                      ) : (
+                        <FileIcon size={18} className="text-kumo-subtle" />
+                      )}
+                    </div>
+                  </Table.Cell>
+
+                  {/* File Name & Tags */}
+                  <Table.Cell>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium text-xs truncate" title={asset.fileName}>
+                        {asset.fileName}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-kumo-subtle font-mono truncate max-w-xs">
+                          {asset.path || assetUrl}
+                        </span>
+                        {asset.tags && asset.tags.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            {asset.tags.map((tag) => (
+                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0">
+                                #{tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </Table.Cell>
+
+                  {/* Folder */}
+                  <Table.Cell>
+                    <Badge variant="outline" className="text-xs font-mono">
+                      {asset.folder || "/"}
+                    </Badge>
+                  </Table.Cell>
+
+                  {/* Dimensions / Duration */}
+                  <Table.Cell>
+                    <span className="text-xs font-mono text-kumo-subtle">
+                      {asset.width && asset.height
+                        ? `${asset.width} × ${asset.height}`
+                        : asset.duration
+                          ? `${Math.floor(asset.duration / 60)}:${String(asset.duration % 60).padStart(2, "0")}`
+                          : "-"}
+                    </span>
+                  </Table.Cell>
+
+                  {/* Size */}
+                  <Table.Cell className="text-xs text-kumo-subtle">
+                    {asset.size.toLocaleString()} bytes
+                  </Table.Cell>
+
+                  {/* Status */}
+                  <Table.Cell>
+                    <StatusBadge
+                      status={
+                        asset.status === "ready"
+                          ? "active"
+                          : asset.status === "failed"
+                            ? "disabled"
+                            : "draft"
                       }
                     />
-                    <DropdownMenu.Content>
-                      <DropdownMenu.Item
-                        icon={Trash}
-                        variant="danger"
-                        onClick={() =>
-                          remove.mutate({
-                            params: { path: { appId: context.appId ?? "", assetId: asset.id } },
-                          })
+                  </Table.Cell>
+
+                  {/* Actions */}
+                  <Table.Cell sticky="right" className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            shape="square"
+                            aria-label={t("moreOptions")}
+                          >
+                            <DotsThree weight="bold" size={16} />
+                          </Button>
                         }
-                      >
-                        {t("delete")}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
-                </Table.Cell>
-              </Table.Row>
-            ))}
+                      />
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Item
+                          icon={Copy}
+                          onClick={() => {
+                            void navigator.clipboard.writeText(asset.path || assetUrl);
+                            toast.add({ title: t("pathCopied") });
+                          }}
+                        >
+                          {t("copyPath")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={Copy}
+                          onClick={() => {
+                            void navigator.clipboard.writeText(
+                              `\${/asset_base_url}${asset.path || assetUrl}`,
+                            );
+                            toast.add({ title: t("templateCopied") });
+                          }}
+                        >
+                          {t("copyTemplate")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={PencilSimple}
+                          onClick={() => {
+                            setEditingAsset(asset);
+                            setEditFolder(asset.folder || "/");
+                            setEditTags(asset.tags || []);
+                          }}
+                        >
+                          {t("editAsset")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={Trash}
+                          variant="danger"
+                          onClick={() =>
+                            remove.mutate({
+                              params: { path: { appId: context.appId ?? "", assetId: asset.id } },
+                            })
+                          }
+                        >
+                          {t("delete")}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
           </Table.Body>
         </Table>
       </LayerCard>
+
+      {/* Upload Dialog */}
+      <Dialog.Root open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>上传资源文件</Dialog.Title>
+          <Dialog.Description>上传图片、音频、适配等多媒体文件至该应用资源库。</Dialog.Description>
+          <div className="grid gap-3 py-4 text-xs">
+            <div>
+              <label className="text-xs font-medium block mb-1">选择文件</label>
+              <input
+                type="file"
+                className="w-full text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:bg-kumo-base file:ring-1 file:ring-kumo-line file:text-xs"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              {file && (
+                <div className="mt-2 p-2 bg-kumo-base rounded border border-kumo-line text-[11px] text-kumo-subtle flex items-center justify-between">
+                  <span>
+                    {file.name} · {file.size.toLocaleString()} bytes
+                  </span>
+                  {extractedDimensions.width && (
+                    <span className="font-mono">
+                      {extractedDimensions.width} × {extractedDimensions.height} px
+                    </span>
+                  )}
+                  {extractedDimensions.duration && (
+                    <span className="font-mono">时长: {extractedDimensions.duration} 秒</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1">文件夹分类</label>
+              <div className="flex gap-2">
+                <Input
+                  value={uploadFolder}
+                  onChange={(e) => setUploadFolder(e.target.value)}
+                  placeholder="/images, /icons, /audio"
+                  className="flex-1"
+                />
+                <select
+                  value={folders.includes(uploadFolder) ? uploadFolder : ""}
+                  onChange={(e) => e.target.value && setUploadFolder(e.target.value)}
+                  className="bg-kumo-base border border-kumo-line rounded-lg px-2 text-xs"
+                >
+                  <option value="">已有文件夹...</option>
+                  {folders.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1">标签 (Tags)</label>
+              <div className="flex gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const t = tagInput.trim();
+                      if (t && !uploadTags.includes(t)) {
+                        setUploadTags([...uploadTags, t]);
+                        setTagInput("");
+                      }
+                    }
+                  }}
+                  placeholder="输入标签按回车添加..."
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const t = tagInput.trim();
+                    if (t && !uploadTags.includes(t)) {
+                      setUploadTags([...uploadTags, t]);
+                      setTagInput("");
+                    }
+                  }}
+                >
+                  添加
+                </Button>
+              </div>
+              {uploadTags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {uploadTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded bg-kumo-base border border-kumo-line px-2 py-0.5 text-xs cursor-pointer hover:opacity-80"
+                      onClick={() => setUploadTags(uploadTags.filter((t) => t !== tag))}
+                    >
+                      #{tag} ×
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {uploadError && <Text variant="error">{uploadError}</Text>}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="secondary" onClick={() => setIsUploadOpen(false)}>
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              loading={intent.isPending || complete.isPending}
+              disabled={!file}
+              onClick={upload}
+            >
+              {t("upload")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+
+      {/* Edit Asset Dialog */}
+      <Dialog.Root
+        open={editingAsset !== null}
+        onOpenChange={(open) => !open && setEditingAsset(null)}
+      >
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("editAsset")}</Dialog.Title>
+          <Dialog.Description>{`编辑资源属性: ${editingAsset?.fileName}`}</Dialog.Description>
+          <div className="grid gap-3 py-4 text-xs">
+            <div>
+              <label className="text-xs font-medium block mb-1">文件夹分类</label>
+              <Input
+                value={editFolder}
+                onChange={(e) => setEditFolder(e.target.value)}
+                placeholder="/images, /icons, /audio"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium block mb-1">标签 (Tags)</label>
+              <div className="flex gap-2">
+                <Input
+                  value={editTagInput}
+                  onChange={(e) => setEditTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const t = editTagInput.trim();
+                      if (t && !editTags.includes(t)) {
+                        setEditTags([...editTags, t]);
+                        setEditTagInput("");
+                      }
+                    }
+                  }}
+                  placeholder="输入标签按回车添加..."
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const t = editTagInput.trim();
+                    if (t && !editTags.includes(t)) {
+                      setEditTags([...editTags, t]);
+                      setEditTagInput("");
+                    }
+                  }}
+                >
+                  添加
+                </Button>
+              </div>
+              {editTags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {editTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded bg-kumo-base border border-kumo-line px-2 py-0.5 text-xs cursor-pointer hover:opacity-80"
+                      onClick={() => setEditTags(editTags.filter((t) => t !== tag))}
+                    >
+                      #{tag} ×
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="secondary" onClick={() => setEditingAsset(null)}>
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              loading={patch.isPending}
+              onClick={() => {
+                if (!editingAsset || !context.appId) return;
+                patch.mutate({
+                  params: { path: { appId: context.appId, assetId: editingAsset.id } },
+                  body: {
+                    folder: editFolder,
+                    tags: editTags,
+                  },
+                });
+              }}
+            >
+              {t("save")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
     </>
   );
 }
@@ -3774,7 +4342,8 @@ function SettingsView() {
   const [rotationError, setRotationError] = useState<unknown>(null);
   const [isRotating, setIsRotating] = useState(false);
 
-  const [storageDriver, setStorageDriver] = useState<"database" | "s3" | "memory">("database");
+  const [pageDriver, setPageDriver] = useState<"database" | "s3" | "memory">("database");
+  const [s3Enabled, setS3Enabled] = useState(false);
   const [storageBucket, setStorageBucket] = useState("");
   const [storageEndpoint, setStorageEndpoint] = useState("");
   const [storageRegion, setStorageRegion] = useState("auto");
@@ -3821,7 +4390,8 @@ function SettingsView() {
   }, [app]);
   useEffect(() => {
     if (storageConfig) {
-      setStorageDriver(storageConfig.driver ?? "database");
+      setPageDriver(storageConfig.pageDriver ?? storageConfig.driver ?? "database");
+      setS3Enabled(Boolean(storageConfig.s3Enabled || storageConfig.driver === "s3"));
       setStorageBucket(storageConfig.bucket ?? "");
       setStorageEndpoint(storageConfig.endpoint ?? "");
       setStorageRegion(storageConfig.region ?? "auto");
@@ -3830,7 +4400,8 @@ function SettingsView() {
       setStoragePublicBaseUrl(storageConfig.publicBaseUrl ?? "");
       setStorageSecretAccessKey("");
     } else {
-      setStorageDriver("database");
+      setPageDriver("database");
+      setS3Enabled(false);
       setStorageBucket("");
       setStorageEndpoint("");
       setStorageRegion("auto");
@@ -3845,7 +4416,9 @@ function SettingsView() {
     updateStorage.mutate({
       params: { path: { appId: context.appId ?? "" } },
       body: {
-        driver: storageDriver,
+        driver: pageDriver,
+        pageDriver,
+        s3Enabled,
         bucket: storageBucket,
         endpoint: storageEndpoint || undefined,
         region: storageRegion || "auto",
@@ -3863,7 +4436,9 @@ function SettingsView() {
       {
         params: { path: { appId: context.appId ?? "" } },
         body: {
-          driver: storageDriver,
+          driver: pageDriver,
+          pageDriver,
+          s3Enabled,
           bucket: storageBucket,
           endpoint: storageEndpoint || undefined,
           region: storageRegion || "auto",
@@ -3989,82 +4564,140 @@ function SettingsView() {
             <LayerCard.Primary className="grid gap-4">
               <Text variant="secondary">{t("storageSettingsDescription")}</Text>
               {storageQuery.error ? <ErrorState error={storageQuery.error} /> : null}
-              <Select
-                label={t("storageMode")}
-                value={storageDriver}
-                items={{
-                  database: t("storageModeDatabase"),
-                  s3: t("storageModeS3"),
-                }}
-                onValueChange={(value) => {
-                  if (value === "database" || value === "s3") {
-                    setStorageDriver(value);
-                    setStorageTestResult(null);
-                  }
-                }}
-              />
-              <Text variant="secondary">
-                {storageDriver === "database"
-                  ? t("storageModeDatabaseDescription")
-                  : t("storageModeS3Description")}
-              </Text>
-              {storageDriver === "s3" ? (
-                <>
-                  <Input
-                    label={t("storageBucket")}
-                    value={storageBucket}
-                    onChange={(e) => setStorageBucket(e.target.value)}
-                    placeholder={t("storageBucketPlaceholder")}
-                  />
-                  <Input
-                    label={t("storageEndpoint")}
-                    value={storageEndpoint}
-                    onChange={(e) => setStorageEndpoint(e.target.value)}
-                    placeholder={t("storageEndpointPlaceholder")}
-                  />
-                  <Input
-                    label={t("storageRegion")}
-                    value={storageRegion}
-                    onChange={(e) => setStorageRegion(e.target.value)}
-                    placeholder="auto"
-                  />
-                  <Input
-                    label={t("storageAccessKeyId")}
-                    value={storageAccessKeyId}
-                    onChange={(e) => setStorageAccessKeyId(e.target.value)}
-                  />
+              {/* Page Release Storage Target */}
+              <div className="grid gap-2 border-b border-kumo-line pb-4">
+                <label className="text-xs font-semibold text-kumo-foreground block">
+                  {t("pageStorageTarget")}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Database Option Card */}
+                  <button
+                    type="button"
+                    onClick={() => setPageDriver("database")}
+                    className={cn(
+                      "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all cursor-pointer",
+                      pageDriver === "database"
+                        ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20"
+                        : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong",
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
+                        <Database size={15} className="text-kumo-subtle" />
+                        <span>{t("pageStorageTargetDatabase")}</span>
+                      </div>
+                      {pageDriver === "database" && (
+                        <Check size={14} weight="bold" className="text-kumo-primary" />
+                      )}
+                    </div>
+                    <Text variant="secondary">{t("storageModeDatabaseDescription")}</Text>
+                  </button>
+
+                  {/* S3 Option Card - Directly Disabled when S3 is not enabled */}
+                  <button
+                    type="button"
+                    disabled={!s3Enabled}
+                    onClick={() => s3Enabled && setPageDriver("s3")}
+                    className={cn(
+                      "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all",
+                      !s3Enabled
+                        ? "opacity-50 cursor-not-allowed bg-kumo-base/20 border-kumo-line"
+                        : pageDriver === "s3"
+                          ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20 cursor-pointer"
+                          : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong cursor-pointer",
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
+                        <Cloud size={15} className="text-kumo-subtle" />
+                        <span>{t("pageStorageTargetS3")}</span>
+                      </div>
+                      {pageDriver === "s3" && (
+                        <Check size={14} weight="bold" className="text-kumo-primary" />
+                      )}
+                    </div>
+                    <Text variant="secondary">
+                      {s3Enabled ? t("storageModeS3Description") : t("s3NotConfiguredHint")}
+                    </Text>
+                  </button>
+                </div>
+              </div>
+              {/* S3 Object Storage Configuration Card */}
+              <div className="grid gap-3 pt-1">
+                <div className="flex items-center justify-between">
                   <div>
-                    <Input
-                      label={t("storageSecretAccessKey")}
-                      type="password"
-                      value={storageSecretAccessKey}
-                      onChange={(e) => setStorageSecretAccessKey(e.target.value)}
-                      placeholder={
-                        storageConfig?.hasSecretAccessKey
-                          ? t("storageSecretAccessKeySet")
-                          : t("storageSecretAccessKeyPlaceholder")
-                      }
-                    />
-                    <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
+                    <Text bold>{t("s3StorageConfig")}</Text>
+                    <Text variant="secondary">{t("s3AssetNotice")}</Text>
                   </div>
                   <Switch
-                    checked={storageForcePathStyle}
-                    label={t("storageForcePathStyle")}
-                    onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+                    checked={s3Enabled}
+                    onCheckedChange={(checked) => {
+                      setS3Enabled(checked);
+                      if (!checked && pageDriver === "s3") {
+                        setPageDriver("database");
+                      }
+                    }}
                   />
-                  <Input
-                    label={t("storagePublicBaseUrl")}
-                    value={storagePublicBaseUrl}
-                    onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
-                    placeholder={t("storagePublicBaseUrlPlaceholder")}
-                  />
-                </>
-              ) : null}
+                </div>
+                {s3Enabled ? (
+                  <div className="grid gap-3 pt-2">
+                    <Input
+                      label={t("storageBucket")}
+                      value={storageBucket}
+                      onChange={(e) => setStorageBucket(e.target.value)}
+                      placeholder={t("storageBucketPlaceholder")}
+                    />
+                    <Input
+                      label={t("storageEndpoint")}
+                      value={storageEndpoint}
+                      onChange={(e) => setStorageEndpoint(e.target.value)}
+                      placeholder={t("storageEndpointPlaceholder")}
+                    />
+                    <Input
+                      label={t("storageRegion")}
+                      value={storageRegion}
+                      onChange={(e) => setStorageRegion(e.target.value)}
+                      placeholder="auto"
+                    />
+                    <Input
+                      label={t("storageAccessKeyId")}
+                      value={storageAccessKeyId}
+                      onChange={(e) => setStorageAccessKeyId(e.target.value)}
+                    />
+                    <div>
+                      <Input
+                        label={t("storageSecretAccessKey")}
+                        type="password"
+                        value={storageSecretAccessKey}
+                        onChange={(e) => setStorageSecretAccessKey(e.target.value)}
+                        placeholder={
+                          storageConfig?.hasSecretAccessKey
+                            ? t("storageSecretAccessKeySet")
+                            : t("storageSecretAccessKeyPlaceholder")
+                        }
+                      />
+                      <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
+                    </div>
+                    <Switch
+                      checked={storageForcePathStyle}
+                      label={t("storageForcePathStyle")}
+                      onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+                    />
+                    <Input
+                      label={t("storagePublicBaseUrl")}
+                      value={storagePublicBaseUrl}
+                      onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
+                      placeholder={t("storagePublicBaseUrlPlaceholder")}
+                    />
+                  </div>
+                ) : null}
+              </div>
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" loading={updateStorage.isPending} onClick={saveStorage}>
                   {t("save")}
                 </Button>
-                {storageDriver === "s3" ? (
+                {s3Enabled ? (
                   <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
                     {t("storageTest")}
                   </Button>

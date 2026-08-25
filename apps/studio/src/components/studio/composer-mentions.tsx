@@ -15,6 +15,7 @@ import {
   CircleSlash,
   Code2,
   Hash,
+  Image as ImageIcon,
   List,
   ToggleLeft,
   Type,
@@ -77,6 +78,12 @@ export function getVariableTypeIcon(type: StateVariableType | (string & {}) | un
         Icon: List,
         color: "text-indigo-500",
         bg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+      };
+    case "asset":
+      return {
+        Icon: ImageIcon,
+        color: "text-rose-500",
+        bg: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
       };
     case "null":
       return {

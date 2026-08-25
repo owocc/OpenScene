@@ -127,6 +127,20 @@
       "when": 1787632540512,
       "tag": "0017_lively_blackheart",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1787636600000,
+      "tag": "0018_asset_folder_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1787636700000,
+      "tag": "0019_storage_s3_page_driver",
+      "breakpoints": true
     }
   ]
 }

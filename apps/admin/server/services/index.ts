@@ -29,9 +29,14 @@ import {
   unavailable,
   validation,
 } from "../errors";
-import { getAppStorage, invalidateAppStorage, S3StorageAdapter } from "../storage";
+import {
+  getAppAssetStorage,
+  getAppPageStorage,
+  invalidateAppStorage,
+  S3StorageAdapter,
+} from "../storage";
 import { encryptSecret, decryptSecret } from "../crypto/encryption";
-import { assetObjectKey, releaseObjectKey } from "../storage/keys";
+import { assetObjectKey, normalizeFolderPath, releaseObjectKey } from "../storage/keys";
 import {
   AppManifestSchema,
   RuntimePageDeliverySchema,
@@ -48,6 +53,7 @@ import {
   AppPromptSchema,
   AppSchema,
   AssetCompleteSchema,
+  AssetPatchSchema,
   AssetSchema,
   CategoryCreateSchema,
   CategoryPatchSchema,
@@ -1252,7 +1258,7 @@ export async function createRelease(
   const releaseId = newId("release");
   const key = releaseObjectKey(appId, releaseId);
   const releaseDocument = parseJson(SceneDocumentSchema, version.documentJson);
-  const storage = await getAppStorage(db, appId);
+  const storage = await getAppPageStorage(db, appId);
   await storage.put(
     key,
     new TextEncoder().encode(
@@ -1638,16 +1644,88 @@ export async function deleteAppOpenApiDoc(
     .run();
 }
 
-export async function listAssets(db: AppDatabase, appId: string): Promise<unknown[]> {
+export async function listAssets(
+  db: AppDatabase,
+  appId: string,
+  options?: {
+    folder?: string;
+    tag?: string;
+    type?: string;
+    q?: string;
+    status?: "pending" | "ready" | "failed";
+  },
+): Promise<unknown[]> {
   await getAppRow(db, appId);
-  return (
-    await db
-      .select()
-      .from(assets)
-      .where(eq(assets.appId, appId))
-      .orderBy(desc(assets.createdAt))
-      .all()
-  ).map(assetRecord);
+  let rows = await db
+    .select()
+    .from(assets)
+    .where(eq(assets.appId, appId))
+    .orderBy(desc(assets.createdAt))
+    .all();
+
+  if (options?.folder !== undefined && options.folder !== "") {
+    const targetFolder = normalizeFolderPath(options.folder);
+    rows = rows.filter((row) => normalizeFolderPath(row.folder) === targetFolder);
+  }
+  if (options?.status) {
+    rows = rows.filter((row) => row.status === options.status);
+  }
+  if (options?.type && options.type !== "all") {
+    if (options.type === "image") {
+      rows = rows.filter((row) => row.mimeType.startsWith("image/"));
+    } else if (options.type === "audio") {
+      rows = rows.filter((row) => row.mimeType.startsWith("audio/"));
+    } else if (options.type === "video") {
+      rows = rows.filter((row) => row.mimeType.startsWith("video/"));
+    } else if (options.type === "other") {
+      rows = rows.filter(
+        (row) =>
+          !row.mimeType.startsWith("image/") &&
+          !row.mimeType.startsWith("audio/") &&
+          !row.mimeType.startsWith("video/"),
+      );
+    }
+  }
+  if (options?.tag) {
+    const targetTag = options.tag.toLowerCase();
+    rows = rows.filter((row) => {
+      if (!row.tags) return false;
+      try {
+        const arr = JSON.parse(row.tags);
+        return Array.isArray(arr) && arr.some((t) => String(t).toLowerCase() === targetTag);
+      } catch {
+        return row.tags.toLowerCase().includes(targetTag);
+      }
+    });
+  }
+  if (options?.q) {
+    const query = options.q.toLowerCase();
+    rows = rows.filter((row) => {
+      return (
+        row.fileName.toLowerCase().includes(query) ||
+        (row.folder && row.folder.toLowerCase().includes(query)) ||
+        (row.tags && row.tags.toLowerCase().includes(query))
+      );
+    });
+  }
+
+  return rows.map(assetRecord);
+}
+
+export async function listAssetFolders(db: AppDatabase, appId: string): Promise<string[]> {
+  await getAppRow(db, appId);
+  const rows = await db
+    .select({ folder: assets.folder })
+    .from(assets)
+    .where(eq(assets.appId, appId))
+    .all();
+  const folderSet = new Set<string>(["/"]);
+  for (const row of rows) {
+    if (row.folder) {
+      folderSet.add(normalizeFolderPath(row.folder));
+    }
+  }
+  return Array.from(folderSet).sort();
 }
 
 export async function getAsset(db: AppDatabase, appId: string, assetId: string): Promise<unknown> {
@@ -1673,9 +1751,10 @@ export async function createUploadIntent(
   if (!config.security.allowedMimeTypes.includes(body.mimeType))
     throw validation("MIME type is not allowed", [{ path: "mimeType", message: body.mimeType }]);
   const assetId = newId("asset");
-  const key = assetObjectKey(appId, assetId, body.fileName);
+  const folder = normalizeFolderPath(body.folder);
+  const key = assetObjectKey(appId, assetId, body.fileName, folder);
   const timestamp = nowIso();
-  const storage = await getAppStorage(db, appId);
+  const storage = await getAppAssetStorage(db, appId);
   const upload = await storage.createUploadIntent({
     key,
     mimeType: body.mimeType,
@@ -1690,9 +1769,13 @@ export async function createUploadIntent(
     mimeType: body.mimeType,
     size: body.size,
     storageKey: key,
+    folder,
+    tags: body.tags ? JSON.stringify(body.tags) : null,
+    metadata: body.metadata ? JSON.stringify(body.metadata) : null,
     checksum: null,
     width: null,
     height: null,
+    duration: null,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -1717,20 +1800,60 @@ export async function completeAsset(
     .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
     .get();
   if (!row) throw notFound();
-  const storage = await getAppStorage(db, appId);
+  const storage = await getAppAssetStorage(db, appId);
   const head = await storage.head(row.storageKey);
   if (!head) throw conflict("Uploaded object was not found");
   if (head.size !== row.size || head.mimeType !== row.mimeType)
     throw conflict("Uploaded object does not match the declared size or MIME type");
+
+  const updateData: Record<string, unknown> = {
+    status: "ready",
+    checksum: body.checksum ?? head.checksum ?? null,
+    updatedAt: nowIso(),
+  };
+  if (body.width !== undefined) updateData.width = body.width;
+  if (body.height !== undefined) updateData.height = body.height;
+  if (body.duration !== undefined) updateData.duration = body.duration;
+  if (body.folder !== undefined) updateData.folder = normalizeFolderPath(body.folder);
+  if (body.tags !== undefined) updateData.tags = JSON.stringify(body.tags);
+  if (body.metadata !== undefined) updateData.metadata = JSON.stringify(body.metadata);
+
   await db
     .update(assets)
-    .set({
-      status: "ready",
-      checksum: body.checksum ?? head.checksum ?? null,
-      width: body.width ?? null,
-      height: body.height ?? null,
-      updatedAt: nowIso(),
-    })
+    .set(updateData)
+    .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
+    .run();
+  return getAsset(db, appId, assetId);
+}
+
+export async function patchAsset(
+  db: AppDatabase,
+  appId: string,
+  assetId: string,
+  input: unknown,
+): Promise<unknown> {
+  const body = AssetPatchSchema.parse(input);
+  const row = await db
+    .select()
+    .from(assets)
+    .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
+    .get();
+  if (!row) throw notFound();
+
+  const updateData: Record<string, unknown> = {
+    updatedAt: nowIso(),
+  };
+  if (body.fileName !== undefined) updateData.fileName = body.fileName;
+  if (body.folder !== undefined) updateData.folder = normalizeFolderPath(body.folder);
+  if (body.tags !== undefined) updateData.tags = JSON.stringify(body.tags);
+  if (body.metadata !== undefined) updateData.metadata = JSON.stringify(body.metadata);
+  if (body.width !== undefined) updateData.width = body.width;
+  if (body.height !== undefined) updateData.height = body.height;
+  if (body.duration !== undefined) updateData.duration = body.duration;
+
+  await db
+    .update(assets)
+    .set(updateData)
     .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
     .run();
   return getAsset(db, appId, assetId);
@@ -1758,12 +1881,41 @@ export async function deleteAsset(db: AppDatabase, appId: string, assetId: strin
   ]);
   if ([...drafts, ...versions].some((item) => item.json.includes(marker)))
     throw conflict("Asset is referenced by a Document or Version");
-  const storage = await getAppStorage(db, appId);
+  const storage = await getAppAssetStorage(db, appId);
   await storage.delete(row.storageKey);
   await db
     .delete(assets)
     .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
     .run();
+}
+
+export async function getAssetRawStream(
+  db: AppDatabase,
+  appId: string,
+  assetId: string,
+): Promise<{
+  body: Uint8Array;
+  mimeType: string;
+  fileName: string;
+  size: number;
+  checksum?: string | null;
+}> {
+  const row = await db
+    .select()
+    .from(assets)
+    .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
+    .get();
+  if (!row) throw notFound();
+  const storage = await getAppAssetStorage(db, appId);
+  const bytes = await storage.get(row.storageKey);
+  if (!bytes) throw notFound("Asset content not found in storage");
+  return {
+    body: bytes,
+    mimeType: row.mimeType,
+    fileName: row.fileName,
+    size: row.size,
+    checksum: row.checksum,
+  };
 }
 
 export async function createStudioSession(
@@ -2070,6 +2222,8 @@ export async function getAppStorageConfig(db: AppDatabase, appId: string): Promi
       config: {
         appId,
         driver: "database",
+        pageDriver: "database",
+        s3Enabled: false,
         endpoint: null,
         region: "auto",
         bucket: null,
@@ -2087,6 +2241,8 @@ export async function getAppStorageConfig(db: AppDatabase, appId: string): Promi
     config: {
       appId: row.appId,
       driver: row.driver,
+      pageDriver: row.pageDriver || row.driver || "database",
+      s3Enabled: Boolean(row.s3Enabled || row.driver === "s3"),
       endpoint: row.endpoint ?? null,
       region: row.region ?? "auto",
       bucket: row.bucket ?? null,
@@ -2122,8 +2278,21 @@ export async function upsertAppStorageConfig(
   let region: string | null = "auto";
   let publicBaseUrl: string | null = null;
   const forcePathStyle = body.forcePathStyle ?? true;
+  const pageDriver =
+    body.pageDriver || body.driver || existing?.pageDriver || existing?.driver || "database";
+  const s3Enabled =
+    body.s3Enabled ?? (body.driver === "s3" || Boolean(body.bucket || existing?.bucket));
 
-  if (body.driver === "s3") {
+  if (pageDriver === "s3" && !s3Enabled && body.driver !== "s3") {
+    throw validation("S3 尚未配置或未启用，无法将页面发布存储目标切换为 S3。请先配置并开启 S3。", [
+      {
+        path: "pageDriver",
+        message: "S3 must be configured and enabled before switching page storage target to S3.",
+      },
+    ]);
+  }
+
+  if (s3Enabled || body.driver === "s3" || pageDriver === "s3") {
     if (!body.bucket && !existing?.bucket) {
       throw validation("A bucket name is required to configure S3 storage", [
         { path: "bucket", message: "Bucket name is required" },
@@ -2149,7 +2318,7 @@ export async function upsertAppStorageConfig(
         { path: "secretAccessKey", message: "Secret access key is required" },
       ]);
     }
-  } else if (body.driver === "memory") {
+  } else if (body.driver === "memory" || pageDriver === "memory") {
     secretAccessKeyEnc = encryptSecret("memory-secret", encryptionKey);
     bucket = "memory";
     accessKeyId = "memory";
@@ -2157,7 +2326,9 @@ export async function upsertAppStorageConfig(
 
   const values = {
     appId,
-    driver: body.driver,
+    driver: pageDriver,
+    pageDriver,
+    s3Enabled,
     endpoint,
     region,
     bucket,
@@ -2176,6 +2347,8 @@ export async function upsertAppStorageConfig(
       target: appStorageConfigs.appId,
       set: {
         driver: values.driver,
+        pageDriver: values.pageDriver,
+        s3Enabled: values.s3Enabled,
         endpoint: values.endpoint,
         region: values.region,
         bucket: values.bucket,
@@ -2193,6 +2366,8 @@ export async function upsertAppStorageConfig(
   return AppStorageConfigSchema.parse({
     appId,
     driver: values.driver,
+    pageDriver: values.pageDriver,
+    s3Enabled: values.s3Enabled,
     endpoint: values.endpoint,
     region: values.region,
     bucket: values.bucket,
@@ -2466,6 +2641,31 @@ function releaseRecord(row: typeof releases.$inferSelect): unknown {
 }
 
 function assetRecord(row: typeof assets.$inferSelect): unknown {
+  let tags: string[] = [];
+  if (row.tags) {
+    try {
+      const parsed = JSON.parse(row.tags);
+      if (Array.isArray(parsed)) tags = parsed.map(String);
+    } catch {
+      tags = row.tags
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+  }
+  let metadata: Record<string, unknown> | null = null;
+  if (row.metadata) {
+    try {
+      const parsed = JSON.parse(row.metadata);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        metadata = parsed as Record<string, unknown>;
+      }
+    } catch {
+      metadata = null;
+    }
+  }
+  const folder = row.folder || "/";
+  const path = `/api/v1/apps/${row.appId}/assets/${row.id}/raw`;
   return {
     id: row.id,
     appId: row.appId,
@@ -2475,8 +2675,14 @@ function assetRecord(row: typeof assets.$inferSelect): unknown {
     size: row.size,
     storageKey: row.storageKey,
     checksum: row.checksum,
+    folder,
+    tags,
+    metadata,
     width: row.width,
     height: row.height,
+    duration: row.duration,
+    path,
+    url: path,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

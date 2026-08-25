@@ -308,12 +308,17 @@ export const assets = sqliteTable(
     size: integer("size").notNull(),
     storageKey: text("storage_key").notNull(),
     checksum: text("checksum"),
+    folder: text("folder").notNull().default("/"),
+    tags: text("tags"),
+    metadata: text("metadata"),
     width: integer("width"),
     height: integer("height"),
+    duration: integer("duration"),
     ...timestamps,
   },
   (table) => [
     index("assets_app_status_created_index").on(table.appId, table.status, table.createdAt),
+    index("assets_app_folder_index").on(table.appId, table.folder),
     uniqueIndex("assets_storage_key_unique").on(table.storageKey),
   ],
 );
@@ -401,6 +406,10 @@ export const appStorageConfigs = sqliteTable(
     driver: text("driver", { enum: ["database", "s3", "memory"] })
       .notNull()
       .default("database"),
+    pageDriver: text("page_driver", { enum: ["database", "s3", "memory"] })
+      .notNull()
+      .default("database"),
+    s3Enabled: integer("s3_enabled", { mode: "boolean" }).notNull().default(false),
     endpoint: text("endpoint"),
     region: text("region").default("auto"),
     bucket: text("bucket"),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Plus, Trash2, Zap } from "lucide-react";
+import { Eye, FolderArchive, Image as ImageIcon, Plus, Trash2, X, Zap } from "lucide-react";
 import {
   dynamicMode,
   dynamicValue,
@@ -20,7 +20,7 @@ import { useStudioStore } from "@/stores/studio-store";
 import { DynamicModeDropdown, DynamicValueInput, VariableCombobox } from "./dynamic-value-input";
 import { StyleControl } from "./property-editor/style";
 import { Button } from "@/components/ui/button";
-
+import { AssetPickerDialog } from "./asset-picker-dialog";
 export * from "./dynamic-value-input";
 import { createOpenSceneClient } from "@openscene/api-client";
 import {
@@ -943,6 +943,81 @@ function ActionControl({ meta }: ControlProps) {
     </div>
   );
 }
+
+function AssetControl({ meta, value, onChange }: ControlProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const textVal = stringValue(value);
+  const isImg =
+    textVal.startsWith("data:image/") ||
+    /\.(png|jpe?g|webp|gif|svg|avif|ico|bmp)$/i.test(textVal) ||
+    textVal.includes("image") ||
+    textVal.startsWith("/assets/");
+
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <div className="flex items-center gap-1.5 w-full">
+        <input
+          className={cn(inputClassName, "font-mono text-xs flex-1")}
+          placeholder={meta.placeholder ?? "/assets/..."}
+          value={textVal}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-2.5 gap-1 text-xs shrink-0"
+          onClick={() => setPickerOpen(true)}
+          title="选择或上传资源"
+        >
+          <ImageIcon className="size-3.5 text-primary" />
+          <span>选择</span>
+        </Button>
+      </div>
+
+      {textVal && (
+        <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 p-1.5">
+          {isImg ? (
+            <div className="size-9 rounded bg-muted/60 overflow-hidden shrink-0 border border-border/40 flex items-center justify-center">
+              <img src={textVal} alt="preview" className="w-full h-full object-contain" />
+            </div>
+          ) : (
+            <div className="size-9 rounded bg-muted/60 shrink-0 border border-border/40 flex items-center justify-center text-primary">
+              <FolderArchive className="size-4" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className="text-[11px] font-mono truncate text-foreground" title={textVal}>
+              {textVal}
+            </span>
+            <span className="text-[9px] font-mono text-primary truncate select-all">
+              {`\${/asset_base_url}${textVal.startsWith("/") ? textVal : `/${textVal}`}`}
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="size-6 p-0 text-muted-foreground hover:text-destructive shrink-0"
+            onClick={() => onChange("")}
+            title="清空"
+          >
+            <X className="size-3" />
+          </Button>
+        </div>
+      )}
+
+      <AssetPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onSelect={(_asset, path) => {
+          onChange(path);
+        }}
+      />
+    </div>
+  );
+}
+
 export const controlRegistry: Record<string, ControlRenderer> = {
   text: TextControl,
   textarea: TextareaControl,
@@ -962,8 +1037,14 @@ export const controlRegistry: Record<string, ControlRenderer> = {
   class: TextControl,
   action: ActionControl,
   openapi: OpenApiControl,
+  asset: AssetControl,
+  resource: AssetControl,
+  image: AssetControl,
+  audio: AssetControl,
+  video: AssetControl,
+  media: AssetControl,
+  file: AssetControl,
 };
-
 /**
  * Resolves a property editor component from a control type string.
  * Handles string normalization (e.g. "key-value", "keyValue", "key_value", "style").
@@ -1011,6 +1092,14 @@ export function resolveControlRenderer(controlName?: string): ControlRenderer {
       return ActionControl;
     case "openapi":
       return OpenApiControl;
+    case "asset":
+    case "resource":
+    case "image":
+    case "audio":
+    case "video":
+    case "media":
+    case "file":
+      return AssetControl;
     default:
       return controlRegistry[trimmed.toLowerCase()] ?? controlRegistry[normalized] ?? TextControl;
   }

@@ -12,6 +12,7 @@ import {
   FileCode,
   Globe,
   Hash,
+  Image as ImageIcon,
   Layers,
   MoreVertical,
   Plus,
@@ -38,6 +39,7 @@ import {
   type StateVariableType,
   type VariableReference,
 } from "@/core/document";
+import { AssetPickerDialog } from "@/components/studio/asset-picker-dialog";
 function formatDisplayString(val: unknown): string {
   if (typeof val === "string") return val;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
@@ -167,6 +169,11 @@ const TYPE_CONFIG: Record<
     label: "Array",
     icon: Layers,
     badgeClass: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+  },
+  asset: {
+    label: "Asset",
+    icon: ImageIcon,
+    badgeClass: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
   },
   null: {
     label: "Null",
@@ -298,6 +305,8 @@ export function VariablesPanel({
   const [i18nFormKeyError, setI18nFormKeyError] = useState<string | null>(null);
   // Dialog states
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
+  const [targetAssetVarKey, setTargetAssetVarKey] = useState<string | null>(null);
   const [renamingVar, setRenamingVar] = useState<StateVariable | null>(null);
   const [deletingVar, setDeletingVar] = useState<StateVariable | null>(null);
   const [inspectingRefsVar, setInspectingRefsVar] = useState<StateVariable | null>(null);
@@ -320,6 +329,10 @@ export function VariablesPanel({
   );
 
   const hasLangVariable = useMemo(() => variables.some((v) => v.key === "lang"), [variables]);
+  const hasAssetBaseUrlVariable = useMemo(
+    () => variables.some((v) => v.key === "asset_base_url"),
+    [variables],
+  );
   // References map for each variable in document elements
   const referencesMap = useMemo(() => {
     const map = new Map<string, VariableReference[]>();
@@ -610,6 +623,23 @@ export function VariablesPanel({
                 >
                   <Globe className="size-3" />
                   <span>{LL.panels.variables.addLangVariable()}</span>
+                </Button>
+              )}
+              {!hasAssetBaseUrlVariable && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="h-6 gap-1 px-1.5 text-[11px] border-rose-500/30 bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                  onClick={() => {
+                    const defaultUrl = bootstrap?.preview?.url
+                      ? new URL(bootstrap.preview.url).origin
+                      : "";
+                    setVariable("asset_base_url", defaultUrl);
+                  }}
+                  title="添加资源基础路径 (asset_base_url)"
+                >
+                  <ImageIcon className="size-3" />
+                  <span>+ asset_base_url</span>
                 </Button>
               )}
               <Button
@@ -1109,6 +1139,48 @@ export function VariablesPanel({
                             {LL.panels.variables.langVariableDesc()}
                           </span>
                         </div>
+                      ) : v.key === "asset_base_url" ? (
+                        <div className="flex flex-col gap-1">
+                          <Input
+                            value={formatDisplayString(v.value)}
+                            onChange={(e) => setVariable("asset_base_url", e.target.value)}
+                            className="h-6.5 font-mono text-[11px] bg-muted/30"
+                            placeholder="http://localhost:3000"
+                          />
+                          <span className="text-[10px] text-muted-foreground">
+                            资源前缀基准地址，在运行时解析为内置变量 {"${/asset_base_url}"}
+                          </span>
+                        </div>
+                      ) : v.type === "asset" ? (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              value={formatDisplayString(v.value)}
+                              onChange={(e) => setVariable(v.key, e.target.value)}
+                              className="h-6.5 font-mono text-[11px] bg-muted/30 flex-1"
+                              placeholder="/assets/... or /api/v1/apps/.../raw"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="xs"
+                              className="h-6.5 px-2 text-[10px] gap-1 shrink-0"
+                              onClick={() => {
+                                setTargetAssetVarKey(v.key);
+                                setIsAssetPickerOpen(true);
+                              }}
+                            >
+                              <ImageIcon className="size-3 text-primary" />
+                              选择
+                            </Button>
+                          </div>
+                          {v.value && typeof v.value === "string" ? (
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground bg-muted/20 px-1.5 py-0.5 rounded border border-border/30">
+                              <span className="shrink-0">模板:</span>
+                              <span className="font-mono text-primary truncate select-all">{`\${/asset_base_url}${v.value}`}</span>
+                            </div>
+                          ) : null}
+                        </div>
                       ) : v.type === "boolean" ? (
                         <div className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1">
                           <span className="font-mono text-[11px] text-muted-foreground">
@@ -1233,7 +1305,15 @@ export function VariablesPanel({
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(
-                  ["string", "number", "boolean", "object", "array", "null"] as StateVariableType[]
+                  [
+                    "string",
+                    "number",
+                    "boolean",
+                    "object",
+                    "array",
+                    "asset",
+                    "null",
+                  ] as StateVariableType[]
                 ).map((t) => {
                   const cfg = TYPE_CONFIG[t];
                   const Icon = cfg.icon;
@@ -1307,6 +1387,40 @@ export function VariablesPanel({
                 </div>
               )}
 
+              {formType === "asset" && (
+                <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={formatDisplayString(formValue)}
+                      onChange={(e) => setFormValue(e.target.value)}
+                      placeholder="/assets/... or /api/v1/apps/.../raw"
+                      className="h-8 text-xs font-mono flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs shrink-0"
+                      onClick={() => {
+                        setTargetAssetVarKey(null);
+                        setIsAssetPickerOpen(true);
+                      }}
+                    >
+                      <ImageIcon className="size-3.5 text-primary" />
+                      选择资源
+                    </Button>
+                  </div>
+                  {formValue && typeof formValue === "string" ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground bg-background/80 p-1.5 rounded border border-border/40">
+                      <span className="shrink-0 text-[10px]">模板引用:</span>
+                      <code className="text-[10px] font-mono text-primary truncate select-all">
+                        {`\${/asset_base_url}${formValue}`}
+                      </code>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               {(formType === "object" || formType === "array") && (
                 <div className="grid gap-1">
                   <Textarea
@@ -1364,7 +1478,15 @@ export function VariablesPanel({
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(
-                  ["string", "number", "boolean", "object", "array", "null"] as StateVariableType[]
+                  [
+                    "string",
+                    "number",
+                    "boolean",
+                    "object",
+                    "array",
+                    "asset",
+                    "null",
+                  ] as StateVariableType[]
                 ).map((t) => {
                   const cfg = TYPE_CONFIG[t];
                   const Icon = cfg.icon;
@@ -1433,6 +1555,40 @@ export function VariablesPanel({
                     checked={Boolean(formValue)}
                     onCheckedChange={(checked) => setFormValue(checked)}
                   />
+                </div>
+              )}
+
+              {formType === "asset" && (
+                <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={formatDisplayString(formValue)}
+                      onChange={(e) => setFormValue(e.target.value)}
+                      placeholder="/assets/... or /api/v1/apps/.../raw"
+                      className="h-8 text-xs font-mono flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs shrink-0"
+                      onClick={() => {
+                        setTargetAssetVarKey(null);
+                        setIsAssetPickerOpen(true);
+                      }}
+                    >
+                      <ImageIcon className="size-3.5 text-primary" />
+                      选择资源
+                    </Button>
+                  </div>
+                  {formValue && typeof formValue === "string" ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground bg-background/80 p-1.5 rounded border border-border/40">
+                      <span className="shrink-0 text-[10px]">模板引用:</span>
+                      <code className="text-[10px] font-mono text-primary truncate select-all">
+                        {`\${/asset_base_url}${formValue}`}
+                      </code>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -1895,6 +2051,18 @@ export function VariablesPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <AssetPickerDialog
+        open={isAssetPickerOpen}
+        onOpenChange={setIsAssetPickerOpen}
+        onSelect={(_asset, path) => {
+          if (targetAssetVarKey) {
+            setVariable(targetAssetVarKey, path);
+            setTargetAssetVarKey(null);
+          } else {
+            setFormValue(path);
+          }
+        }}
+      />
     </div>
   );
 }

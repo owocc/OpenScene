@@ -142,9 +142,15 @@ export const AssetSchema = z.object({
   mimeType: z.string(),
   size: z.number().int().nonnegative(),
   storageKey: z.string(),
-  checksum: z.string().nullable(),
-  width: z.number().int().nonnegative().nullable(),
-  height: z.number().int().nonnegative().nullable(),
+  checksum: z.string().nullable().optional(),
+  folder: z.string().default("/"),
+  tags: z.array(z.string()).default([]),
+  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  width: z.number().int().nonnegative().nullable().optional(),
+  height: z.number().int().nonnegative().nullable().optional(),
+  duration: z.number().nonnegative().nullable().optional(),
+  url: z.string().optional(),
+  path: z.string().optional(),
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
 });
@@ -362,11 +368,27 @@ export const UploadIntentSchema = z.object({
   fileName: z.string().min(1).max(255),
   mimeType: z.string().min(1),
   size: z.number().int().positive(),
+  folder: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export const AssetCompleteSchema = z.object({
   checksum: z.string().optional(),
+  folder: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   width: z.number().int().nonnegative().optional(),
   height: z.number().int().nonnegative().optional(),
+  duration: z.number().nonnegative().optional(),
+});
+export const AssetPatchSchema = z.object({
+  fileName: z.string().min(1).max(255).optional(),
+  folder: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  width: z.number().int().nonnegative().optional(),
+  height: z.number().int().nonnegative().optional(),
+  duration: z.number().nonnegative().optional(),
 });
 
 export const PaginationQuerySchema = z.object({
@@ -591,7 +613,9 @@ export const PromptPreviewResponseSchema = z
 export const AppStorageConfigSchema = z
   .object({
     appId: IdSchema,
-    driver: z.enum(["database", "s3", "memory"]),
+    driver: z.enum(["database", "s3", "memory"]).default("database"),
+    pageDriver: z.enum(["database", "s3", "memory"]).default("database"),
+    s3Enabled: z.boolean().default(false),
     endpoint: z.string().nullable().optional(),
     region: z.string().nullable().optional(),
     bucket: z.string().nullable().optional(),
@@ -614,6 +638,8 @@ export const AppStorageConfigStatusSchema = z
 export const AppStorageConfigUpsertSchema = z
   .object({
     driver: z.enum(["database", "s3", "memory"]).default("database"),
+    pageDriver: z.enum(["database", "s3", "memory"]).default("database"),
+    s3Enabled: z.boolean().default(false),
     endpoint: z.string().url().optional().nullable(),
     region: z.string().optional().nullable(),
     bucket: z.string().max(256).optional().nullable(),

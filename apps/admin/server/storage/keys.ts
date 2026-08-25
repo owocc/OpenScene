@@ -1,7 +1,29 @@
 import path from "node:path";
 
-export function assetObjectKey(appId: string, assetId: string, fileName: string): string {
-  return `apps/${safeSegment(appId)}/assets/${safeSegment(assetId)}/${safeFileName(fileName)}`;
+export function normalizeFolderPath(folder?: string | null): string {
+  if (!folder || folder === "/") return "/";
+  const cleaned = folder
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/\/+/g, "/")
+    .replace(/^\/|\/$/g, "");
+  return cleaned ? `/${cleaned}` : "/";
+}
+
+export function assetObjectKey(
+  appId: string,
+  assetId: string,
+  fileName: string,
+  folder?: string | null,
+): string {
+  const normFolder = normalizeFolderPath(folder);
+  const folderPrefix =
+    normFolder === "/" ? "" : normFolder.slice(1).split("/").map(safeSegment).join("/") + "/";
+  return `apps/${safeSegment(appId)}/assets/${folderPrefix}${safeSegment(assetId)}/${safeFileName(fileName)}`;
+}
+
+export function assetRelativePath(appId: string, assetId: string, _fileName?: string): string {
+  return `/api/v1/apps/${safeSegment(appId)}/assets/${safeSegment(assetId)}/raw`;
 }
 
 export function releaseObjectKey(appId: string, releaseId: string): string {

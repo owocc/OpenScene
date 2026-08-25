@@ -144,7 +144,7 @@ export function PromptInput({
   className,
   children,
   onSubmit,
-  globalDrop,
+  globalDrop: _globalDrop,
   multiple = true,
   accept = "image/*,.json,.txt,.md,.pdf,.csv",
   ...props

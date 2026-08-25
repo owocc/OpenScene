@@ -858,6 +858,51 @@ describe("App Storage binding & encryption", () => {
     expect(testRes.status).toBe(200);
     expect((await testRes.json()).status).toBe("up");
   });
+  test("allows configuring S3 independently with pageDriver database while requiring S3 for assets", async () => {
+    // 1. Create a dedicated app
+    const appRes = await call("POST", ["apps"], {
+      key: "app-s3-test",
+      name: "App S3 Test",
+      type: APP_TYPE_WEB,
+    });
+    expect(appRes.status).toBe(201);
+    const appS3 = await appRes.json();
+
+    // 2. Configure S3 for App with pageDriver set to database
+    const saveRes = await call("PUT", ["apps", appS3.id, "storage"], {
+      pageDriver: "database",
+      s3Enabled: true,
+      bucket: "app-s3-assets",
+      endpoint: "http://45.205.31.54:4566",
+      region: "us-east-1",
+      accessKeyId: "key-s3-123",
+      secretAccessKey: "secret-key-s3",
+      forcePathStyle: true,
+      publicBaseUrl: "https://assets.app-s3.com",
+    });
+    expect(saveRes.status).toBe(200);
+    const saved = await saveRes.json();
+    expect(saved.pageDriver).toBe("database");
+    expect(saved.s3Enabled).toBe(true);
+    expect(saved.bucket).toBe("app-s3-assets");
+
+    // 3. Upload asset uses S3 directory structure
+    const assetIntent = await call("POST", ["apps", appS3.id, "assets", "upload-intents"], {
+      fileName: "picture.png",
+      mimeType: "image/png",
+      size: 512,
+      folder: "/photos",
+    });
+    expect(assetIntent.status).toBe(201);
+    const assetData = await assetIntent.json();
+    expect(assetData.asset.storageKey).toContain(`apps/${appS3.id}/assets/photos/`);
+    // 4. Attempting to switch pageDriver to s3 when S3 is not enabled/configured fails with 400
+    const invalidSwitch = await call("PUT", ["apps", appS3.id, "storage"], {
+      pageDriver: "s3",
+      s3Enabled: false,
+    });
+    expect(invalidSwitch.status).toBe(422);
+  });
 
   test("global storage is deprecated and reports status in health check", async () => {
     const health = await call("GET", ["health"]);
@@ -872,18 +917,144 @@ describe("App Storage binding & encryption", () => {
     expect(storageHealthBody.status).toBe("deprecated");
   });
 });
+describe("Asset Management & Categorization", () => {
+  test("supports image, audio, video upload intents with folder, tags, and metadata", async () => {
+    const testAppId = appA.id;
+    // 1. Create upload intent for an image with folder and tags
+    const imageIntentRes = await call("POST", ["apps", testAppId, "assets", "upload-intents"], {
+      fileName: "hero.png",
+      mimeType: "image/png",
+      size: 1024,
+      folder: "/images/banners",
+      tags: ["banner", "hero", "homepage"],
+      metadata: { theme: "dark" },
+    });
+    if (imageIntentRes.status !== 201) {
+      console.error("imageIntentRes error:", await imageIntentRes.json());
+    }
+    expect(imageIntentRes.status).toBe(201);
+    const imageIntent = await imageIntentRes.json();
+    expect(imageIntent.asset.folder).toBe("/images/banners");
+    expect(imageIntent.asset.tags).toEqual(["banner", "hero", "homepage"]);
+    expect(imageIntent.asset.status).toBe("pending");
+    expect(imageIntent.uploadUrl).toBeDefined();
+
+    // 2. Upload bytes via local upload endpoint
+    const uploadRes = await call(
+      "PUT",
+      ["apps", testAppId, "assets", "upload"],
+      new Uint8Array(1024),
+      { "content-type": "image/png" },
+      `key=${encodeURIComponent(imageIntent.asset.storageKey)}`,
+    );
+    expect(uploadRes.status).toBe(200);
+    // 3. Complete the asset with image width, height
+    const completeImageRes = await call(
+      "POST",
+      ["apps", testAppId, "assets", imageIntent.asset.id, "complete"],
+      {
+        width: 1920,
+        height: 1080,
+      },
+    );
+    expect(completeImageRes.status).toBe(200);
+    const completedImage = await completeImageRes.json();
+    expect(completedImage.status).toBe("ready");
+    expect(completedImage.width).toBe(1920);
+    expect(completedImage.height).toBe(1080);
+    expect(completedImage.path).toContain(
+      `/api/v1/apps/${testAppId}/assets/${imageIntent.asset.id}/raw`,
+    );
+
+    // 4. Create upload intent for audio with duration
+    const audioIntentRes = await call("POST", ["apps", testAppId, "assets", "upload-intents"], {
+      fileName: "soundtrack.mp3",
+      mimeType: "audio/mp3",
+      size: 2048,
+      folder: "/audio",
+      tags: ["bgm", "theme"],
+    });
+    expect(audioIntentRes.status).toBe(201);
+    const audioIntent = await audioIntentRes.json();
+    const uploadAudioRes = await call(
+      "PUT",
+      ["apps", testAppId, "assets", "upload"],
+      new Uint8Array(2048),
+      { "content-type": "audio/mp3" },
+      `key=${encodeURIComponent(audioIntent.asset.storageKey)}`,
+    );
+    expect(uploadAudioRes.status).toBe(200);
+
+    const completeAudioRes = await call(
+      "POST",
+      ["apps", testAppId, "assets", audioIntent.asset.id, "complete"],
+      {
+        duration: 125,
+      },
+    );
+    expect(completeAudioRes.status).toBe(200);
+    const completedAudio = await completeAudioRes.json();
+    expect(completedAudio.duration).toBe(125);
+    expect(completedAudio.mimeType).toBe("audio/mp3");
+
+    // 5. Test listing distinct folders
+    const foldersRes = await call("GET", ["apps", testAppId, "assets", "folders"]);
+    expect(foldersRes.status).toBe(200);
+    const folders = await foldersRes.json();
+    expect(folders).toContain("/");
+    expect(folders).toContain("/images/banners");
+    expect(folders).toContain("/audio");
+
+    // 6. Test filtering by folder
+    const bannerListRes = await call(
+      "GET",
+      ["apps", testAppId, "assets"],
+      undefined,
+      {},
+      `folder=/images/banners`,
+    );
+    expect(bannerListRes.status).toBe(200);
+    const bannerAssets = await bannerListRes.json();
+    expect(bannerAssets.length).toBeGreaterThanOrEqual(1);
+    expect(bannerAssets[0].folder).toBe("/images/banners");
+
+    // 7. Test PATCH asset (moving folder & updating tags)
+    const patchRes = await call("PATCH", ["apps", testAppId, "assets", imageIntent.asset.id], {
+      folder: "/images/featured",
+      tags: ["featured", "hero"],
+    });
+    expect(patchRes.status).toBe(200);
+    const patched = await patchRes.json();
+    expect(patched.folder).toBe("/images/featured");
+    expect(patched.tags).toEqual(["featured", "hero"]);
+
+    // 8. Test raw streaming endpoint
+    const rawRes = await call("GET", ["apps", testAppId, "assets", imageIntent.asset.id, "raw"]);
+    expect(rawRes.status).toBe(200);
+    expect(rawRes.headers.get("content-type")).toBe("image/png");
+    expect(rawRes.headers.get("cache-control")).toContain("public");
+  });
+});
 
 async function call(
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   segments: string[],
   payload?: unknown,
   extraHeaders: Record<string, string> = {},
+  query?: string,
 ): Promise<Response> {
   const headers = new Headers(extraHeaders);
-  if (payload !== undefined) headers.set("content-type", "application/json");
+  let bodyData: BodyInit | undefined = undefined;
+  if (payload instanceof Uint8Array) {
+    bodyData = payload as unknown as BodyInit;
+  } else if (payload !== undefined) {
+    headers.set("content-type", "application/json");
+    bodyData = JSON.stringify(payload);
+  }
+  const qs = query ? `?${query}` : "";
   const request = new NextRequest(
-    `http://localhost${segments.length ? `/api/v1/${segments.join("/")}` : "/api/v1"}`,
-    { method, headers, body: payload === undefined ? undefined : JSON.stringify(payload) },
+    `http://localhost${segments.length ? `/api/v1/${segments.join("/")}` : "/api/v1"}${qs}`,
+    { method, headers, body: bodyData },
   );
   const context: PathContext = { params: Promise.resolve({ path: segments }) };
   if (method === "GET") return GET(request, context);

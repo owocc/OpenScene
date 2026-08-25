@@ -20,7 +20,9 @@ const envSchema = z.object({
   OPENSCENE_MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(52_428_800),
   OPENSCENE_ALLOWED_MIME_TYPES: z
     .string()
-    .default("image/jpeg,image/png,image/webp,image/gif,application/pdf"),
+    .default(
+      "image/jpeg,image/png,image/webp,image/gif,image/svg+xml,image/avif,image/x-icon,image/bmp,audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/aac,audio/webm,audio/mp4,audio/flac,audio/x-m4a,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,application/pdf,application/json,font/woff,font/woff2,font/ttf,font/otf,model/gltf+json,model/gltf-binary",
+    ),
   OPENSCENE_AI_ENCRYPTION_KEY: z
     .string()
     .min(1)

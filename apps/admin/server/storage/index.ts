@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -13,7 +14,7 @@ import { decryptSecret } from "../crypto/encryption";
 import type { AppDatabase } from "../db/client";
 import { nowIso } from "../db/ids";
 import { appStorageConfigs, storageObjects } from "../db/schema";
-import { unavailable } from "../errors";
+import { unavailable, validation } from "../errors";
 
 export type StorageHead = { size: number; mimeType?: string; checksum?: string };
 export type StorageHealth = {
@@ -49,7 +50,7 @@ export type S3StorageOptions = {
 export class S3StorageAdapter implements StorageAdapter {
   private readonly config: S3StorageOptions;
   private readonly client: S3Client | undefined;
-
+  private corsConfigured = false;
   constructor(options: S3StorageOptions) {
     this.config = options;
     this.client =
@@ -75,6 +76,7 @@ export class S3StorageAdapter implements StorageAdapter {
       };
     }
     try {
+      void this.ensureCors();
       await this.client.send(
         new HeadObjectCommand({ Bucket: this.config.bucket, Key: "__openscene_health__" }),
       );
@@ -95,6 +97,30 @@ export class S3StorageAdapter implements StorageAdapter {
       };
     }
   }
+  private async ensureCors(): Promise<void> {
+    if (this.corsConfigured || !this.client || !this.config.bucket) return;
+    try {
+      await this.client.send(
+        new PutBucketCorsCommand({
+          Bucket: this.config.bucket,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedHeaders: ["*"],
+                AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"],
+                AllowedOrigins: ["*"],
+                ExposeHeaders: ["ETag", "x-amz-request-id", "Content-Length"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      );
+      this.corsConfigured = true;
+    } catch {
+      // Ignore if provider/IAM does not allow PutBucketCors
+    }
+  }
 
   async createUploadIntent(input: {
     key: string;
@@ -103,14 +129,15 @@ export class S3StorageAdapter implements StorageAdapter {
     expiresInSeconds: number;
   }): Promise<{ url: string; expiresAt: string }> {
     this.requireConfigured();
+    void this.ensureCors();
     const command = new PutObjectCommand({
       Bucket: this.config.bucket,
       Key: input.key,
       ContentType: input.mimeType,
-      ContentLength: input.size,
     });
     const url = await getSignedUrl(this.client as S3Client, command, {
       expiresIn: input.expiresInSeconds,
+      unhoistableHeaders: new Set(["content-length", "content-type"]),
     });
     return { url, expiresAt: new Date(Date.now() + input.expiresInSeconds * 1_000).toISOString() };
   }
@@ -292,8 +319,50 @@ export class MemoryStorageAdapter implements StorageAdapter {
 
 const appAdapters = new Map<string, StorageAdapter>();
 
-export async function getAppStorage(db: AppDatabase, appId: string): Promise<StorageAdapter> {
-  const cached = appAdapters.get(appId);
+export async function getAppAssetStorage(db: AppDatabase, appId: string): Promise<StorageAdapter> {
+  const cached = appAdapters.get(`asset_${appId}`);
+  if (cached) return cached;
+
+  const testAdapter = appAdapters.get("__default_test__") || appAdapters.get(appId);
+  if (testAdapter && testAdapter instanceof MemoryStorageAdapter) return testAdapter;
+
+  const row = await db
+    .select()
+    .from(appStorageConfigs)
+    .where(eq(appStorageConfigs.appId, appId))
+    .get();
+
+  if (
+    !row ||
+    (!row.s3Enabled && row.driver !== "s3") ||
+    !row.bucket ||
+    !row.accessKeyId ||
+    !row.secretAccessKeyEnc
+  ) {
+    const defaultTestAdapter = appAdapters.get("__default_test__");
+    if (defaultTestAdapter) return defaultTestAdapter;
+    throw validation("资源存储必须配置并启用 S3 存储桶。请在应用设置中配置并开启 S3。", [
+      { path: "storage", message: "S3 storage is required and must be enabled for assets." },
+    ]);
+  }
+
+  const encryptionKey = getConfig().ai.encryptionKey;
+  const secretAccessKey = decryptSecret(row.secretAccessKeyEnc, encryptionKey);
+  const adapter = new S3StorageAdapter({
+    endpoint: row.endpoint ?? undefined,
+    region: row.region ?? "auto",
+    bucket: row.bucket,
+    accessKeyId: row.accessKeyId,
+    secretAccessKey,
+    forcePathStyle: row.forcePathStyle,
+    publicBaseUrl: row.publicBaseUrl ?? undefined,
+  });
+  appAdapters.set(`asset_${appId}`, adapter);
+  return adapter;
+}
+
+export async function getAppPageStorage(db: AppDatabase, appId: string): Promise<StorageAdapter> {
+  const cached = appAdapters.get(`page_${appId}`);
   if (cached) return cached;
 
   const row = await db
@@ -302,15 +371,17 @@ export async function getAppStorage(db: AppDatabase, appId: string): Promise<Sto
     .where(eq(appStorageConfigs.appId, appId))
     .get();
 
-  if (!row || row.driver === "database") {
+  const driver = row?.pageDriver ?? row?.driver ?? "database";
+
+  if (driver === "database" || !row) {
     const adapter = new DatabaseStorageAdapter(db, appId);
-    appAdapters.set(appId, adapter);
+    appAdapters.set(`page_${appId}`, adapter);
     return adapter;
   }
 
-  if (row.driver === "memory") {
+  if (driver === "memory") {
     const adapter = new MemoryStorageAdapter();
-    appAdapters.set(appId, adapter);
+    appAdapters.set(`page_${appId}`, adapter);
     return adapter;
   }
 
@@ -333,14 +404,19 @@ export async function getAppStorage(db: AppDatabase, appId: string): Promise<Sto
     forcePathStyle: row.forcePathStyle,
     publicBaseUrl: row.publicBaseUrl ?? undefined,
   });
-  appAdapters.set(appId, adapter);
+  appAdapters.set(`page_${appId}`, adapter);
   return adapter;
+}
+
+export async function getAppStorage(db: AppDatabase, appId: string): Promise<StorageAdapter> {
+  return getAppPageStorage(db, appId);
 }
 
 export function invalidateAppStorage(appId: string): void {
   appAdapters.delete(appId);
+  appAdapters.delete(`asset_${appId}`);
+  appAdapters.delete(`page_${appId}`);
 }
-
 export function resetStorageForTests(): void {
   appAdapters.clear();
   appAdapters.set("__default_test__", new MemoryStorageAdapter());

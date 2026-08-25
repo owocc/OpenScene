@@ -43,6 +43,11 @@ describe("admin navigation context", () => {
       key: "components",
       icon: "cubes",
     });
+    expect(navigationItems).toContainEqual({
+      href: "/assets",
+      key: "assets",
+      icon: "image",
+    });
   });
 
   test("identifies non-app-scoped and app-scoped paths correctly", () => {

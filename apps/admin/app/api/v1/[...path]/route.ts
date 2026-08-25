@@ -12,6 +12,7 @@ import {
 } from "../../../../server/auth";
 import { initializeDatabase, checkDatabaseHealth } from "../../../../server/db/client";
 import { getConfig } from "../../../../server/config/env";
+import { getAppAssetStorage } from "../../../../server/storage";
 import { notFound, problemResponse, ProblemError, validation } from "../../../../server/errors";
 import {
   bootstrapStudioSession,
@@ -42,6 +43,7 @@ import {
   getAppPrompt,
   getAppStorageConfig,
   getAsset,
+  getAssetRawStream,
   getCategory,
   getDocument,
   getDraft,
@@ -57,6 +59,7 @@ import {
   listAppOpenApiDocs,
   listAppPrompts,
   listApps,
+  listAssetFolders,
   listAssets,
   listCategories,
   listLocales,
@@ -65,6 +68,7 @@ import {
   listReleases,
   listResources,
   listVersions,
+  patchAsset,
   pushManifest,
   rotateAppKey,
   runtimePage,
@@ -230,6 +234,13 @@ async function handleRequest(
         });
       throw notFound();
     }
+    if (path[0] === "studio-sessions" && path[2] === "assets") {
+      const authContext = await authenticate(request, db, "session");
+      if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
+      const appId = authContext.appId!;
+      const rewrittenPath = ["apps", appId, ...path.slice(2)];
+      return await assetRoutes(request, db, method, rewrittenPath);
+    }
     if (path[0] === "studio-sessions" && path[2] === "prompts" && method === "GET") {
       const authContext = await authenticate(request, db, "session");
       if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
@@ -296,11 +307,18 @@ async function handleRequest(
     if (path[0] === "ai") return await aiRoutes(request, db, method, path);
 
     const appId = path[0] === "apps" ? path[1] : undefined;
+    const isPublicRawAsset =
+      path[0] === "apps" && path[2] === "assets" && path[4] === "raw" && method === "GET";
+    const isLocalUpload =
+      path[0] === "apps" && path[2] === "assets" && path[3] === "upload" && method === "PUT";
     const requirement =
-      path[0] === "apps" && path[2] === "manifest" && path[3] === "push" ? "app-key" : "management";
+      isPublicRawAsset || isLocalUpload
+        ? "public"
+        : path[0] === "apps" && path[2] === "manifest" && path[3] === "push"
+          ? "app-key"
+          : "management";
     await authenticate(request, db, requirement, appId);
     if (requirement === "management") assertManagementCsrf(request, method);
-
     if (path[0] !== "apps") throw notFound();
     if (path.length === 1 && method === "GET")
       return json(await listApps(db, request.nextUrl.searchParams));
@@ -624,14 +642,59 @@ async function assetRoutes(
   path: string[],
 ): Promise<Response> {
   const appId = path[1];
-  if (path.length === 3 && method === "GET") return json(await listAssets(db, appId));
+  if (path.length === 3 && method === "GET") {
+    const url = new URL(request.url);
+    const folder = url.searchParams.get("folder") ?? undefined;
+    const tag = url.searchParams.get("tag") ?? undefined;
+    const type = url.searchParams.get("type") ?? undefined;
+    const q = url.searchParams.get("q") ?? undefined;
+    const status = url.searchParams.get("status") as "pending" | "ready" | "failed" | null;
+    return json(
+      await listAssets(db, appId, {
+        folder,
+        tag,
+        type,
+        q,
+        status: status ?? undefined,
+      }),
+    );
+  }
+  if (path[3] === "folders" && method === "GET") {
+    return json(await listAssetFolders(db, appId));
+  }
   if (path[3] === "upload-intents" && method === "POST")
     return json(await createUploadIntent(db, appId, await body(request)), 201);
+  if (path[3] === "upload" && method === "PUT") {
+    const key = request.nextUrl.searchParams.get("key");
+    if (!key)
+      throw validation("Missing storage key parameter", [
+        { path: "key", message: "key query parameter is required" },
+      ]);
+    const storage = await getAppAssetStorage(db, appId);
+    const mimeType = request.headers.get("content-type") || "application/octet-stream";
+    const bodyBuffer = new Uint8Array(await request.arrayBuffer());
+    await storage.put(key, bodyBuffer, mimeType);
+    return new Response(null, { status: 200 });
+  }
   const assetId = path[3];
   if (!assetId) throw notFound();
   if (path.length === 4 && method === "GET") return json(await getAsset(db, appId, assetId));
+  if (path.length === 4 && method === "PATCH")
+    return json(await patchAsset(db, appId, assetId, await body(request)));
   if (path[4] === "complete" && method === "POST")
     return json(await completeAsset(db, appId, assetId, await body(request)));
+  if (path[4] === "raw" && method === "GET") {
+    const raw = await getAssetRawStream(db, appId, assetId);
+    return new Response(raw.body as BodyInit, {
+      status: 200,
+      headers: {
+        "content-type": raw.mimeType,
+        "content-length": String(raw.size),
+        "content-disposition": `inline; filename="${encodeURIComponent(raw.fileName)}"`,
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    });
+  }
   if (path.length === 4 && method === "DELETE") {
     await deleteAsset(db, appId, assetId);
     return noContent();
