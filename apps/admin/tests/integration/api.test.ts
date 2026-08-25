@@ -6,9 +6,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { NextRequest } from "next/server";
-import { DELETE, GET, PATCH, POST } from "../../app/api/v1/[...path]/route";
+import { DELETE, GET, PATCH, POST, PUT } from "../../app/api/v1/[...path]/route";
 import { initializeDatabase, resetDatabaseForTests } from "../../server/db/client";
-import { appKeys } from "../../server/db/schema";
+import { appKeys, appStorageConfigs } from "../../server/db/schema";
 import { resetConfigForTests } from "../../server/config/env";
 import { resetStorageForTests } from "../../server/storage";
 import { createOpenApiDocument } from "../../server/openapi/document";
@@ -601,9 +601,119 @@ describe("App AI prompts", () => {
     expect(body.breakdown.selectedElementText).toContain("button-1");
   });
 });
+describe("App Storage binding & encryption", () => {
+  beforeAll(() => {
+    process.env.OPENSCENE_AUTH_MODE = "disabled";
+    resetConfigForTests();
+  });
+
+  test("manages dedicated storage configuration per app with encrypted secret key", async () => {
+    // 1. Initial state: storage not configured
+    const initial = await call("GET", ["apps", appA.id, "storage"]);
+    expect(initial.status).toBe(200);
+    const initialBody = await initial.json();
+    expect(initialBody.configured).toBe(false);
+
+    // 2. Configure S3 storage for App A
+    const saveRes = await call("PUT", ["apps", appA.id, "storage"], {
+      driver: "s3",
+      bucket: "app-a-bucket",
+      endpoint: "http://45.205.31.54:4566",
+      region: "us-east-1",
+      accessKeyId: "key-a-123",
+      secretAccessKey: "super-secret-s3-key-value",
+      forcePathStyle: true,
+      publicBaseUrl: "https://cdn.app-a.com",
+    });
+    expect(saveRes.status).toBe(200);
+    const saved = await saveRes.json();
+    expect(saved.appId).toBe(appA.id);
+    expect(saved.bucket).toBe("app-a-bucket");
+    expect(saved.accessKeyId).toBe("key-a-123");
+    expect(saved.hasSecretAccessKey).toBe(true);
+    expect(saved.secretAccessKey).toBeUndefined(); // Secret key must not be returned!
+    expect(saved.publicBaseUrl).toBe("https://cdn.app-a.com");
+
+    // 3. Verify DB record: secret is encrypted at rest (contains iv.authTag.ciphertext format)
+    const { db } = await initializeDatabase();
+    const dbRow = await db
+      .select()
+      .from(appStorageConfigs)
+      .where(eq(appStorageConfigs.appId, appA.id))
+      .get();
+    expect(dbRow).toBeDefined();
+    expect(dbRow?.secretAccessKeyEnc).toBeDefined();
+    expect(dbRow?.secretAccessKeyEnc).not.toBe("super-secret-s3-key-value");
+    expect(dbRow?.secretAccessKeyEnc.split(".")).toHaveLength(3);
+
+    // 4. Retrieve storage config via GET: secret key is never exposed
+    const getRes = await call("GET", ["apps", appA.id, "storage"]);
+    expect(getRes.status).toBe(200);
+    const getBody = await getRes.json();
+    expect(getBody.configured).toBe(true);
+    expect(getBody.config.bucket).toBe("app-a-bucket");
+    expect(getBody.config.accessKeyId).toBe("key-a-123");
+    expect(getBody.config.hasSecretAccessKey).toBe(true);
+    expect(getBody.config.secretAccessKey).toBeUndefined();
+
+    // 5. Update storage configuration without providing secretAccessKey (preserves existing secret)
+    const updateRes = await call("PUT", ["apps", appA.id, "storage"], {
+      driver: "s3",
+      bucket: "app-a-bucket-updated",
+      endpoint: "http://45.205.31.54:4566",
+      region: "us-east-2",
+      accessKeyId: "key-a-updated",
+      forcePathStyle: false,
+    });
+    expect(updateRes.status).toBe(200);
+    const updated = await updateRes.json();
+    expect(updated.bucket).toBe("app-a-bucket-updated");
+    expect(updated.region).toBe("us-east-2");
+    expect(updated.accessKeyId).toBe("key-a-updated");
+    expect(updated.hasSecretAccessKey).toBe(true);
+    expect(updated.forcePathStyle).toBe(false);
+
+    // Verify secret in DB was preserved
+    const updatedDbRow = await db
+      .select()
+      .from(appStorageConfigs)
+      .where(eq(appStorageConfigs.appId, appA.id))
+      .get();
+    expect(updatedDbRow?.secretAccessKeyEnc).toBe(dbRow?.secretAccessKeyEnc);
+
+    // 6. Test storage connection endpoint
+    const testRes = await call("POST", ["apps", appA.id, "storage", "test"], {
+      driver: "memory",
+    });
+    expect(testRes.status).toBe(200);
+    const testBody = await testRes.json();
+    expect(testBody.status).toBe("up");
+
+    // 7. Delete storage configuration
+    const delRes = await call("DELETE", ["apps", appA.id, "storage"]);
+    expect(delRes.status).toBe(204);
+
+    const postDelete = await call("GET", ["apps", appA.id, "storage"]);
+    expect(postDelete.status).toBe(200);
+    expect((await postDelete.json()).configured).toBe(false);
+  });
+
+  test("global storage is deprecated and reports status in health check", async () => {
+    const health = await call("GET", ["health"]);
+    expect(health.status).toBe(200);
+    const healthBody = await health.json();
+    expect(healthBody.status).toBe("ok");
+    expect(healthBody.storage.status).toBe("deprecated");
+
+    const storageHealth = await call("GET", ["storage", "health"]);
+    expect(storageHealth.status).toBe(200);
+    const storageHealthBody = await storageHealth.json();
+    expect(storageHealthBody.status).toBe("deprecated");
+  });
+});
 
 async function call(
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   segments: string[],
   payload?: unknown,
   extraHeaders: Record<string, string> = {},
@@ -618,5 +728,6 @@ async function call(
   if (method === "GET") return GET(request, context);
   if (method === "POST") return POST(request, context);
   if (method === "PATCH") return PATCH(request, context);
+  if (method === "PUT") return PUT(request, context);
   return DELETE(request, context);
 }

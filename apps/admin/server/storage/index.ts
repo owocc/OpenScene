@@ -7,12 +7,16 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHash } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { getConfig } from "../config/env";
+import { decryptSecret } from "../crypto/encryption";
+import type { AppDatabase } from "../db/client";
+import { appStorageConfigs } from "../db/schema";
 import { unavailable } from "../errors";
 
 export type StorageHead = { size: number; mimeType?: string; checksum?: string };
 export type StorageHealth = {
-  status: "up" | "down" | "not_configured";
+  status: "up" | "down" | "not_configured" | "deprecated";
   driver: "s3" | "memory";
   detail?: string;
 };
@@ -31,28 +35,44 @@ export interface StorageAdapter {
   delete(key: string): Promise<void>;
 }
 
-class S3StorageAdapter implements StorageAdapter {
-  private readonly config = getConfig().storage;
-  private readonly client: S3Client | undefined =
-    this.config.bucket && this.config.accessKeyId && this.config.secretAccessKey
-      ? new S3Client({
-          region: this.config.region,
-          endpoint: this.config.endpoint,
-          forcePathStyle: this.config.forcePathStyle,
-          credentials: {
-            accessKeyId: this.config.accessKeyId,
-            secretAccessKey: this.config.secretAccessKey,
-          },
-        })
-      : undefined;
+export type S3StorageOptions = {
+  endpoint?: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  forcePathStyle?: boolean;
+  publicBaseUrl?: string;
+};
+
+export class S3StorageAdapter implements StorageAdapter {
+  private readonly config: S3StorageOptions;
+  private readonly client: S3Client | undefined;
+
+  constructor(options: S3StorageOptions) {
+    this.config = options;
+    this.client =
+      options.bucket && options.accessKeyId && options.secretAccessKey
+        ? new S3Client({
+            region: options.region || "auto",
+            endpoint: options.endpoint || undefined,
+            forcePathStyle: options.forcePathStyle ?? true,
+            credentials: {
+              accessKeyId: options.accessKeyId,
+              secretAccessKey: options.secretAccessKey,
+            },
+          })
+        : undefined;
+  }
 
   async health(): Promise<StorageHealth> {
-    if (!this.client || !this.config.bucket)
+    if (!this.client || !this.config.bucket) {
       return {
         status: "not_configured",
         driver: "s3",
         detail: "S3 bucket and credentials are not configured",
       };
+    }
     try {
       await this.client.send(
         new HeadObjectCommand({ Bucket: this.config.bucket, Key: "__openscene_health__" }),
@@ -64,7 +84,14 @@ class S3StorageAdapter implements StorageAdapter {
           ? String(error.name)
           : "S3 request failed";
       if (code === "NotFound" || code === "NoSuchKey") return { status: "up", driver: "s3" };
-      return { status: "down", driver: "s3", detail: "S3 health check failed" };
+      return {
+        status: "down",
+        driver: "s3",
+        detail:
+          typeof error === "object" && error !== null && "message" in error
+            ? String(error.message)
+            : "S3 health check failed",
+      };
     }
   }
 
@@ -136,11 +163,13 @@ class S3StorageAdapter implements StorageAdapter {
   }
 
   private requireConfigured(): void {
-    if (!this.client || !this.config.bucket) throw unavailable("Object storage is not configured");
+    if (!this.client || !this.config.bucket) {
+      throw unavailable("S3 object storage is not configured for this application");
+    }
   }
 }
 
-class MemoryStorageAdapter implements StorageAdapter {
+export class MemoryStorageAdapter implements StorageAdapter {
   private readonly objects = new Map<
     string,
     { body: Uint8Array; mimeType: string; checksum: string }
@@ -176,22 +205,64 @@ class MemoryStorageAdapter implements StorageAdapter {
   async get(key: string): Promise<Uint8Array | undefined> {
     return this.objects.get(key)?.body;
   }
+
   async delete(key: string): Promise<void> {
     this.objects.delete(key);
   }
 }
 
-let adapter: StorageAdapter | undefined;
+const appAdapters = new Map<string, StorageAdapter>();
 
-export function getStorage(): StorageAdapter {
-  if (!adapter)
-    adapter =
-      getConfig().storage.driver === "memory" ? new MemoryStorageAdapter() : new S3StorageAdapter();
+export async function getAppStorage(db: AppDatabase, appId: string): Promise<StorageAdapter> {
+  const cached = appAdapters.get(appId);
+  if (cached) return cached;
+
+  const row = await db
+    .select()
+    .from(appStorageConfigs)
+    .where(eq(appStorageConfigs.appId, appId))
+    .get();
+
+  if (!row) {
+    const defaultTestAdapter = appAdapters.get("__default_test__");
+    if (defaultTestAdapter) return defaultTestAdapter;
+    throw unavailable(
+      `Object storage is not configured for application ${appId}. Please configure storage in App Settings.`,
+    );
+  }
+
+  if (row.driver === "memory") {
+    const adapter = new MemoryStorageAdapter();
+    appAdapters.set(appId, adapter);
+    return adapter;
+  }
+
+  const encryptionKey = getConfig().ai.encryptionKey;
+  const secretAccessKey = decryptSecret(row.secretAccessKeyEnc, encryptionKey);
+  const adapter = new S3StorageAdapter({
+    endpoint: row.endpoint ?? undefined,
+    region: row.region,
+    bucket: row.bucket,
+    accessKeyId: row.accessKeyId,
+    secretAccessKey,
+    forcePathStyle: row.forcePathStyle,
+    publicBaseUrl: row.publicBaseUrl ?? undefined,
+  });
+  appAdapters.set(appId, adapter);
   return adapter;
 }
 
+export function invalidateAppStorage(appId: string): void {
+  appAdapters.delete(appId);
+}
+
 export function resetStorageForTests(): void {
-  adapter = undefined;
+  appAdapters.clear();
+  appAdapters.set("__default_test__", new MemoryStorageAdapter());
+}
+
+export function setAppStorageForTests(appId: string, adapter: StorageAdapter): void {
+  appAdapters.set(appId, adapter);
 }
 
 async function checksum(body: Uint8Array): Promise<string> {

@@ -7,6 +7,7 @@ import {
   appOpenApiDocs,
   appPrompts,
   apps,
+  appStorageConfigs,
   assets,
   categories,
   documentVersions,
@@ -28,7 +29,8 @@ import {
   unavailable,
   validation,
 } from "../errors";
-import { getStorage } from "../storage";
+import { getAppStorage, invalidateAppStorage, S3StorageAdapter } from "../storage";
+import { encryptSecret, decryptSecret } from "../crypto/encryption";
 import { assetObjectKey, releaseObjectKey } from "../storage/keys";
 import {
   AppManifestSchema,
@@ -71,6 +73,10 @@ import {
   DEFAULT_APP_SYSTEM_PROMPT,
   type ResourceKind,
   VersionSchema,
+  AppStorageConfigSchema,
+  AppStorageConfigStatusSchema,
+  AppStorageConfigUpsertSchema,
+  AppStorageHealthSchema,
 } from "../validation/schemas";
 import { z } from "zod";
 type ResourceRow = typeof pages.$inferSelect | typeof templates.$inferSelect;
@@ -1080,7 +1086,8 @@ export async function createRelease(
   const releaseId = newId("release");
   const key = releaseObjectKey(appId, releaseId);
   const releaseDocument = parseJson(SceneDocumentSchema, version.documentJson);
-  await getStorage().put(
+  const storage = await getAppStorage(db, appId);
+  await storage.put(
     key,
     new TextEncoder().encode(
       stableJson({
@@ -1502,7 +1509,8 @@ export async function createUploadIntent(
   const assetId = newId("asset");
   const key = assetObjectKey(appId, assetId, body.fileName);
   const timestamp = nowIso();
-  const upload = await getStorage().createUploadIntent({
+  const storage = await getAppStorage(db, appId);
+  const upload = await storage.createUploadIntent({
     key,
     mimeType: body.mimeType,
     size: body.size,
@@ -1543,7 +1551,8 @@ export async function completeAsset(
     .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
     .get();
   if (!row) throw notFound();
-  const head = await getStorage().head(row.storageKey);
+  const storage = await getAppStorage(db, appId);
+  const head = await storage.head(row.storageKey);
   if (!head) throw conflict("Uploaded object was not found");
   if (head.size !== row.size || head.mimeType !== row.mimeType)
     throw conflict("Uploaded object does not match the declared size or MIME type");
@@ -1583,7 +1592,8 @@ export async function deleteAsset(db: AppDatabase, appId: string, assetId: strin
   ]);
   if ([...drafts, ...versions].some((item) => item.json.includes(marker)))
     throw conflict("Asset is referenced by a Document or Version");
-  await getStorage().delete(row.storageKey);
+  const storage = await getAppStorage(db, appId);
+  await storage.delete(row.storageKey);
   await db
     .delete(assets)
     .where(and(eq(assets.appId, appId), eq(assets.id, assetId)))
@@ -1867,7 +1877,177 @@ export async function runtimeRelease(
 }
 
 export async function storageHealth(): Promise<unknown> {
-  return getStorage().health();
+  return {
+    status: "deprecated",
+    driver: "none",
+    detail: "Global storage is deprecated. Storage is configured per app.",
+  };
+}
+
+export async function getAppStorageConfig(db: AppDatabase, appId: string): Promise<unknown> {
+  await getAppRow(db, appId);
+  const row = await db
+    .select()
+    .from(appStorageConfigs)
+    .where(eq(appStorageConfigs.appId, appId))
+    .get();
+  if (!row) {
+    return AppStorageConfigStatusSchema.parse({ configured: false });
+  }
+  return AppStorageConfigStatusSchema.parse({
+    configured: true,
+    config: {
+      appId: row.appId,
+      driver: row.driver,
+      endpoint: row.endpoint ?? null,
+      region: row.region,
+      bucket: row.bucket,
+      accessKeyId: row.accessKeyId,
+      hasSecretAccessKey: true,
+      forcePathStyle: row.forcePathStyle,
+      publicBaseUrl: row.publicBaseUrl ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    },
+  });
+}
+
+export async function upsertAppStorageConfig(
+  db: AppDatabase,
+  appId: string,
+  input: unknown,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const body = AppStorageConfigUpsertSchema.parse(input);
+  const timestamp = nowIso();
+  const existing = await db
+    .select()
+    .from(appStorageConfigs)
+    .where(eq(appStorageConfigs.appId, appId))
+    .get();
+
+  const encryptionKey = getConfig().ai.encryptionKey;
+  let secretAccessKeyEnc: string;
+  if (body.secretAccessKey) {
+    secretAccessKeyEnc = encryptSecret(body.secretAccessKey, encryptionKey);
+  } else if (existing?.secretAccessKeyEnc) {
+    secretAccessKeyEnc = existing.secretAccessKeyEnc;
+  } else if (body.driver === "memory") {
+    secretAccessKeyEnc = encryptSecret("memory-secret", encryptionKey);
+  } else {
+    throw validation("A secret access key is required to configure S3 storage", [
+      { path: "secretAccessKey", message: "Secret access key is required" },
+    ]);
+  }
+
+  const values = {
+    appId,
+    driver: body.driver,
+    endpoint: body.endpoint ? body.endpoint : null,
+    region: body.region,
+    bucket: body.bucket,
+    accessKeyId: body.accessKeyId,
+    secretAccessKeyEnc,
+    forcePathStyle: body.forcePathStyle,
+    publicBaseUrl: body.publicBaseUrl ? body.publicBaseUrl : null,
+    createdAt: existing?.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+
+  await db
+    .insert(appStorageConfigs)
+    .values(values)
+    .onConflictDoUpdate({
+      target: appStorageConfigs.appId,
+      set: {
+        driver: values.driver,
+        endpoint: values.endpoint,
+        region: values.region,
+        bucket: values.bucket,
+        accessKeyId: values.accessKeyId,
+        secretAccessKeyEnc: values.secretAccessKeyEnc,
+        forcePathStyle: values.forcePathStyle,
+        publicBaseUrl: values.publicBaseUrl,
+        updatedAt: values.updatedAt,
+      },
+    })
+    .run();
+
+  invalidateAppStorage(appId);
+
+  return AppStorageConfigSchema.parse({
+    appId,
+    driver: values.driver,
+    endpoint: values.endpoint,
+    region: values.region,
+    bucket: values.bucket,
+    accessKeyId: values.accessKeyId,
+    hasSecretAccessKey: true,
+    forcePathStyle: values.forcePathStyle,
+    publicBaseUrl: values.publicBaseUrl,
+    createdAt: values.createdAt,
+    updatedAt: values.updatedAt,
+  });
+}
+
+export async function deleteAppStorageConfig(db: AppDatabase, appId: string): Promise<void> {
+  await getAppRow(db, appId);
+  await db.delete(appStorageConfigs).where(eq(appStorageConfigs.appId, appId)).run();
+  invalidateAppStorage(appId);
+}
+
+export async function testAppStorage(
+  db: AppDatabase,
+  appId: string,
+  input?: unknown,
+): Promise<unknown> {
+  await getAppRow(db, appId);
+  const existing = await db
+    .select()
+    .from(appStorageConfigs)
+    .where(eq(appStorageConfigs.appId, appId))
+    .get();
+
+  let body: Partial<z.infer<typeof AppStorageConfigUpsertSchema>> | undefined;
+  if (input && typeof input === "object" && Object.keys(input).length > 0) {
+    body = AppStorageConfigUpsertSchema.partial().parse(input);
+  }
+  const driver = body?.driver ?? existing?.driver ?? "s3";
+  if (driver === "memory") {
+    return AppStorageHealthSchema.parse({ status: "up", driver: "memory" });
+  }
+
+  const endpoint = body ? body.endpoint || undefined : (existing?.endpoint ?? undefined);
+  const region = body?.region ?? existing?.region ?? "auto";
+  const bucket = body?.bucket ?? existing?.bucket;
+  const accessKeyId = body?.accessKeyId ?? existing?.accessKeyId;
+  const forcePathStyle = body?.forcePathStyle ?? existing?.forcePathStyle ?? true;
+
+  let secretAccessKey: string | undefined = body?.secretAccessKey;
+  if (!secretAccessKey && existing?.secretAccessKeyEnc) {
+    const encryptionKey = getConfig().ai.encryptionKey;
+    secretAccessKey = decryptSecret(existing.secretAccessKeyEnc, encryptionKey);
+  }
+
+  if (!bucket || !accessKeyId || !secretAccessKey) {
+    return AppStorageHealthSchema.parse({
+      status: "not_configured",
+      driver: "s3",
+      detail: "S3 bucket, access key ID, and secret access key are required for testing",
+    });
+  }
+
+  const adapter = new S3StorageAdapter({
+    endpoint,
+    region,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle,
+  });
+
+  const health = await adapter.health();
+  return AppStorageHealthSchema.parse(health);
 }
 
 async function getAppRow(db: AppDatabase, appId: string): Promise<typeof apps.$inferSelect> {

@@ -2,9 +2,11 @@ import { APP_TYPE_FLUTTER, APP_TYPE_REACT_NATIVE, APP_TYPE_WEB } from "@openscen
 import { describe, expect, test } from "vite-plus/test";
 import {
   AppCreateSchema,
+  AppStorageConfigUpsertSchema,
   ManifestSchema,
   SceneDocumentSchema,
 } from "../../server/validation/schemas";
+import { decryptSecret, encryptSecret } from "../../server/crypto/encryption";
 import { assetObjectKey, releaseObjectKey, safeFileName } from "../../server/storage/keys";
 
 describe("runtime schemas", () => {
@@ -72,5 +74,55 @@ describe("storage keys", () => {
       "apps/app_a/releases/release_1/document.json",
     );
     expect(safeFileName("../../")).toBe("upload.bin");
+  });
+});
+describe("crypto encryption", () => {
+  test("encrypts and decrypts secret symmetrically using AES-256-GCM", () => {
+    const secret = "my-encryption-key-123456";
+    const plaintext = "s3-super-secret-access-key-abc-xyz";
+
+    const encrypted = encryptSecret(plaintext, secret);
+    expect(encrypted).not.toBe(plaintext);
+    expect(encrypted.split(".")).toHaveLength(3);
+
+    const decrypted = decryptSecret(encrypted, secret);
+    expect(decrypted).toBe(plaintext);
+  });
+
+  test("fails to decrypt with corrupted payload or incorrect key", () => {
+    const secret = "my-encryption-key-123456";
+    const plaintext = "s3-super-secret-access-key";
+    const encrypted = encryptSecret(plaintext, secret);
+
+    expect(() => decryptSecret(encrypted, "wrong-key")).toThrow();
+    expect(() => decryptSecret("invalid.payload", secret)).toThrow();
+  });
+});
+
+describe("app storage schemas", () => {
+  test("validates and parses valid storage config upsert input", () => {
+    const valid = AppStorageConfigUpsertSchema.parse({
+      bucket: "my-bucket",
+      accessKeyId: "my-key-id",
+      secretAccessKey: "my-secret-key",
+      endpoint: "https://s3.us-west-2.amazonaws.com",
+      region: "us-west-2",
+      forcePathStyle: true,
+      publicBaseUrl: "https://cdn.example.com",
+    });
+    expect(valid.bucket).toBe("my-bucket");
+    expect(valid.region).toBe("us-west-2");
+    expect(valid.driver).toBe("s3");
+    expect(valid.forcePathStyle).toBe(true);
+  });
+
+  test("requires bucket and accessKeyId for S3 storage upsert", () => {
+    expect(() => AppStorageConfigUpsertSchema.parse({})).toThrow();
+    expect(() =>
+      AppStorageConfigUpsertSchema.parse({
+        bucket: "",
+        accessKeyId: "key",
+      }),
+    ).toThrow();
   });
 });

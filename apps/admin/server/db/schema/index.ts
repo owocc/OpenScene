@@ -381,6 +381,26 @@ export const aiChatSessions = sqliteTable(
     index("ai_chat_sessions_app_idx").on(table.appId),
   ],
 );
+export const appStorageConfigs = sqliteTable(
+  "app_storage_configs",
+  {
+    appId: text("app_id")
+      .primaryKey()
+      .references(() => apps.id, { onDelete: "cascade" }),
+    driver: text("driver", { enum: ["s3", "memory"] })
+      .notNull()
+      .default("s3"),
+    endpoint: text("endpoint"),
+    region: text("region").notNull().default("auto"),
+    bucket: text("bucket").notNull(),
+    accessKeyId: text("access_key_id").notNull(),
+    secretAccessKeyEnc: text("secret_access_key_enc").notNull(),
+    forcePathStyle: integer("force_path_style", { mode: "boolean" }).notNull().default(true),
+    publicBaseUrl: text("public_base_url"),
+    ...timestamps,
+  },
+  (table) => [index("app_storage_configs_app_idx").on(table.appId)],
+);
 
 export const schema = {
   apps,
@@ -401,6 +421,7 @@ export const schema = {
   appPrompts,
   systemPrompts,
   aiChatSessions,
+  appStorageConfigs,
 };
 
 export type AppRow = typeof apps.$inferSelect;
@@ -418,3 +439,4 @@ export type StudioSessionRow = typeof studioSessions.$inferSelect;
 export type AiConfigRow = typeof aiConfig.$inferSelect;
 export type SystemPromptRow = typeof systemPrompts.$inferSelect;
 export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;
+export type AppStorageConfigRow = typeof appStorageConfigs.$inferSelect;

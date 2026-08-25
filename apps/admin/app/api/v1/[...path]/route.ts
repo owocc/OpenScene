@@ -13,7 +13,6 @@ import {
 import { initializeDatabase, checkDatabaseHealth } from "../../../../server/db/client";
 import { getConfig } from "../../../../server/config/env";
 import { notFound, problemResponse, ProblemError, validation } from "../../../../server/errors";
-import { getStorage } from "../../../../server/storage";
 import {
   bootstrapStudioSession,
   completeAsset,
@@ -36,9 +35,11 @@ import {
   deleteLocale,
   deletePreviewProfile,
   deleteResource,
+  deleteAppStorageConfig,
   getApp,
   getAppOpenApiDoc,
   getAppPrompt,
+  getAppStorageConfig,
   getAsset,
   getCategory,
   getDocument,
@@ -68,6 +69,7 @@ import {
   runtimePage,
   runtimeRelease,
   storageHealth,
+  testAppStorage,
   syncManifest,
   updateApp,
   updateAppOpenApiDoc,
@@ -77,6 +79,7 @@ import {
   updateLocale,
   updatePreviewProfile,
   updateResource,
+  upsertAppStorageConfig,
   updateStudioDraft,
 } from "../../../../server/services";
 import {
@@ -183,9 +186,9 @@ async function handleRequest(
     }
     if (path.length === 1 && path[0] === "health" && method === "GET") {
       const database = await checkDatabaseHealth(runtimeDb);
-      const storage = await getStorage().health();
+      const storage = await storageHealth();
       return Response.json({
-        status: database.status === "up" && storage.status !== "down" ? "ok" : "degraded",
+        status: database.status === "up" ? "ok" : "degraded",
         database,
         storage,
       });
@@ -315,6 +318,7 @@ async function handleRequest(
     if (path[2] === "documents") return await documentRoutes(request, db, method, path);
     if (path[2] === "categories") return await categoryRoutes(request, db, method, path);
     if (path[2] === "locales") return await localeRoutes(request, db, method, path);
+    if (path[2] === "storage") return await appStorageRoutes(request, db, method, path);
     if (path[2] === "assets") return await assetRoutes(request, db, method, path);
     if (path[2] === "studio-sessions") return await sessionRoutes(request, db, method, path);
     if (path[2] === "releases") {
@@ -626,6 +630,31 @@ async function assetRoutes(
   if (path.length === 4 && method === "DELETE") {
     await deleteAsset(db, appId, assetId);
     return noContent();
+  }
+  throw notFound();
+}
+async function appStorageRoutes(
+  request: NextRequest,
+  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
+  method: Method,
+  path: string[],
+): Promise<Response> {
+  const appId = path[1];
+  if (path.length === 3 && method === "GET") {
+    return json(await getAppStorageConfig(db, appId));
+  }
+  if (path.length === 3 && (method === "PUT" || method === "POST")) {
+    return json(await upsertAppStorageConfig(db, appId, await body(request)));
+  }
+  if (path.length === 3 && method === "DELETE") {
+    await deleteAppStorageConfig(db, appId);
+    return noContent();
+  }
+  if (path.length === 4 && path[3] === "health" && method === "GET") {
+    return json(await testAppStorage(db, appId));
+  }
+  if (path.length === 4 && path[3] === "test" && method === "POST") {
+    return json(await testAppStorage(db, appId, await body(request)));
   }
   throw notFound();
 }

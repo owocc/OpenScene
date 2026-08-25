@@ -52,6 +52,10 @@ import {
   SystemPromptSchema,
   SystemPromptUpdateSchema,
   AiTestSchema,
+  AppStorageConfigSchema,
+  AppStorageConfigStatusSchema,
+  AppStorageConfigUpsertSchema,
+  AppStorageHealthSchema,
 } from "../validation/schemas";
 
 extendZodWithOpenApi(z);
@@ -86,6 +90,10 @@ const schemas = [
   ["AppPromptPatch", AppPromptPatchSchema],
   ["SystemPrompt", SystemPromptSchema],
   ["SystemPromptUpdate", SystemPromptUpdateSchema],
+  ["AppStorageConfig", AppStorageConfigSchema],
+  ["AppStorageConfigStatus", AppStorageConfigStatusSchema],
+  ["AppStorageHealth", AppStorageHealthSchema],
+  ["AppStorageConfigUpsert", AppStorageConfigUpsertSchema],
 ] as const;
 for (const [name, schema] of [...schemas].sort(([a], [b]) => a.localeCompare(b)))
   registry.register(name, schema);
@@ -113,7 +121,7 @@ const ListOpenApiDocSchema = z.array(OpenApiDocSchema);
 const ListOpenApiDocSummarySchema = z.array(OpenApiDocSummarySchema);
 
 type Operation = {
-  method: "get" | "post" | "patch" | "delete";
+  method: "get" | "post" | "patch" | "put" | "delete";
   path: string;
   operationId: string;
   tag: string;
@@ -212,6 +220,49 @@ const operations: Operation[] = [
     operationId: "rotateAppKey",
     tag: "Apps",
     response: AppKeyRotationSchema,
+    params: true,
+  },
+  {
+    method: "get",
+    path: "/api/v1/apps/{appId}/storage",
+    operationId: "getAppStorage",
+    tag: "Apps",
+    response: AppStorageConfigStatusSchema,
+    params: true,
+  },
+  {
+    method: "put",
+    path: "/api/v1/apps/{appId}/storage",
+    operationId: "upsertAppStorage",
+    tag: "Apps",
+    response: AppStorageConfigSchema,
+    body: AppStorageConfigUpsertSchema,
+    params: true,
+  },
+  {
+    method: "delete",
+    path: "/api/v1/apps/{appId}/storage",
+    operationId: "deleteAppStorage",
+    tag: "Apps",
+    response: z.void(),
+    params: true,
+    status: 204,
+  },
+  {
+    method: "get",
+    path: "/api/v1/apps/{appId}/storage/health",
+    operationId: "getAppStorageHealth",
+    tag: "Apps",
+    response: AppStorageHealthSchema,
+    params: true,
+  },
+  {
+    method: "post",
+    path: "/api/v1/apps/{appId}/storage/test",
+    operationId: "testAppStorage",
+    tag: "Apps",
+    response: AppStorageHealthSchema,
+    body: AppStorageConfigUpsertSchema,
     params: true,
   },
   {

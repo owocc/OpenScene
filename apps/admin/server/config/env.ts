@@ -12,14 +12,7 @@ const envSchema = z.object({
   OPENSCENE_APP_KEY_HEADER: z.string().min(1).default("x-openscene-app-key"),
   OPENSCENE_RUNTIME_KEY_HEADER: z.string().min(1).default("x-openscene-runtime-key"),
   OPENSCENE_RUNTIME_PUBLIC: z.enum(["true", "false"]).default("false"),
-  OPENSCENE_STORAGE_DRIVER: z.enum(["s3", "memory"]).default("s3"),
-  OPENSCENE_S3_ENDPOINT: z.string().url().optional().or(z.literal("")),
-  OPENSCENE_S3_REGION: z.string().min(1).default("auto"),
-  OPENSCENE_S3_BUCKET: z.string().optional(),
-  OPENSCENE_S3_ACCESS_KEY_ID: z.string().optional(),
-  OPENSCENE_S3_SECRET_ACCESS_KEY: z.string().optional(),
-  OPENSCENE_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
-  OPENSCENE_S3_PUBLIC_BASE_URL: z.string().url().optional().or(z.literal("")),
+  OPENSCENE_ENCRYPTION_KEY: z.string().min(1).optional(),
   OPENSCENE_STUDIO_PUBLIC_BASE_URL: z.string().url().default("http://localhost:5173"),
   OPENSCENE_API_PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
   OPENSCENE_SESSION_TTL_SECONDS: z.coerce.number().int().positive().max(86_400).default(1_800),
@@ -46,16 +39,7 @@ export type AppConfig = {
     runtimeKeyHeader: string;
     runtimePublic: boolean;
   };
-  storage: {
-    driver: "s3" | "memory";
-    endpoint?: string;
-    region: string;
-    bucket?: string;
-    accessKeyId?: string;
-    secretAccessKey?: string;
-    forcePathStyle: boolean;
-    publicBaseUrl?: string;
-  };
+  encryption: { key: string };
   api: { publicBaseUrl: string };
   studio: { publicBaseUrl: string; sessionTtlSeconds: number; uiSessionTtlSeconds: number };
   ai: { encryptionKey: string };
@@ -79,15 +63,6 @@ export function getConfig(): AppConfig {
   if (env.OPENSCENE_AUTH_MODE === "proxy" && !env.OPENSCENE_TRUSTED_PROXY_VALUE) {
     throw new Error("OPENSCENE_TRUSTED_PROXY_VALUE is required when OPENSCENE_AUTH_MODE=proxy");
   }
-  if (
-    env.OPENSCENE_STORAGE_DRIVER === "s3" &&
-    (!env.OPENSCENE_S3_BUCKET ||
-      !env.OPENSCENE_S3_ACCESS_KEY_ID ||
-      !env.OPENSCENE_S3_SECRET_ACCESS_KEY)
-  ) {
-    // Storage is intentionally allowed to be unavailable for local API development.
-    // Storage health and upload/release operations will report this dependency state.
-  }
   cachedConfig = {
     database: {
       url: env.OPENSCENE_DATABASE_URL,
@@ -104,23 +79,18 @@ export function getConfig(): AppConfig {
       runtimeKeyHeader: env.OPENSCENE_RUNTIME_KEY_HEADER,
       runtimePublic: env.OPENSCENE_RUNTIME_PUBLIC === "true",
     },
-    storage: {
-      driver: env.OPENSCENE_STORAGE_DRIVER,
-      endpoint: env.OPENSCENE_S3_ENDPOINT || undefined,
-      region: env.OPENSCENE_S3_REGION,
-      bucket: env.OPENSCENE_S3_BUCKET,
-      accessKeyId: env.OPENSCENE_S3_ACCESS_KEY_ID,
-      secretAccessKey: env.OPENSCENE_S3_SECRET_ACCESS_KEY,
-      forcePathStyle: env.OPENSCENE_S3_FORCE_PATH_STYLE === "true",
-      publicBaseUrl: env.OPENSCENE_S3_PUBLIC_BASE_URL || undefined,
-    },
     api: { publicBaseUrl: env.OPENSCENE_API_PUBLIC_BASE_URL },
     studio: {
       publicBaseUrl: env.OPENSCENE_STUDIO_PUBLIC_BASE_URL,
       sessionTtlSeconds: env.OPENSCENE_SESSION_TTL_SECONDS,
       uiSessionTtlSeconds: env.OPENSCENE_UI_SESSION_TTL_SECONDS,
     },
-    ai: { encryptionKey: env.OPENSCENE_AI_ENCRYPTION_KEY },
+    encryption: {
+      key: env.OPENSCENE_ENCRYPTION_KEY || env.OPENSCENE_AI_ENCRYPTION_KEY,
+    },
+    ai: {
+      encryptionKey: env.OPENSCENE_ENCRYPTION_KEY || env.OPENSCENE_AI_ENCRYPTION_KEY,
+    },
     security: {
       maxUploadBytes: env.OPENSCENE_MAX_UPLOAD_BYTES,
       allowedMimeTypes: splitCsv(env.OPENSCENE_ALLOWED_MIME_TYPES),

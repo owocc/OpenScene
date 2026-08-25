@@ -162,8 +162,8 @@ export const HealthSchema = z.object({
   status: z.enum(["ok", "degraded"]),
   database: z.object({ status: z.enum(["up", "down"]) }),
   storage: z.object({
-    status: z.enum(["up", "down", "not_configured"]),
-    driver: z.enum(["s3", "memory"]),
+    status: z.enum(["up", "down", "not_configured", "deprecated"]),
+    driver: z.enum(["s3", "memory", "none", "deprecated"]).optional(),
     detail: z.string().optional(),
   }),
 });
@@ -397,7 +397,7 @@ export const AiConfigStatusSchema = z.object({
 export const AiConfigUpdateSchema = z.object({
   provider: AiProviderSchema,
   model: z.string().min(1).max(200),
-  baseUrl: z.string().url().optional().or(z.literal("")).nullable(),
+  baseUrl: z.string().url().optional().nullable(),
   apiKey: z.string().min(1).max(4_000).optional(),
   enabled: z.boolean(),
 });
@@ -576,4 +576,47 @@ export const PromptPreviewResponseSchema = z
   })
   .openapi({ description: "Assembled system prompt preview response" });
 
+export const AppStorageConfigSchema = z
+  .object({
+    appId: IdSchema,
+    driver: z.enum(["s3", "memory"]),
+    endpoint: z.string().nullable().optional(),
+    region: z.string(),
+    bucket: z.string(),
+    accessKeyId: z.string(),
+    hasSecretAccessKey: z.boolean(),
+    forcePathStyle: z.boolean(),
+    publicBaseUrl: z.string().nullable().optional(),
+    createdAt: IsoDateSchema,
+    updatedAt: IsoDateSchema,
+  })
+  .openapi({ description: "App S3 object storage configuration" });
+
+export const AppStorageConfigStatusSchema = z
+  .object({
+    configured: z.boolean(),
+    config: AppStorageConfigSchema.optional(),
+  })
+  .openapi({ description: "App S3 storage configuration and status" });
+
+export const AppStorageConfigUpsertSchema = z
+  .object({
+    driver: z.enum(["s3", "memory"]).default("s3"),
+    endpoint: z.string().url().optional().nullable(),
+    region: z.string().min(1).default("auto"),
+    bucket: z.string().min(1).max(256),
+    accessKeyId: z.string().min(1).max(256),
+    secretAccessKey: z.string().min(1).max(4096).optional(),
+    forcePathStyle: z.boolean().default(true),
+    publicBaseUrl: z.string().url().optional().nullable(),
+  })
+  .openapi({ description: "Create or update app S3 storage configuration" });
+
+export const AppStorageHealthSchema = z
+  .object({
+    status: z.enum(["up", "down", "not_configured"]),
+    driver: z.enum(["s3", "memory"]),
+    detail: z.string().optional(),
+  })
+  .openapi({ description: "App S3 storage health check result" });
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

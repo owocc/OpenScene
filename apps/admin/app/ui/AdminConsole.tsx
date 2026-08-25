@@ -3131,6 +3131,28 @@ function SettingsView() {
       void queryClient.invalidateQueries();
     },
   });
+  const storageQuery = api.useQuery(
+    "get",
+    "/api/v1/apps/{appId}/storage",
+    {
+      params: { path: { appId: context.appId ?? "" } },
+    },
+    { enabled: hasAppSelected },
+  );
+  const updateStorage = api.useMutation("put", "/api/v1/apps/{appId}/storage", {
+    onSuccess: () => {
+      toast.add({ title: t("storageSaved") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const deleteStorageMutation = api.useMutation("delete", "/api/v1/apps/{appId}/storage", {
+    onSuccess: () => {
+      toast.add({ title: t("storageDeleted") });
+      void queryClient.invalidateQueries();
+    },
+  });
+  const testStorageMutation = api.useMutation("post", "/api/v1/apps/{appId}/storage/test");
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [runtimeUrl, setRuntimeUrl] = useState("");
@@ -3138,7 +3160,22 @@ function SettingsView() {
   const [rotatedAppKey, setRotatedAppKey] = useState<string | null>(null);
   const [rotationError, setRotationError] = useState<unknown>(null);
   const [isRotating, setIsRotating] = useState(false);
+
+  const [storageDriver, setStorageDriver] = useState<"s3" | "memory">("s3");
+  const [storageBucket, setStorageBucket] = useState("");
+  const [storageEndpoint, setStorageEndpoint] = useState("");
+  const [storageRegion, setStorageRegion] = useState("auto");
+  const [storageAccessKeyId, setStorageAccessKeyId] = useState("");
+  const [storageSecretAccessKey, setStorageSecretAccessKey] = useState("");
+  const [storageForcePathStyle, setStorageForcePathStyle] = useState(true);
+  const [storagePublicBaseUrl, setStoragePublicBaseUrl] = useState("");
+  const [storageTestResult, setStorageTestResult] = useState<{
+    status: "up" | "down" | "not_configured";
+    detail?: string;
+  } | null>(null);
+
   const app = query.data;
+  const storageConfig = storageQuery.data?.config;
   async function rotateAppKey() {
     setRotationError(null);
     setIsRotating(true);
@@ -3169,6 +3206,82 @@ function SettingsView() {
       setRuntimeUrl(app.runtime.publicBaseUrl ?? "");
     }
   }, [app]);
+  useEffect(() => {
+    if (storageConfig) {
+      setStorageDriver(storageConfig.driver);
+      setStorageBucket(storageConfig.bucket);
+      setStorageEndpoint(storageConfig.endpoint ?? "");
+      setStorageRegion(storageConfig.region);
+      setStorageAccessKeyId(storageConfig.accessKeyId);
+      setStorageForcePathStyle(storageConfig.forcePathStyle);
+      setStoragePublicBaseUrl(storageConfig.publicBaseUrl ?? "");
+      setStorageSecretAccessKey("");
+    } else {
+      setStorageBucket("");
+      setStorageEndpoint("");
+      setStorageRegion("auto");
+      setStorageAccessKeyId("");
+      setStorageSecretAccessKey("");
+      setStorageForcePathStyle(true);
+      setStoragePublicBaseUrl("");
+    }
+  }, [storageConfig]);
+
+  function saveStorage() {
+    updateStorage.mutate({
+      params: { path: { appId: context.appId ?? "" } },
+      body: {
+        driver: storageDriver,
+        bucket: storageBucket,
+        endpoint: storageEndpoint || undefined,
+        region: storageRegion || "auto",
+        accessKeyId: storageAccessKeyId,
+        secretAccessKey: storageSecretAccessKey || undefined,
+        forcePathStyle: storageForcePathStyle,
+        publicBaseUrl: storagePublicBaseUrl || undefined,
+      },
+    });
+  }
+
+  function runStorageTest() {
+    setStorageTestResult(null);
+    testStorageMutation.mutate(
+      {
+        params: { path: { appId: context.appId ?? "" } },
+        body: {
+          driver: storageDriver,
+          bucket: storageBucket,
+          endpoint: storageEndpoint || undefined,
+          region: storageRegion || "auto",
+          accessKeyId: storageAccessKeyId,
+          secretAccessKey: storageSecretAccessKey || undefined,
+          forcePathStyle: storageForcePathStyle,
+          publicBaseUrl: storagePublicBaseUrl || undefined,
+        },
+      },
+      {
+        onSuccess: (data) => setStorageTestResult(data ?? null),
+        onError: (error) =>
+          setStorageTestResult({
+            status: "down",
+            detail:
+              error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                  ? error
+                  : "Unknown error",
+          }),
+      },
+    );
+  }
+
+  function deleteStorage() {
+    if (window.confirm(t("deleteStorageConfirm"))) {
+      deleteStorageMutation.mutate({
+        params: { path: { appId: context.appId ?? "" } },
+      });
+    }
+  }
   return (
     <>
       <PageHeader title={t("settings")} description={t("settingsDescription")} />
@@ -3255,6 +3368,94 @@ function SettingsView() {
               >
                 {t("save")}
               </Button>
+            </LayerCard.Primary>
+          </LayerCard>
+          <LayerCard className="mt-4 max-w-2xl">
+            <LayerCard.Secondary>{t("storageSettings")}</LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-4">
+              <Text variant="secondary">{t("storageSettingsDescription")}</Text>
+              {storageQuery.error ? <ErrorState error={storageQuery.error} /> : null}
+              <Input
+                label={t("storageBucket")}
+                value={storageBucket}
+                onChange={(e) => setStorageBucket(e.target.value)}
+                placeholder={t("storageBucketPlaceholder")}
+              />
+              <Input
+                label={t("storageEndpoint")}
+                value={storageEndpoint}
+                onChange={(e) => setStorageEndpoint(e.target.value)}
+                placeholder={t("storageEndpointPlaceholder")}
+              />
+              <Input
+                label={t("storageRegion")}
+                value={storageRegion}
+                onChange={(e) => setStorageRegion(e.target.value)}
+                placeholder="auto"
+              />
+              <Input
+                label={t("storageAccessKeyId")}
+                value={storageAccessKeyId}
+                onChange={(e) => setStorageAccessKeyId(e.target.value)}
+              />
+              <div>
+                <Input
+                  label={t("storageSecretAccessKey")}
+                  type="password"
+                  value={storageSecretAccessKey}
+                  onChange={(e) => setStorageSecretAccessKey(e.target.value)}
+                  placeholder={
+                    storageConfig?.hasSecretAccessKey
+                      ? t("storageSecretAccessKeySet")
+                      : t("storageSecretAccessKeyPlaceholder")
+                  }
+                />
+                <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
+              </div>
+              <Switch
+                checked={storageForcePathStyle}
+                label={t("storageForcePathStyle")}
+                onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+              />
+              <Input
+                label={t("storagePublicBaseUrl")}
+                value={storagePublicBaseUrl}
+                onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
+                placeholder={t("storagePublicBaseUrlPlaceholder")}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" loading={updateStorage.isPending} onClick={saveStorage}>
+                  {t("save")}
+                </Button>
+                <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
+                  {t("storageTest")}
+                </Button>
+                {storageConfig ? (
+                  <Button
+                    variant="destructive"
+                    loading={deleteStorageMutation.isPending}
+                    onClick={deleteStorage}
+                  >
+                    {t("delete")}
+                  </Button>
+                ) : null}
+              </div>
+              {updateStorage.error ? <ErrorState error={updateStorage.error} /> : null}
+              {testStorageMutation.error ? <ErrorState error={testStorageMutation.error} /> : null}
+              {storageTestResult ? (
+                <div className="mt-2">
+                  {storageTestResult.status === "up" ? (
+                    <Badge variant="green">{t("storageConnectionSuccess")}</Badge>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="red">{t("storageConnectionFailed")}</Badge>
+                      {storageTestResult.detail ? (
+                        <Text variant="secondary">{storageTestResult.detail}</Text>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </LayerCard.Primary>
           </LayerCard>
           <LayerCard className="mt-4 max-w-2xl">

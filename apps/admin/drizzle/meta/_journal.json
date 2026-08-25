@@ -92,6 +92,13 @@
       "when": 1787562723111,
       "tag": "0012_little_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1787628568383,
+      "tag": "0013_parched_rawhide_kid",
+      "breakpoints": true
     }
   ]
 }
