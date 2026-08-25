@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "cd ../.. && vp -C packages/constants pack && vp -C packages/schema pack && vp -C packages/protocol pack && vp -C packages/api-client pack",
     "build": "next build",
     "start": "next start",
     "check": "vp check",
