@@ -1,3 +1,4 @@
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `storage_objects` (
 	`key` text PRIMARY KEY NOT NULL,
 	`app_id` text NOT NULL,
@@ -68,4 +69,5 @@ CREATE UNIQUE INDEX `templates_app_key_unique` ON `templates` (`app_id`,`key`);-
 ALTER TABLE `app_storage_configs` ALTER COLUMN "region" TO "region" text DEFAULT 'auto';--> statement-breakpoint
 ALTER TABLE `app_storage_configs` ALTER COLUMN "bucket" TO "bucket" text;--> statement-breakpoint
 ALTER TABLE `app_storage_configs` ALTER COLUMN "access_key_id" TO "access_key_id" text;--> statement-breakpoint
-ALTER TABLE `app_storage_configs` ALTER COLUMN "secret_access_key_enc" TO "secret_access_key_enc" text;
+ALTER TABLE `app_storage_configs` ALTER COLUMN "secret_access_key_enc" TO "secret_access_key_enc" text;--> statement-breakpoint
+PRAGMA foreign_keys=ON;

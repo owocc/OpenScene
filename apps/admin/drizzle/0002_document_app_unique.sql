@@ -1,1 +1,1 @@
-CREATE UNIQUE INDEX `documents_app_id_unique` ON `documents` (`app_id`,`id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `documents_app_id_unique` ON `documents` (`app_id`,`id`);
