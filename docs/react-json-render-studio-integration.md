@@ -1,6 +1,6 @@
-# OpenScene React + json-render + Studio 集成配置指南
+# OpenScene React + json-render + Studio 集成与上线发布指南
 
-本文档记录了在 OpenScene 体系中集成 React、`@json-render/react` 以及适配 OpenScene Studio（设计期可视化编辑器）与 Admin Runtime 的完整配置、SDK 架构及示例工程实现。
+本文档记录了在 OpenScene 体系中集成 React、`@json-render/react` 以及适配 OpenScene Studio（设计期可视化编辑器）与 Admin Runtime 的完整配置、SDK 架构、避错指南与生产上线检查清单。
 
 ---
 
@@ -143,7 +143,7 @@ export default defineConfig(({ mode }) => {
 声明所有可被 Studio 可视化编排的组件及属性 Schema（包含 `x-editor` 扩展元数据）：
 
 ```tsx
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { APP_TYPE_WEB } from "@openscene/constants";
 import { defineAppManifest } from "@openscene/javascript";
 import {
@@ -199,9 +199,9 @@ const Image = defineOpenSceneReactComponent({
   },
 });
 
-// 3. 组合组件 Callout
+// 3. 组合组件 Callout（注意：命名必须是跨 Adapter 的通用语义名）
 const Callout = defineOpenSceneReactComponent({
-  type: "ReactViteCallout",
+  type: "Callout",
   schema: z
     .object({
       tone: z.enum(["info", "success", "warning"]).optional(),
@@ -252,13 +252,14 @@ export function createManifest(appKey: string) {
 **`src/App.tsx`**:
 
 ```tsx
-import React from "react";
 import type { OpenSceneClient } from "@openscene/javascript";
-import { OpenSceneProvider, OpenSceneRenderer, type OpenSceneReactApp } from "@openscene/react";
+import { OpenSceneProvider, OpenSceneRenderer } from "@openscene/react";
+import type { ReactApp } from "./openscene.tsx";
+import "./App.css";
 
 interface AppProps {
   client: OpenSceneClient;
-  app: OpenSceneReactApp;
+  app: ReactApp;
 }
 
 function App(props: AppProps) {
@@ -306,12 +307,13 @@ createRoot(document.getElementById("root")!).render(
 ```bash
 # 浏览器端运行时配置 (Vite 会打包带 VITE_ 前缀的环境变量)
 VITE_OPENSCENE_ADMIN_URL=http://localhost:3000
-VITE_OPENSCENE_APP_KEY=your-app-key
+VITE_OPENSCENE_APP_KEY=react-vite-app
 
 # 构建期 Manifest 自动同步配置 (由 Vite 插件在打包时读取，不泄露给客户端)
+# 如果本地构建无需向 Admin 同步，留空或注释即可
 OPENSCENE_ADMIN_URL=http://localhost:3000
-OPENSCENE_APP_ID=your-app-id
-OPENSCENE_APP_KEY=your-app-key
+OPENSCENE_APP_ID=app_e3deffe02d474a21a73fedc31e408bed
+OPENSCENE_APP_KEY=appkey_2z7TOcEf2_tk8_XbTikymI7mTT2r9VgJ2PNz87svZxQ
 ```
 
 ---
@@ -343,14 +345,59 @@ OPENSCENE_APP_KEY=your-app-key
 vp install
 
 # 运行 @openscene/react 测试
-vp test --dir packages/sdk/react
+vp test packages/sdk/react
 
 # 运行 examples/react-vite 测试
-vp test --dir examples/react-vite
+vp test examples/react-vite
 
 # 全量构建验证
 vp run build
 
-# 启动 React 示例应用本地开发服务器
-vp dev -C examples/react-vite
+# 启动 React 示例应用本地开发服务器 (指定 5174 端口避免与 Studio 5173 冲突)
+vp -C examples/react-vite dev -- --port 5174
 ```
+
+---
+
+## 6. 常见踩坑与避错指南（上线必读）
+
+### 坑 1：组件 `type` 命名规范（避免“文档 type 必须是跨 Adapter 的稳定名称”报错）
+
+- **原因**：OpenScene Studio 的 JSON 文档必须保持跨框架可移植性。Studio 内置了命名校验规则（`/^(N|Shadcn|React)[A-Z]/`），禁止在组件 `type` 中加入框架前缀（如 `ReactCallout`、`ShadcnButton`、`NCard`）。
+- **避错方案**：统一使用跨框架通用的业务语义名，例如 `Callout`、`StatusCard`、`OpenApiProvider`、`Button`、`Image`。
+
+### 坑 2：环境变量配置混淆导致 Manifest 推送 404
+
+构建时 Vite 插件报错 `OpenScene manifest push failed (HTTP 404): The requested resource was not found` 的常见根因：
+
+1. **`OPENSCENE_APP_ID` 填错**：必须填 Admin 数据库中生成的 App 主键 ID（格式为 `app_...`），不能填成 `appkey_...` 秘钥字符串。
+2. **`OPENSCENE_APP_KEY` 权限不匹配**：必须是在 Admin 该应用详情页生成的构建密钥（`appkey_...`），不能填 `runtime_...` 运行时只读令牌。Admin 鉴权失败出于安全保护会统一返回 404。
+3. **离线构建策略**：如果某次构建无需自动同步 Manifest 到 Admin，将 `OPENSCENE_ADMIN_URL`、`OPENSCENE_APP_ID`、`OPENSCENE_APP_KEY` 留空即可，构建将自动跳过推送。
+
+### 坑 3：Studio 按钮点击无响应（缺少 Preview Profile）
+
+- **原因**：Admin 进入 Studio 需要生成单次编辑会话，而会话必须绑定一个具体的 **Preview Profile（预览环境配置）**。如果当前应用未创建任何 Preview Profile，Admin 前端会静默拦截点击。
+- **避错方案**：在 Admin 后台侧边栏点击 **「Preview profiles / 预览配置」**（`/preview-profiles`），为该应用新建一条预览配置（如 `Local React Preview`，地址为 `http://localhost:5174/`，允许来源为 `http://localhost:5173`），并勾选「设为默认 (isDefault)」。
+
+---
+
+## 7. 生产上线发布检查清单 (Production Checklist)
+
+在将 OpenScene 部署上线或发布到生产环境前，请逐项核对：
+
+- [ ] **1. 全量测试与类型检查通过**：
+  ```bash
+  vp check && vp test packages/sdk/react examples/react-vite && vp run build
+  ```
+- [ ] **2. 生产环境 Preview Profile 配置**：
+  - 在生产 Admin 控制台中，为应用添加生产预览环境（如 `Staging Preview` 或 `Prod Preview`）。
+  - 配置真实的 HTTPS 预览地址（如 `https://preview.yourdomain.com/`）。
+  - 在 `allowedOrigins` 中严格填写生产 Studio 域名（如 `https://studio.yourdomain.com`），防止未经授权的页面嵌入与 iframe 劫持。
+- [ ] **3. 生产环境变量与凭据隔离**：
+  - 生产前端静态资源只暴露 `VITE_OPENSCENE_ADMIN_URL` 与 `VITE_OPENSCENE_APP_KEY`。
+  - `OPENSCENE_APP_KEY`（构建秘钥）与管理端凭证仅配置在 CI/CD 流水线中，绝不打包入客户端 JS。
+- [ ] **4. Manifest 正式发布**：
+  - CI/CD 在执行 `vp build` 时注入生产 `OPENSCENE_ADMIN_URL`、`OPENSCENE_APP_ID`、`OPENSCENE_APP_KEY`，确保最新组件 Schema 自动同步至 Admin。
+- [ ] **5. 静态资源与页面发布通道 (Release Channels)**：
+  - 确认 Admin 中的 Storage 配置已就绪（S3 或 Database 存储）。
+  - 确认生产发布通道（`production` / `staging`）生效，终端用户正常通过 `/@openscene/runtime` 消费已发布的页面文档。
