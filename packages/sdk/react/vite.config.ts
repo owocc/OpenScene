@@ -5,9 +5,7 @@ export default defineConfig({
   plugins: lazyPlugins(() => [react()]),
   pack: {
     entry: ["src/index.tsx", "src/server.ts", "src/vite.ts"],
-    dts: {
-      tsgo: true,
-    },
+    dts: true,
   },
   lint: {
     options: {

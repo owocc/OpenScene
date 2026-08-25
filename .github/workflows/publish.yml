@@ -34,12 +34,10 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install global Vite+ CLI
-        run: bun install -g vite-plus
-
       - name: Install dependencies
-        run: vp install
-
+        run: |
+          bun install
+          echo "$GITHUB_WORKSPACE/node_modules/.bin" >> $GITHUB_PATH
       - name: Build packages
         run: |
           cd packages/constants && vp run build
