@@ -784,6 +784,9 @@ export function useAdminContext() {
   const setLanguage = useCallback((next: AdminLanguage) => {
     document.cookie = `openscene_admin_lang=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
     setLanguageState(next);
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
   }, []);
 
   const dictionary = useMemo(() => messages[language], [language]);
