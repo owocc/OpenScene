@@ -433,7 +433,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                           context.router.push(context.href("/overview", { appId: app.id }));
                         }}
                       >
-                        <span className="truncate">{app.name}</span>
+                        <span className="flex-1 truncate text-left">{app.name}</span>
                       </DropdownMenu.Item>
                     );
                   })}
@@ -653,7 +653,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                                 context.router.push(buildHref("/apps", { orgSlug: org.slug }));
                               }}
                             >
-                              <span className="truncate">{org.name}</span>
+                              <span className="flex-1 truncate text-left">{org.name}</span>
                             </DropdownMenu.Item>
                           );
                         })}
@@ -685,19 +685,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
                         selected={theme === "system"}
                         onClick={() => setTheme("system")}
                       >
-                        {t("themeSystem")}
+                        <span className="flex-1 text-left">{t("themeSystem")}</span>
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         selected={theme === "light"}
                         onClick={() => setTheme("light")}
                       >
-                        {t("themeLight")}
+                        <span className="flex-1 text-left">{t("themeLight")}</span>
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         selected={theme === "dark"}
                         onClick={() => setTheme("dark")}
                       >
-                        {t("themeDark")}
+                        <span className="flex-1 text-left">{t("themeDark")}</span>
                       </DropdownMenu.Item>
                     </DropdownMenu.SubContent>
                   </DropdownMenu.Sub>
@@ -709,13 +709,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
                         selected={context.language === "en"}
                         onClick={() => context.setLanguage("en")}
                       >
-                        {t("english")}
+                        <span className="flex-1 text-left">{t("english")}</span>
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         selected={context.language === "zh-CN"}
                         onClick={() => context.setLanguage("zh-CN")}
                       >
-                        {t("chinese")}
+                        <span className="flex-1 text-left">{t("chinese")}</span>
                       </DropdownMenu.Item>
                     </DropdownMenu.SubContent>
                   </DropdownMenu.Sub>
