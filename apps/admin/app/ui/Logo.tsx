@@ -1,9 +1,9 @@
 import type { SVGProps } from "react";
 
 export function OpenSceneLogo({
-  width = 48,
-  height = 33,
-  className = "w-12 h-auto shrink-0",
+  width = 32,
+  height = 22,
+  className = "w-8 h-auto shrink-0",
   ...props
 }: SVGProps<SVGSVGElement>) {
   return (

@@ -387,8 +387,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               className="translate-y-0.5 cursor-pointer origin-left scale-[0.833] group-not-data-[state=collapsed]/sidebar:scale-100 transition-transform duration-250 flex items-center justify-center shrink-0 text-kumo-default"
               aria-label="Home"
             >
-              <div className="flex w-12 items-center justify-center shrink-0">
-                <OpenSceneLogo className="w-12 h-auto shrink-0" />
+              <div className="flex w-8 items-center justify-center shrink-0">
+                <OpenSceneLogo className="w-8 h-auto shrink-0" />
               </div>
             </a>
             {!isPersonal && (
