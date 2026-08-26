@@ -619,9 +619,26 @@ export function OpenApiDocDetailView() {
           </div>
 
           {filteredOperations.length === 0 ? (
-            <LayerCard className="p-8 text-center text-kumo-secondary">
-              <Text>{t("noResults")}</Text>
-            </LayerCard>
+            <Empty
+              icon={<CodeIcon size={36} />}
+              title={allOperations.length === 0 ? t("noResults") : t("noResults")}
+              description={
+                allOperations.length === 0
+                  ? "No API endpoints or operations found in this OpenAPI specification document."
+                  : t("noResultsDescription")
+              }
+              contents={
+                allOperations.length === 0 ? (
+                  <Button
+                    variant="secondary"
+                    icon={UploadSimple}
+                    onClick={() => setUploadModalOpen(true)}
+                  >
+                    {t("upload") || "Upload"}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="flex flex-col gap-3">
               {filteredOperations.map((op) => {

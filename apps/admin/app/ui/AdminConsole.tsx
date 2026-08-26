@@ -8,6 +8,7 @@ import {
   CaretRight,
   Check,
   ClipboardText,
+  Code as CodeIcon,
   Cloud,
   Copy,
   Database,
@@ -23,6 +24,7 @@ import {
   Star,
   Tag,
   Trash,
+  UploadSimple,
   VideoCamera,
 } from "@phosphor-icons/react";
 import {
@@ -1042,9 +1044,26 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
         <LoadingState variant="table" hasHeader={false} />
       ) : resources.length === 0 ? (
         <Empty
-          title={t("noResults")}
-          description={t("noResultsDescription")}
-          contents={<Button onClick={openCreate}>{t("create")}</Button>}
+          icon={kind === "pages" ? <FileIcon size={40} /> : <Copy size={40} />}
+          title={
+            statusFilter || categoryFilter || search
+              ? t("noResults")
+              : kind === "pages"
+                ? t("noPagesYet")
+                : t("noTemplatesYet")
+          }
+          description={
+            statusFilter || categoryFilter || search
+              ? t("noResultsDescription")
+              : kind === "pages"
+                ? t("noPagesDescription")
+                : t("noTemplatesDescription")
+          }
+          contents={
+            <Button variant="primary" icon={Plus} onClick={openCreate}>
+              {t("create")} {title}
+            </Button>
+          }
         />
       ) : (
         <LayerCard className="w-full overflow-x-auto p-0">
@@ -2498,6 +2517,57 @@ function OpenApiDocsView() {
   const [editing, setEditing] = useState<{ id: string } | null>(null);
   const [form, setForm] = useState({ name: "", json: "", isDefault: false });
   const [jsonInvalid, setJsonInvalid] = useState(false);
+  const [fileInfo, setFileInfo] = useState<{ fileName: string; endpointsCount: number } | null>(
+    null,
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      toast.add({ title: t("onlyJsonAllowed"), type: "error" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      try {
+        const parsed = JSON.parse(text);
+        if (
+          typeof parsed !== "object" ||
+          parsed === null ||
+          Array.isArray(parsed) ||
+          typeof (parsed as { paths?: unknown }).paths !== "object" ||
+          (parsed as { paths?: unknown }).paths === null ||
+          Array.isArray((parsed as { paths?: unknown }).paths)
+        ) {
+          setJsonInvalid(true);
+          toast.add({ title: t("openApiJsonInvalid"), type: "error" });
+          return;
+        }
+        const endpointsCount = Object.keys(
+          (parsed as { paths?: Record<string, unknown> }).paths ?? {},
+        ).length;
+        const specTitle = (parsed as { info?: { title?: string } }).info?.title;
+        setForm((prev) => ({
+          ...prev,
+          name: prev.name.trim()
+            ? prev.name
+            : (specTitle || file.name.replace(/\.json$/i, "")).trim(),
+          json: JSON.stringify(parsed, null, 2),
+        }));
+        setFileInfo({ fileName: file.name, endpointsCount });
+        setJsonInvalid(false);
+        toast.add({
+          title: `${file.name} (${endpointsCount} ${t("endpointsDetected")})`,
+          type: "success",
+        });
+      } catch {
+        setJsonInvalid(true);
+        toast.add({ title: t("openApiJsonInvalid"), type: "error" });
+      }
+    };
+    reader.readAsText(file);
+  };
   const query = api.useQuery("get", "/api/v1/apps/{appId}/openapi-docs", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -2533,6 +2603,7 @@ function OpenApiDocsView() {
             setEditing(null);
             setForm({ name: "", json: "", isDefault: false });
             setJsonInvalid(false);
+            setFileInfo(null);
             setDialog(true);
           }}
         >
@@ -2540,118 +2611,144 @@ function OpenApiDocsView() {
         </Button>
       </PageHeader>
       {query.error ? <ErrorState error={query.error} /> : null}
-      <LayerCard className="w-full overflow-x-auto p-0">
-        <Table layout="fixed">
-          <colgroup>
-            <col />
-            <col style={{ width: "140px" }} />
-            <col style={{ width: "140px" }} />
-            <col style={{ width: "56px" }} />
-          </colgroup>
-          <Table.Header>
-            <Table.Row>
-              <Table.Head>{t("openApiName")}</Table.Head>
-              <Table.Head>{t("openApiEndpoints")}</Table.Head>
-              <Table.Head>{t("status")}</Table.Head>
-              <Table.Head sticky="right">
-                <span className="sr-only">{t("actions")}</span>
-              </Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {items.map((item) => (
-              <Table.Row key={item.id}>
-                <Table.Cell>
-                  <button
-                    type="button"
-                    onClick={() => context.router.push(context.href(`/openapi-docs/${item.id}`))}
-                    className="text-left font-medium text-kumo-link hover:underline cursor-pointer"
-                  >
-                    {item.name}
-                  </button>
-                </Table.Cell>
-                <Table.Cell>
-                  {
-                    Object.keys((item.json as { paths?: Record<string, unknown> })?.paths ?? {})
-                      .length
-                  }
-                </Table.Cell>
-                <Table.Cell>
-                  {item.isDefault ? <Badge variant="green">{t("default")}</Badge> : "—"}
-                </Table.Cell>
-                <Table.Cell sticky="right" className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenu.Trigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          shape="square"
-                          aria-label={t("moreOptions")}
-                        >
-                          <DotsThree weight="bold" size={16} />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenu.Content>
-                      <DropdownMenu.Item
-                        icon={Eye}
-                        onClick={() =>
-                          context.router.push(context.href(`/openapi-docs/${item.id}`))
-                        }
-                      >
-                        {t("viewDetails")}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        icon={PencilSimple}
-                        onClick={() => {
-                          setEditing(item);
-                          setForm({
-                            name: item.name,
-                            json: JSON.stringify(item.json, null, 2),
-                            isDefault: item.isDefault,
-                          });
-                          setJsonInvalid(false);
-                          setDialog(true);
-                        }}
-                      >
-                        {t("edit")}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Item
-                        icon={Star}
-                        onClick={() =>
-                          update.mutate({
-                            params: {
-                              path: { appId: context.appId ?? "", openApiDocId: item.id },
-                            },
-                            body: { isDefault: !item.isDefault },
-                          })
-                        }
-                      >
-                        {item.isDefault ? t("removeDefault") : t("setDefault")}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item
-                        icon={Trash}
-                        variant="danger"
-                        onClick={() =>
-                          remove.mutate({
-                            params: {
-                              path: { appId: context.appId ?? "", openApiDocId: item.id },
-                            },
-                          })
-                        }
-                      >
-                        {t("delete")}
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
-                </Table.Cell>
+      {query.isLoading ? (
+        <LoadingState variant="table" hasHeader={false} />
+      ) : items.length === 0 ? (
+        <Empty
+          icon={<CodeIcon size={40} />}
+          title={t("noOpenApiDocsYet")}
+          description={t("noOpenApiDocsDescription")}
+          contents={
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => {
+                setEditing(null);
+                setForm({ name: "", json: "", isDefault: false });
+                setJsonInvalid(false);
+                setFileInfo(null);
+                setDialog(true);
+              }}
+            >
+              {t("create")}
+            </Button>
+          }
+        />
+      ) : (
+        <LayerCard className="w-full overflow-x-auto p-0">
+          <Table layout="fixed">
+            <colgroup>
+              <col />
+              <col style={{ width: "140px" }} />
+              <col style={{ width: "140px" }} />
+              <col style={{ width: "56px" }} />
+            </colgroup>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>{t("openApiName")}</Table.Head>
+                <Table.Head>{t("openApiEndpoints")}</Table.Head>
+                <Table.Head>{t("status")}</Table.Head>
+                <Table.Head sticky="right">
+                  <span className="sr-only">{t("actions")}</span>
+                </Table.Head>
               </Table.Row>
-            ))}
-          </Table.Body>
-        </Table>
-      </LayerCard>
+            </Table.Header>
+            <Table.Body>
+              {items.map((item) => (
+                <Table.Row key={item.id}>
+                  <Table.Cell>
+                    <button
+                      type="button"
+                      onClick={() => context.router.push(context.href(`/openapi-docs/${item.id}`))}
+                      className="text-left font-medium text-kumo-link hover:underline cursor-pointer"
+                    >
+                      {item.name}
+                    </button>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {
+                      Object.keys((item.json as { paths?: Record<string, unknown> })?.paths ?? {})
+                        .length
+                    }
+                  </Table.Cell>
+                  <Table.Cell>
+                    {item.isDefault ? <Badge variant="green">{t("default")}</Badge> : "—"}
+                  </Table.Cell>
+                  <Table.Cell sticky="right" className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            shape="square"
+                            aria-label={t("moreOptions")}
+                          >
+                            <DotsThree weight="bold" size={16} />
+                          </Button>
+                        }
+                      />
+                      <DropdownMenu.Content>
+                        <DropdownMenu.Item
+                          icon={Eye}
+                          onClick={() =>
+                            context.router.push(context.href(`/openapi-docs/${item.id}`))
+                          }
+                        >
+                          {t("viewDetails")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={PencilSimple}
+                          onClick={() => {
+                            setEditing(item);
+                            setForm({
+                              name: item.name,
+                              json: JSON.stringify(item.json, null, 2),
+                              isDefault: item.isDefault,
+                            });
+                            setJsonInvalid(false);
+                            setFileInfo(null);
+                            setDialog(true);
+                          }}
+                        >
+                          {t("edit")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={Star}
+                          onClick={() =>
+                            update.mutate({
+                              params: {
+                                path: { appId: context.appId ?? "", openApiDocId: item.id },
+                              },
+                              body: { isDefault: !item.isDefault },
+                            })
+                          }
+                        >
+                          {item.isDefault ? t("removeDefault") : t("setDefault")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          icon={Trash}
+                          variant="danger"
+                          onClick={() =>
+                            remove.mutate({
+                              params: {
+                                path: { appId: context.appId ?? "", openApiDocId: item.id },
+                              },
+                            })
+                          }
+                        >
+                          {t("delete")}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
+        </LayerCard>
+      )}
       <Dialog.Root open={dialog} onOpenChange={setDialog}>
         <Dialog size="lg" className="px-8 py-6">
           <Dialog.Title>
@@ -2663,6 +2760,37 @@ function OpenApiDocsView() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
+            {/* File Upload Selector (.json restricted) */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-kumo-default">
+                  {t("uploadJsonFile")}
+                </label>
+                {fileInfo ? (
+                  <Badge variant="green">
+                    {fileInfo.fileName} ({fileInfo.endpointsCount} {t("endpointsDetected")})
+                  </Badge>
+                ) : null}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".json,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                  if (e.target) e.target.value = "";
+                }}
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-kumo-line bg-kumo-canvas/60 p-3 text-xs text-kumo-subtle hover:border-kumo-brand hover:bg-kumo-tint hover:text-kumo-brand transition-colors cursor-pointer"
+              >
+                <UploadSimple size={16} />
+                <span>{t("dropJsonFileHere")}</span>
+              </div>
+            </div>
             <Textarea
               label={t("openApiJson")}
               className="font-mono"
