@@ -561,7 +561,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-4 border-b border-kumo-line bg-kumo-canvas px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Sidebar.Trigger aria-label="Open sidebar" />
             {isPersonal ? (
               <Breadcrumbs size="sm">
                 <Breadcrumbs.Current>
