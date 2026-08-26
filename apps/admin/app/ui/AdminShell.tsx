@@ -29,7 +29,7 @@ import {
   Tag,
   User,
 } from "@phosphor-icons/react";
-import { CloudflareLogo } from "@cloudflare/kumo";
+import { OpenSceneLogo } from "./Logo";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
@@ -214,10 +214,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
       className="h-dvh min-h-0 overflow-hidden"
     >
       <Sidebar className="h-full border-r border-kumo-line" fullScreenOnMobile>
-        <Sidebar.Header className="w-full border-b border-kumo-line p-2.5">
-          <div className="flex h-8 items-center justify-between gap-2 px-1">
-            <a href="/" className="flex items-center shrink-0" aria-label="Home">
-              <CloudflareLogo variant="glyph" className="h-6 w-auto" color="color" />
+        <Sidebar.Header className="w-full border-b border-kumo-line p-2">
+          <div className="flex h-12 items-center justify-between gap-2 px-1 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:p-0">
+            <a
+              href="/"
+              className="flex size-12 shrink-0 items-center justify-center text-kumo-default"
+              aria-label="Home"
+            >
+              <OpenSceneLogo className="size-12 shrink-0 text-kumo-default" />
             </a>
 
             {!isPersonal && (
@@ -226,7 +230,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   render={
                     <button
                       type="button"
-                      className="flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg px-2 py-1 text-left text-sm font-semibold transition-colors hover:bg-kumo-fill cursor-pointer group-data-[state=collapsed]/sidebar:hidden"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-left text-sm font-semibold transition-colors hover:bg-kumo-fill cursor-pointer group-data-[state=collapsed]/sidebar:hidden"
                     >
                       <span className="truncate text-kumo-default">
                         {currentApp?.name || t("selectApp")}

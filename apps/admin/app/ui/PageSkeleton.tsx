@@ -501,7 +501,7 @@ export function FullPageSkeleton({ variant = "table", ...props }: PageSkeletonPr
       <div className="hidden h-full w-64 shrink-0 border-r border-kumo-line bg-kumo-surface md:block">
         <div className="flex h-14 items-center justify-between border-b border-kumo-line px-4">
           <div className="flex items-center gap-2">
-            <SkeletonLine className="size-7 rounded-lg" minWidth={100} maxWidth={100} />
+            <SkeletonLine className="size-12 rounded-lg" minWidth={100} maxWidth={100} />
             <SkeletonLine className="h-4.5 w-28 rounded" minWidth={100} maxWidth={100} />
           </div>
         </div>
