@@ -171,8 +171,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
     // When logged in via session, verify organization access
     if (session?.user && Array.isArray(orgs)) {
-      const isPersonal = isPersonalPath(pathname) || isPersonalPath(context.viewPath);
-
+      const isPersonal = isPersonalPath(pathname);
       if (orgs.length === 0 && !isPersonal) {
         context.router.replace("/");
         return;
@@ -214,7 +213,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
   const canManageAi = hasStatement(activeStatements, "ai", "manage");
 
-  const isPersonal = isPersonalPath(pathname) || isPersonalPath(context.viewPath);
+  const isPersonal = isPersonalPath(pathname);
   const activeNavGroups = isPersonal ? personalNavigationGroups : navigationGroups;
 
   const normalizedNavigationSearch = navigationSearch.trim().toLocaleLowerCase();
@@ -590,7 +589,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 </Breadcrumbs.Link>
                 <Breadcrumbs.Separator />
                 <Breadcrumbs.Current>
-                  {t((context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey)}
+                  {context.viewPath === "/settings" && context.appId
+                    ? t("appSettings")
+                    : t((context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey)}
                 </Breadcrumbs.Current>
               </Breadcrumbs>
             )}
