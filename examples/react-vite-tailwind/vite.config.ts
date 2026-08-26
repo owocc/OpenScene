@@ -2,7 +2,7 @@ import { openSceneManifestPlugin } from "@openscene-ai/react/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
 import { createManifest } from "./src/openscene.tsx";
-
+import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
@@ -32,6 +32,6 @@ export default defineConfig(({ mode }) => {
         },
       ],
     },
-    plugins: lazyPlugins(() => [react(), openSceneManifestPlugin({ manifest })]),
+    plugins: lazyPlugins(() => [react(), tailwindcss(), openSceneManifestPlugin({ manifest })]),
   };
 });

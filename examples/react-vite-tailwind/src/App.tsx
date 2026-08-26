@@ -1,10 +1,9 @@
-import type { OpenSceneClient } from "@openscene-ai/javascript";
-import { OpenSceneProvider, OpenSceneRenderer } from "@openscene-ai/solid";
-import type { SolidApp } from "./openscene.tsx";
+import { OpenSceneProvider, OpenSceneRenderer, type OpenSceneClient } from "@openscene-ai/react";
+import type { ReactApp } from "./openscene.tsx";
 
 interface AppProps {
   client: OpenSceneClient;
-  app: SolidApp;
+  app: ReactApp;
 }
 
 /** The example owns no page document; Admin release or Studio supplies it at runtime. */
