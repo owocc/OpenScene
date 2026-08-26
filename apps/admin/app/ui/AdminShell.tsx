@@ -471,11 +471,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 <Sidebar.Menu>
                   {group.items.map((item) => {
                     if ("type" in item && item.type === "sub") {
-                      const isAnySubActive = item.items.some(
-                        (sub) =>
-                          context.viewPath === sub.href ||
-                          context.viewPath.startsWith(`${sub.href}/`),
-                      );
                       const SubIcon = icons[item.icon as keyof typeof icons] ?? Folder;
                       return (
                         <Sidebar.MenuItem key={item.key}>
@@ -485,7 +480,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
                                 <Sidebar.MenuButton
                                   icon={SubIcon}
                                   tooltip={t(item.key as MessageKey)}
-                                  active={isAnySubActive}
                                 >
                                   {t(item.key as MessageKey)} <Sidebar.MenuChevron />
                                 </Sidebar.MenuButton>
