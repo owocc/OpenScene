@@ -22,13 +22,7 @@ export function isPersonalPath(pathname: string): boolean {
   const segments = clean.split("/").filter(Boolean);
   if (segments.length === 0) return true; // root "/" is the personal organizations selection view
   const first = segments[0];
-  return (
-    first === "account" ||
-    first === "settings" ||
-    first === "login" ||
-    first === "invite" ||
-    (first === "organization" && (segments[1] === "new" || segments[1] === "select"))
-  );
+  return first === "account" || first === "settings" || first === "login" || first === "invite";
 }
 
 export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; viewPath: string } {
@@ -43,10 +37,6 @@ export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; view
     segments[0] === "account" ||
     segments[0] === "settings"
   ) {
-    return { orgSlug: "", viewPath: `/${segments.join("/")}` };
-  }
-
-  if (segments[0] === "organization" && (segments[1] === "new" || segments[1] === "select")) {
     return { orgSlug: "", viewPath: `/${segments.join("/")}` };
   }
 
@@ -119,8 +109,6 @@ export function isAppScopedPath(pathname: string): boolean {
     viewPath !== "/ai" &&
     viewPath !== "/system-prompt" &&
     viewPath !== "/organization" &&
-    viewPath !== "/organization/new" &&
-    viewPath !== "/organization/select" &&
     !viewPath.startsWith("/invite") &&
     viewPath !== "/settings" &&
     viewPath !== "/account" &&

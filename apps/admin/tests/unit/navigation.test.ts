@@ -37,8 +37,6 @@ describe("admin navigation context", () => {
     expect(isPersonalPath("/")).toBe(true);
     expect(isPersonalPath("/account")).toBe(true);
     expect(isPersonalPath("/settings")).toBe(true);
-    expect(isPersonalPath("/organization/new")).toBe(true);
-    expect(isPersonalPath("/organization/select")).toBe(true);
     expect(isPersonalPath("/login")).toBe(true);
     expect(isPersonalPath("/invite/123")).toBe(true);
 
@@ -52,7 +50,6 @@ describe("admin navigation context", () => {
     expect(buildHref("/", { orgSlug: "acme" })).toBe("/");
     expect(buildHref("/account", { orgSlug: "acme" })).toBe("/account");
     expect(buildHref("/settings", { orgSlug: "acme" })).toBe("/settings");
-    expect(buildHref("/organization/new", { orgSlug: "acme" })).toBe("/organization/new");
 
     // Org-scoped routes correctly receive orgSlug
     expect(buildHref("/apps", { orgSlug: "acme" })).toBe("/acme/apps");

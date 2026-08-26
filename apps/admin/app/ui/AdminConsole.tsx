@@ -6247,7 +6247,7 @@ function OrganizationView() {
   return (
     <>
       <PageHeader title={t("organization")} description={t("organizationDescription")}>
-        <Button onClick={() => (window.location.href = "/organization/new")}>
+        <Button onClick={() => setCreateOrgDialog(true)}>
           <Plus size={16} />
           {t("createOrganization")}
         </Button>

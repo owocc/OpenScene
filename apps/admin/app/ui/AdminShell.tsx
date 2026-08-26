@@ -33,7 +33,9 @@ import { OpenSceneLogo } from "./Logo";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { CommandPalette } from "@cloudflare/kumo/components/command-palette";
+import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
 import {
@@ -87,12 +89,50 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [newOrgSlugEdited, setNewOrgSlugEdited] = useState(false);
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const { data: session, isPending: isSessionPending } = useSession();
   const { data: orgs } = useListOrganizations();
   const { data: activeOrg } = useActiveOrganization();
   const { data: activeMember } = useActiveMember();
   const queryClient = useQueryClient();
 
+  async function handleCreateOrgSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newOrgName.trim() || !newOrgSlug.trim()) return;
+    setCreatingOrg(true);
+    setCreateError(null);
+    try {
+      const cleanSlug =
+        newOrgSlug
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") || "org";
+      const res = await authClient.organization.create({
+        name: newOrgName.trim(),
+        slug: cleanSlug,
+      });
+      if (res?.error) {
+        setCreateError(res.error.message || t("requestFailed"));
+        setCreatingOrg(false);
+        return;
+      }
+      setCreateOrgOpen(false);
+      setNewOrgName("");
+      setNewOrgSlug("");
+      setNewOrgSlugEdited(false);
+      void queryClient.invalidateQueries();
+      window.location.href = buildHref("/apps", { orgSlug: cleanSlug });
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : t("requestFailed"));
+      setCreatingOrg(false);
+    }
+  }
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -242,7 +282,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       label: t("createNewOrg"),
       category: "Account",
       icon: "buildings",
-      action: () => context.router.push("/organization/new"),
+      action: () => setCreateOrgOpen(true),
     });
 
     // Organization-scoped navigation items
@@ -522,13 +562,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
             {isPersonal ? (
               <Breadcrumbs size="sm">
                 <Breadcrumbs.Current>
-                  {context.viewPath === "/organization/new"
-                    ? t("createNewOrg")
-                    : context.viewPath === "/account"
-                      ? t("account")
-                      : context.viewPath === "/settings"
-                        ? t("settings")
-                        : t("organizations")}
+                  {context.viewPath === "/account"
+                    ? t("account")
+                    : context.viewPath === "/settings"
+                      ? t("settings")
+                      : t("organizations")}
                 </Breadcrumbs.Current>
               </Breadcrumbs>
             ) : (
@@ -606,10 +644,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                           );
                         })}
                         <DropdownMenu.Separator />
-                        <DropdownMenu.Item
-                          icon={Plus}
-                          onClick={() => context.router.push("/organization/new")}
-                        >
+                        <DropdownMenu.Item icon={Plus} onClick={() => setCreateOrgOpen(true)}>
                           {t("createNewOrg")}
                         </DropdownMenu.Item>
                         <DropdownMenu.Item
@@ -767,6 +802,66 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </span>
         </CommandPalette.Footer>
       </CommandPalette.Root>
+
+      {/* Create Organization Modal Dialog */}
+      <Dialog.Root open={createOrgOpen} onOpenChange={setCreateOrgOpen}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("createOrganization")}</Dialog.Title>
+          <Dialog.Description>{t("createOrgDescription")}</Dialog.Description>
+          {createError && (
+            <div className="rounded-lg border border-kumo-danger/20 bg-kumo-danger/10 p-3 text-xs text-kumo-danger font-medium mt-3">
+              {createError}
+            </div>
+          )}
+          <form onSubmit={handleCreateOrgSubmit} className="grid gap-4 py-4">
+            <Input
+              label={t("orgName")}
+              placeholder="e.g. Acme Corp"
+              value={newOrgName}
+              onChange={(e) => {
+                setNewOrgName(e.target.value);
+                if (!newOrgSlugEdited) {
+                  setNewOrgSlug(
+                    e.target.value
+                      .toLowerCase()
+                      .trim()
+                      .replace(/[^a-z0-9]+/g, "-")
+                      .replace(/^-|-$/g, "") || "org",
+                  );
+                }
+              }}
+              required
+            />
+            <Input
+              label={t("orgSlug")}
+              placeholder="e.g. acme-corp"
+              value={newOrgSlug}
+              onChange={(e) => {
+                setNewOrgSlugEdited(true);
+                setNewOrgSlug(
+                  e.target.value
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "") || "org",
+                );
+              }}
+              required
+            />
+            <div className="flex justify-end gap-2 pt-3 border-t border-kumo-line">
+              <Dialog.Close render={<Button type="button">{t("cancel")}</Button>} />
+              <Button
+                type="submit"
+                variant="primary"
+                loading={creatingOrg}
+                disabled={!newOrgName.trim() || !newOrgSlug.trim()}
+              >
+                {t("createOrganization")}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      </Dialog.Root>
     </Sidebar.Provider>
   );
 }

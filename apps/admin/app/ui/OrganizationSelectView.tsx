@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@cloudflare/kumo/components/button";
+import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { Input } from "@cloudflare/kumo/components/input";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Table } from "@cloudflare/kumo/components/table";
@@ -50,11 +51,13 @@ export function OrganizationSelectView() {
   >([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
 
-  // Inline creation state if user has no orgs
-  const [firstOrgName, setFirstOrgName] = useState("");
-  const [firstOrgSlug, setFirstOrgSlug] = useState("");
-  const [creatingFirstOrg, setCreatingFirstOrg] = useState(false);
-  const [firstOrgError, setFirstOrgError] = useState<string | null>(null);
+  // Create Organization Dialog state
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [newOrgSlugEdited, setNewOrgSlugEdited] = useState(false);
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!sessionPending && !session?.user) {
@@ -127,27 +130,31 @@ export function OrganizationSelectView() {
     }
   }
 
-  async function handleCreateFirstOrg(e: React.FormEvent) {
+  async function handleCreateOrgSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!firstOrgName.trim() || !firstOrgSlug.trim()) return;
-    setCreatingFirstOrg(true);
-    setFirstOrgError(null);
+    if (!newOrgName.trim() || !newOrgSlug.trim()) return;
+    setCreatingOrg(true);
+    setCreateError(null);
     try {
-      const cleanSlug = slugify(firstOrgSlug);
+      const cleanSlug = slugify(newOrgSlug);
       const res = await authClient.organization.create({
-        name: firstOrgName.trim(),
+        name: newOrgName.trim(),
         slug: cleanSlug,
       });
       if (res?.error) {
-        setFirstOrgError(res.error.message || t("requestFailed"));
-        setCreatingFirstOrg(false);
+        setCreateError(res.error.message || t("requestFailed"));
+        setCreatingOrg(false);
         return;
       }
+      setCreateOrgOpen(false);
+      setNewOrgName("");
+      setNewOrgSlug("");
+      setNewOrgSlugEdited(false);
       void queryClient.invalidateQueries();
       window.location.href = buildHref("/apps", { orgSlug: cleanSlug });
     } catch (err) {
-      setFirstOrgError(err instanceof Error ? err.message : t("requestFailed"));
-      setCreatingFirstOrg(false);
+      setCreateError(err instanceof Error ? err.message : t("requestFailed"));
+      setCreatingOrg(false);
     }
   }
 
@@ -165,208 +172,231 @@ export function OrganizationSelectView() {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto py-2 sm:py-4 flex min-h-[calc(100vh-8rem)] flex-col justify-between gap-10">
-      <div className="grid gap-6">
-        {/* User email & Title section (Cloudflare style) */}
-        <div>
-          {session?.user?.email && (
-            <div className="text-xs font-medium text-kumo-subtle">{session.user.email}</div>
-          )}
-          <Text variant="heading" as="h1" size="lg">
-            {t("organizations")}
-          </Text>
-          <p className="mt-1.5 text-sm text-kumo-subtle">
-            {orgList.length === 0 ? t("createFirstOrgDescription") : t("selectOrgDescription")}
-          </p>
-        </div>
-
-        {/* Pending Invitations Banner */}
-        {userInvitations.length > 0 && (
-          <div className="rounded-xl border border-kumo-line bg-kumo-base p-4 grid gap-3">
-            <div className="font-semibold text-sm">{t("userInvitations")}</div>
-            {userInvitations.map((inv) => (
-              <div
-                key={inv.id}
-                className="flex items-center justify-between gap-4 rounded-lg border border-kumo-line bg-kumo-canvas p-3 text-sm"
-              >
-                <div>
-                  <span className="font-medium">{inv.organizationName || inv.organizationId}</span>
-                  <span className="ml-2 text-kumo-subtle">({inv.role})</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="xs"
-                    variant="primary"
-                    onClick={() => void handleAcceptInvite(inv.id)}
-                  >
-                    {t("acceptInvitation")}
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="secondary"
-                    onClick={() => void handleRejectInvite(inv.id)}
-                  >
-                    {t("cancelInvitation")}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Search & Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="relative flex-1 min-w-[260px] max-w-xl">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-kumo-subtle">
-              <MagnifyingGlass size={16} />
-            </span>
-            <Input
-              aria-label={t("searchOrganizations")}
-              placeholder={t("searchOrganizations")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="!pl-9 w-full"
-            />
-          </div>
-          <Button variant="primary" icon={Plus} onClick={() => router.push("/organization/new")}>
-            {t("createNewOrg")}
-          </Button>
-        </div>
-
-        {/* Organizations Table (Cloudflare style) */}
-        {orgList.length === 0 ? (
-          <LayerCard className="p-6 sm:p-8 rounded-xl ring ring-kumo-line grid gap-4 max-w-lg">
-            <div>
-              <Text variant="heading" as="h2">
-                {t("noOrgsYet")}
-              </Text>
-              <p className="mt-1 text-xs text-kumo-subtle">{t("createFirstOrgDescription")}</p>
-            </div>
-            {firstOrgError && (
-              <div className="rounded-lg border border-kumo-danger/20 bg-kumo-danger/10 p-3 text-xs text-kumo-danger font-medium">
-                {firstOrgError}
-              </div>
+    <>
+      <div className="w-full max-w-5xl mx-auto py-2 sm:py-4 flex min-h-[calc(100vh-8rem)] flex-col justify-between gap-10">
+        <div className="grid gap-6">
+          {/* User email & Title section (Cloudflare style) */}
+          <div>
+            {session?.user?.email && (
+              <div className="text-xs font-medium text-kumo-subtle">{session.user.email}</div>
             )}
-            <form onSubmit={handleCreateFirstOrg} className="grid gap-4">
+            <Text variant="heading" as="h1" size="lg">
+              {t("organizations")}
+            </Text>
+            <p className="mt-1.5 text-sm text-kumo-subtle">
+              {orgList.length === 0 ? t("createFirstOrgDescription") : t("selectOrgDescription")}
+            </p>
+          </div>
+
+          {/* Pending Invitations Banner */}
+          {userInvitations.length > 0 && (
+            <div className="rounded-xl border border-kumo-line bg-kumo-base p-4 grid gap-3">
+              <div className="font-semibold text-sm">{t("userInvitations")}</div>
+              {userInvitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-kumo-line bg-kumo-canvas p-3 text-sm"
+                >
+                  <div>
+                    <span className="font-medium">
+                      {inv.organizationName || inv.organizationId}
+                    </span>
+                    <span className="ml-2 text-kumo-subtle">({inv.role})</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="xs"
+                      variant="primary"
+                      onClick={() => void handleAcceptInvite(inv.id)}
+                    >
+                      {t("acceptInvitation")}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => void handleRejectInvite(inv.id)}
+                    >
+                      {t("cancelInvitation")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Search & Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="relative flex-1 min-w-[260px] max-w-xl">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-kumo-subtle">
+                <MagnifyingGlass size={16} />
+              </span>
               <Input
-                label={t("orgName")}
-                placeholder="e.g. Acme Corp"
-                value={firstOrgName}
-                onChange={(e) => {
-                  setFirstOrgName(e.target.value);
-                  if (!firstOrgSlug) setFirstOrgSlug(slugify(e.target.value));
-                }}
-                required
+                aria-label={t("searchOrganizations")}
+                placeholder={t("searchOrganizations")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="!pl-9 w-full"
               />
-              <Input
-                label={t("orgSlug")}
-                placeholder="e.g. acme-corp"
-                value={firstOrgSlug}
-                onChange={(e) => setFirstOrgSlug(slugify(e.target.value))}
-                required
-              />
+            </div>
+            <Button variant="primary" icon={Plus} onClick={() => setCreateOrgOpen(true)}>
+              {t("createNewOrg")}
+            </Button>
+          </div>
+
+          {/* Organizations Table (Cloudflare style) */}
+          {orgList.length === 0 ? (
+            <LayerCard className="p-6 sm:p-8 rounded-xl ring ring-kumo-line grid gap-4 max-w-lg">
+              <div>
+                <Text variant="heading" as="h2">
+                  {t("noOrgsYet")}
+                </Text>
+                <p className="mt-1 text-xs text-kumo-subtle">{t("createFirstOrgDescription")}</p>
+              </div>
+              <Button
+                variant="primary"
+                icon={Plus}
+                onClick={() => setCreateOrgOpen(true)}
+                className="w-full"
+              >
+                {t("createOrganization")}
+              </Button>
+            </LayerCard>
+          ) : (
+            <LayerCard className="w-full overflow-x-auto p-0 shadow-sm ring ring-kumo-line rounded-xl">
+              <Table layout="fixed">
+                <colgroup>
+                  <col />
+                  <col style={{ width: "240px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "64px" }} />
+                </colgroup>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head className="font-medium text-xs text-kumo-subtle">
+                      {t("organization")} ↑
+                    </Table.Head>
+                    <Table.Head className="font-medium text-xs text-kumo-subtle">
+                      {t("orgSlug")}
+                    </Table.Head>
+                    <Table.Head className="font-medium text-xs text-kumo-subtle">
+                      {t("status")}
+                    </Table.Head>
+                    <Table.Head sticky="right" className="text-right">
+                      <span className="sr-only">{t("actions")}</span>
+                    </Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {filteredOrgs.length === 0 ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={4} className="py-8 text-center text-sm text-kumo-subtle">
+                        {t("noResults")}
+                      </Table.Cell>
+                    </Table.Row>
+                  ) : (
+                    filteredOrgs.map((org) => {
+                      const isActive = org.id === activeOrg?.id;
+                      return (
+                        <Table.Row
+                          key={org.id}
+                          className="hover:bg-kumo-surface/50 transition-colors"
+                        >
+                          <Table.Cell>
+                            <button
+                              type="button"
+                              onClick={() => void handleEnter(org)}
+                              className="font-medium text-kumo-link hover:underline text-left cursor-pointer"
+                            >
+                              {org.name}
+                            </button>
+                          </Table.Cell>
+                          <Table.Cell className="font-mono text-xs text-kumo-subtle">
+                            {org.slug || "—"}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {isActive ? (
+                              <Badge variant="green">{t("activeOrg")}</Badge>
+                            ) : (
+                              <span className="text-xs text-kumo-subtle">—</span>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell sticky="right" className="text-right">
+                            <button
+                              type="button"
+                              onClick={() => void handleEnter(org)}
+                              title={t("enterOrg")}
+                              aria-label={t("enterOrg")}
+                              className="inline-flex size-7 items-center justify-center rounded-md text-kumo-subtle hover:bg-kumo-fill hover:text-kumo-default transition-colors cursor-pointer"
+                            >
+                              <DotsThree size={18} weight="bold" />
+                            </button>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
+                  )}
+                </Table.Body>
+              </Table>
+            </LayerCard>
+          )}
+        </div>
+
+        {/* Cloudflare-style Page Footer */}
+        <footer className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-kumo-line pt-6 text-xs text-kumo-subtle">
+          <span>Support</span>
+          <span>System Status</span>
+          <span>Careers</span>
+          <span>Terms of Use</span>
+          <span>Report Security Issues</span>
+          <span>Privacy Policy</span>
+          <span>© 2026 OpenScene, Inc.</span>
+        </footer>
+      </div>
+      {/* Create Organization Modal Dialog */}
+      <Dialog.Root open={createOrgOpen} onOpenChange={setCreateOrgOpen}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("createNewOrg")}</Dialog.Title>
+          <Dialog.Description>{t("createOrgDescription")}</Dialog.Description>
+          {createError && (
+            <div className="rounded-lg border border-kumo-danger/20 bg-kumo-danger/10 p-3 text-xs text-kumo-danger font-medium mt-3">
+              {createError}
+            </div>
+          )}
+          <form onSubmit={handleCreateOrgSubmit} className="grid gap-4 py-4">
+            <Input
+              label={t("orgName")}
+              placeholder="e.g. Acme Corp"
+              value={newOrgName}
+              onChange={(e) => {
+                setNewOrgName(e.target.value);
+                if (!newOrgSlugEdited) setNewOrgSlug(slugify(e.target.value));
+              }}
+              required
+            />
+            <Input
+              label={t("orgSlug")}
+              placeholder="e.g. acme-corp"
+              value={newOrgSlug}
+              onChange={(e) => {
+                setNewOrgSlugEdited(true);
+                setNewOrgSlug(slugify(e.target.value));
+              }}
+              required
+            />
+            <div className="flex justify-end gap-2 pt-3 border-t border-kumo-line">
+              <Dialog.Close render={<Button type="button">{t("cancel")}</Button>} />
               <Button
                 type="submit"
                 variant="primary"
-                loading={creatingFirstOrg}
-                disabled={!firstOrgName.trim() || !firstOrgSlug.trim()}
-                className="w-full"
+                loading={creatingOrg}
+                disabled={!newOrgName.trim() || !newOrgSlug.trim()}
               >
-                <Plus size={16} />
                 {t("createOrganization")}
               </Button>
-            </form>
-          </LayerCard>
-        ) : (
-          <LayerCard className="w-full overflow-x-auto p-0 shadow-sm ring ring-kumo-line rounded-xl">
-            <Table layout="fixed">
-              <colgroup>
-                <col />
-                <col style={{ width: "240px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "64px" }} />
-              </colgroup>
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head className="font-medium text-xs text-kumo-subtle">
-                    {t("organization")} ↑
-                  </Table.Head>
-                  <Table.Head className="font-medium text-xs text-kumo-subtle">
-                    {t("orgSlug")}
-                  </Table.Head>
-                  <Table.Head className="font-medium text-xs text-kumo-subtle">
-                    {t("status")}
-                  </Table.Head>
-                  <Table.Head sticky="right" className="text-right">
-                    <span className="sr-only">{t("actions")}</span>
-                  </Table.Head>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {filteredOrgs.length === 0 ? (
-                  <Table.Row>
-                    <Table.Cell colSpan={4} className="py-8 text-center text-sm text-kumo-subtle">
-                      {t("noResults")}
-                    </Table.Cell>
-                  </Table.Row>
-                ) : (
-                  filteredOrgs.map((org) => {
-                    const isActive = org.id === activeOrg?.id;
-                    return (
-                      <Table.Row
-                        key={org.id}
-                        className="hover:bg-kumo-surface/50 transition-colors"
-                      >
-                        <Table.Cell>
-                          <button
-                            type="button"
-                            onClick={() => void handleEnter(org)}
-                            className="font-medium text-kumo-link hover:underline text-left cursor-pointer"
-                          >
-                            {org.name}
-                          </button>
-                        </Table.Cell>
-                        <Table.Cell className="font-mono text-xs text-kumo-subtle">
-                          {org.slug || "—"}
-                        </Table.Cell>
-                        <Table.Cell>
-                          {isActive ? (
-                            <Badge variant="green">{t("activeOrg")}</Badge>
-                          ) : (
-                            <span className="text-xs text-kumo-subtle">—</span>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell sticky="right" className="text-right">
-                          <button
-                            type="button"
-                            onClick={() => void handleEnter(org)}
-                            title={t("enterOrg")}
-                            aria-label={t("enterOrg")}
-                            className="inline-flex size-7 items-center justify-center rounded-md text-kumo-subtle hover:bg-kumo-fill hover:text-kumo-default transition-colors cursor-pointer"
-                          >
-                            <DotsThree size={18} weight="bold" />
-                          </button>
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })
-                )}
-              </Table.Body>
-            </Table>
-          </LayerCard>
-        )}
-      </div>
-
-      {/* Cloudflare-style Page Footer */}
-      <footer className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-kumo-line pt-6 text-xs text-kumo-subtle">
-        <span>Support</span>
-        <span>System Status</span>
-        <span>Careers</span>
-        <span>Terms of Use</span>
-        <span>Report Security Issues</span>
-        <span>Privacy Policy</span>
-        <span>© 2026 OpenScene, Inc.</span>
-      </footer>
-    </div>
+            </div>
+          </form>
+        </Dialog>
+      </Dialog.Root>
+    </>
   );
 }
