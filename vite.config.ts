@@ -13,4 +13,7 @@ export default defineConfig({
   run: {
     cache: true,
   },
+  test: {
+    projects: ["apps/*", "packages/*", "packages/sdk/*"],
+  },
 });

@@ -1,10 +1,10 @@
 import { apiKey } from "@better-auth/api-key";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { sql } from "drizzle-orm";
+import { organization } from "better-auth/plugins";
 import { createDatabaseRuntime } from "../server/db/client.ts";
 import * as schema from "../server/db/schema/index.ts";
-
+import { ac, defaultRoles } from "./permissions.ts";
 const socialProviders: Record<
   string,
   { clientId: string; clientSecret: string; [key: string]: unknown }
@@ -41,23 +41,6 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
     },
-    databaseHooks: {
-      user: {
-        create: {
-          before: async (user) => {
-            // Allow only the very first admin user creation (initial setup)
-            const userCount = await db
-              .select({ count: sql<number>`count(*)` })
-              .from(schema.user)
-              .get();
-            if ((userCount?.count ?? 0) > 0) {
-              throw new Error("Public registration is disabled. OpenScene is already initialized.");
-            }
-            return { data: user };
-          },
-        },
-      },
-    },
     plugins: [
       apiKey({
         requireName: true,
@@ -66,6 +49,13 @@ function createAuth() {
         permissions: {
           defaultPermissions: { manifest: ["write"] },
         },
+      }),
+      organization({
+        allowUserToCreateOrganization: true,
+        ac,
+        roles: defaultRoles,
+        dynamicAccessControl: { enabled: true },
+        creatorRole: "owner",
       }),
     ],
     socialProviders: Object.keys(socialProviders).length > 0 ? socialProviders : undefined,

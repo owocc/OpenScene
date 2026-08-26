@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { RendererPortMessageSchema,
-RendererWindowMessageSchema,
-StudioPortMessageSchema,
-createBridgeEnvelope,
-withEditorConnection, } from "@openscene-ai/core";
+import {
+  RendererPortMessageSchema,
+  RendererWindowMessageSchema,
+  StudioPortMessageSchema,
+  createBridgeEnvelope,
+  withEditorConnection,
+} from "@openscene-ai/core";
 import type { AppType } from "@openscene-ai/core";
 import type { AppManifest, ElementRect } from "@openscene-ai/core";
 import type { CanvasRendererProps } from "../types";

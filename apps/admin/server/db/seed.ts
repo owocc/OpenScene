@@ -14,6 +14,7 @@ export async function seedDemoApp(db: AppDatabase): Promise<void> {
         .insert(apps)
         .values({
           id: appId,
+          organizationId: "org_default",
           key: "demo",
           name: "OpenScene Demo",
           description: "Development seed App",

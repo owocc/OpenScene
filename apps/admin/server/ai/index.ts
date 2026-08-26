@@ -11,7 +11,7 @@ import {
   manifestRevisions,
   systemPrompts,
 } from "../db/schema";
-import { nowIso } from "../db/ids";
+import { newId, nowIso } from "../db/ids";
 import { getConfig } from "../config/env";
 import { forbidden, validation } from "../errors";
 import { encryptSecret, decryptSecret } from "./encryption";
@@ -49,20 +49,30 @@ function recordToPublic(row: typeof aiConfig.$inferSelect) {
   });
 }
 
-/** Read the global AI configuration. API key is never exposed. */
-export async function getAiConfig(db: AppDatabase) {
-  const row = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
+/** Read the organization AI configuration. API key is never exposed. */
+export async function getAiConfig(db: AppDatabase, organizationId?: string) {
+  const row = organizationId
+    ? await db.select().from(aiConfig).where(eq(aiConfig.organizationId, organizationId)).get()
+    : await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
   return AiConfigStatusSchema.parse({
     configured: Boolean(row),
     config: row ? recordToPublic(row) : undefined,
   });
 }
 
-/** Create or replace the single global AI configuration. The API key is encrypted at rest. */
-export async function upsertAiConfig(db: AppDatabase, input: AiConfigInput) {
+/** Create or replace the organization AI configuration. The API key is encrypted at rest. */
+export async function upsertAiConfig(
+  db: AppDatabase,
+  organizationId: string,
+  input: AiConfigInput,
+) {
   const timestamp = nowIso();
   const encryptionKey = getConfig().ai.encryptionKey;
-  const existing = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
+  const existing = await db
+    .select()
+    .from(aiConfig)
+    .where(eq(aiConfig.organizationId, organizationId))
+    .get();
   const apiKeyEnc = input.apiKey ? encryptSecret(input.apiKey, encryptionKey) : existing?.apiKeyEnc;
   if (!apiKeyEnc) {
     throw validation("An API key is required", [
@@ -70,8 +80,10 @@ export async function upsertAiConfig(db: AppDatabase, input: AiConfigInput) {
     ]);
   }
   const baseUrl = input.baseUrl ? input.baseUrl : (existing?.baseUrl ?? null);
+  const id = existing?.id ?? newId("ai_cfg");
   const values = {
-    id: GLOBAL_ID,
+    id,
+    organizationId,
     provider: input.provider,
     model: input.model,
     baseUrl,
@@ -80,30 +92,27 @@ export async function upsertAiConfig(db: AppDatabase, input: AiConfigInput) {
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
-  await db
-    .insert(aiConfig)
-    .values(values)
-    .onConflictDoUpdate({
-      target: aiConfig.id,
-      set: {
-        provider: values.provider,
-        model: values.model,
-        baseUrl: values.baseUrl,
-        apiKeyEnc: values.apiKeyEnc,
-        enabled: values.enabled,
-        updatedAt: values.updatedAt,
-      },
-    })
-    .run();
-  const saved = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
+  if (existing) {
+    await db.update(aiConfig).set(values).where(eq(aiConfig.id, existing.id)).run();
+  } else {
+    await db.insert(aiConfig).values(values).run();
+  }
+  const saved = await db.select().from(aiConfig).where(eq(aiConfig.id, id)).get();
   return recordToPublic(saved!);
 }
 
 const EPOCH_ISO = "1970-01-01T00:00:00.000Z";
 
 /** Read the global deployment system prompt. Returns default prompt when unconfigured. */
-export async function getSystemPrompt(db: AppDatabase) {
-  const row = await db.select().from(systemPrompts).where(eq(systemPrompts.id, GLOBAL_ID)).get();
+/** Read the organization system prompt. Returns default prompt when unconfigured. */
+export async function getSystemPrompt(db: AppDatabase, organizationId?: string) {
+  const row = organizationId
+    ? await db
+        .select()
+        .from(systemPrompts)
+        .where(eq(systemPrompts.organizationId, organizationId))
+        .get()
+    : await db.select().from(systemPrompts).where(eq(systemPrompts.id, GLOBAL_ID)).get();
   if (!row) {
     return SystemPromptSchema.parse({
       prompt: DEFAULT_GLOBAL_SYSTEM_PROMPT,
@@ -122,44 +131,48 @@ export async function getSystemPrompt(db: AppDatabase) {
   });
 }
 
-/** Create or update the global deployment system prompt. */
+/** Create or update the organization system prompt. */
 export async function upsertSystemPrompt(
   db: AppDatabase,
+  organizationId: string,
   input: z.infer<typeof SystemPromptUpdateSchema>,
 ) {
   const timestamp = nowIso();
   const existing = await db
     .select()
     .from(systemPrompts)
-    .where(eq(systemPrompts.id, GLOBAL_ID))
+    .where(eq(systemPrompts.organizationId, organizationId))
     .get();
   const prompt = input.prompt ?? existing?.prompt ?? DEFAULT_GLOBAL_SYSTEM_PROMPT;
   const enabled = input.enabled ?? existing?.enabled ?? true;
+  const id = existing?.id ?? newId("sys_prompt");
   const values = {
-    id: GLOBAL_ID,
+    id,
+    organizationId,
     prompt,
     enabled,
     createdAt: existing?.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
-  await db
-    .insert(systemPrompts)
-    .values(values)
-    .onConflictDoUpdate({
-      target: systemPrompts.id,
-      set: {
-        prompt: values.prompt,
-        enabled: values.enabled,
-        updatedAt: values.updatedAt,
-      },
-    })
-    .run();
-  return getSystemPrompt(db);
+  if (existing) {
+    await db.update(systemPrompts).set(values).where(eq(systemPrompts.id, existing.id)).run();
+  } else {
+    await db.insert(systemPrompts).values(values).run();
+  }
+  return getSystemPrompt(db, organizationId);
 }
 
 /** Validate provider credentials by performing a minimal completion. */
-export async function testAiConfig(db: AppDatabase, input: Partial<AiConfigInput>) {
-  const existing = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
+export async function testAiConfig(
+  db: AppDatabase,
+  organizationId: string,
+  input: Partial<AiConfigInput>,
+) {
+  const existing = await db
+    .select()
+    .from(aiConfig)
+    .where(eq(aiConfig.organizationId, organizationId))
+    .get();
   const provider = input.provider ?? existing?.provider;
   const model = input.model ?? existing?.model;
   const baseUrl = input.baseUrl ?? existing?.baseUrl ?? undefined;
@@ -204,8 +217,10 @@ function buildModel(
   return provider === "openai-responses" ? openai.responses(model) : openai.chat(model);
 }
 
-async function resolveConfig(db: AppDatabase): Promise<ResolvedConfig> {
-  const row = await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
+async function resolveConfig(db: AppDatabase, organizationId?: string): Promise<ResolvedConfig> {
+  const row = organizationId
+    ? await db.select().from(aiConfig).where(eq(aiConfig.organizationId, organizationId)).get()
+    : await db.select().from(aiConfig).where(eq(aiConfig.id, GLOBAL_ID)).get();
   if (!row || !row.enabled) throw forbidden("AI is not configured or is disabled");
   const apiKey = decryptSecret(row.apiKeyEnc, getConfig().ai.encryptionKey);
   return {
@@ -307,12 +322,20 @@ export async function buildAppSystemPrompt(
   const opts = typeof options === "string" ? { requestSystem: options } : (options ?? {});
   const parts: string[] = [];
 
-  // 1. Global Deployment System Prompt
-  const globalPrompt = await getSystemPrompt(db);
+  // 1. Organization Deployment System Prompt
+  let organizationId: string | undefined;
+  if (appId) {
+    const app = await db
+      .select({ organizationId: apps.organizationId })
+      .from(apps)
+      .where(eq(apps.id, appId))
+      .get();
+    organizationId = app?.organizationId ?? undefined;
+  }
+  const globalPrompt = await getSystemPrompt(db, organizationId);
   if (globalPrompt.enabled && globalPrompt.prompt.trim()) {
     parts.push(globalPrompt.prompt.trim());
   }
-
   // 2. Resolve App-specific prompt profile
   let row: typeof appPrompts.$inferSelect | undefined;
   if (opts.promptId) {
@@ -421,14 +444,22 @@ export async function previewAppSystemPrompt(
 
   const parts: string[] = [];
 
-  // 1. Global Deployment System Prompt
-  const globalPrompt = await getSystemPrompt(db);
+  // 1. Organization Deployment System Prompt
+  let organizationId: string | undefined;
+  if (appId) {
+    const app = await db
+      .select({ organizationId: apps.organizationId })
+      .from(apps)
+      .where(eq(apps.id, appId))
+      .get();
+    organizationId = app?.organizationId ?? undefined;
+  }
+  const globalPrompt = await getSystemPrompt(db, organizationId);
   if (globalPrompt.enabled && globalPrompt.prompt.trim()) {
     const text = globalPrompt.prompt.trim();
     parts.push(text);
     breakdown.globalPrompt = text;
   }
-
   // 2. Resolve App-specific prompt profile
   let row: typeof appPrompts.$inferSelect | undefined;
   if (opts.promptId) {
@@ -548,7 +579,16 @@ export async function previewAppSystemPrompt(
  * responsible for authenticating the request (app key) before invoking this.
  */
 export async function chatWithAi(db: AppDatabase, input: AiChatInput): Promise<Response> {
-  const config = await resolveConfig(db);
+  let organizationId: string | undefined;
+  if (input.appId) {
+    const app = await db
+      .select({ organizationId: apps.organizationId })
+      .from(apps)
+      .where(eq(apps.id, input.appId))
+      .get();
+    organizationId = app?.organizationId ?? undefined;
+  }
+  const config = await resolveConfig(db, organizationId);
   const model = buildModel(
     config.provider,
     config.apiKey,

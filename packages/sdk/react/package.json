@@ -36,9 +36,9 @@
   "dependencies": {
     "@json-render/core": "^0.20.0",
     "@json-render/react": "^0.20.0",
+    "@openscene-ai/core": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
-    "@openscene-ai/schema": "workspace:*",
-    "@openscene-ai/core": "workspace:*"
+    "@openscene-ai/schema": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

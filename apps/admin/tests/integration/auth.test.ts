@@ -45,6 +45,26 @@ describe("Better Auth Integration & Middleware Protection", () => {
     expect(data.user.email).toBe(testEmail);
     expect(data.user.name).toBe("Test Admin");
   });
+  test("allows second user sign up (open registration)", async () => {
+    const secondEmail = `user2-${Date.now()}@openscene.dev`;
+    const req = new NextRequest("http://localhost:3000/api/auth/sign-up/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Second User",
+        email: secondEmail,
+        password: testPassword,
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.user).toBeDefined();
+    expect(data.user.email).toBe(secondEmail);
+  });
 
   test("sign in with email and password via auth API", async () => {
     const req = new NextRequest("http://localhost:3000/api/auth/sign-in/email", {
@@ -81,6 +101,35 @@ describe("Better Auth Integration & Middleware Protection", () => {
     const data = await res.json();
     expect(data?.user?.email).toBe(testEmail);
   });
+  test("create organization and list organizations via auth API", async () => {
+    const createReq = new NextRequest("http://localhost:3000/api/auth/organization/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: sessionCookie,
+      },
+      body: JSON.stringify({
+        name: "Test Workspace",
+        slug: `test-org-${Date.now()}`,
+      }),
+    });
+    const createRes = await POST(createReq);
+    expect(createRes.status).toBe(200);
+    const orgData = await createRes.json();
+    expect(orgData.name).toBe("Test Workspace");
+
+    const listReq = new NextRequest("http://localhost:3000/api/auth/organization/list", {
+      method: "GET",
+      headers: {
+        cookie: sessionCookie,
+      },
+    });
+    const listRes = await GET(listReq);
+    expect(listRes.status).toBe(200);
+    const listData = await listRes.json();
+    expect(Array.isArray(listData)).toBe(true);
+    expect(listData.some((o: { name?: string }) => o.name === "Test Workspace")).toBe(true);
+  });
 
   test("sign out via auth API", async () => {
     const req = new NextRequest("http://localhost:3000/api/auth/sign-out", {
@@ -95,10 +144,12 @@ describe("Better Auth Integration & Middleware Protection", () => {
   });
 
   test("middleware redirects unauthenticated users to /login", () => {
+    process.env.OPENSCENE_AUTH_MODE = "token";
     const req = new NextRequest("http://localhost:3000/apps");
     const res = middleware(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("http://localhost:3000/login?next=%2Fapps");
+    process.env.OPENSCENE_AUTH_MODE = "disabled";
   });
 
   test("middleware allows /login page", () => {

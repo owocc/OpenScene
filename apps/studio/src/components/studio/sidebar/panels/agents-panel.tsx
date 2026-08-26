@@ -20,10 +20,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { applyAgentUiActionsToDocument,
-splitContentAndUiActions,
-type AgentUiAction,
-type SceneDocument, } from "@openscene-ai/core";
+import {
+  applyAgentUiActionsToDocument,
+  splitContentAndUiActions,
+  type AgentUiAction,
+  type SceneDocument,
+} from "@openscene-ai/core";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";

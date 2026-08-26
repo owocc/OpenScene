@@ -35,6 +35,7 @@ export const ResourceStatusSchema = z.enum(["active", "disabled", "draft", "publ
 
 export const AppSchema = z.object({
   id: IdSchema,
+  organizationId: z.string().optional(),
   key: KeySchema,
   name: z.string(),
   description: z.string(),
@@ -47,6 +48,19 @@ export const AppSchema = z.object({
   }),
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
+});
+
+export const OrganizationMemberSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string().nullable().optional(),
+  email: z.string(),
+  role: z.string(),
+  createdAt: z.union([z.number(), z.string(), z.date()]),
+});
+
+export const OrganizationMembersResponseSchema = z.object({
+  items: z.array(OrganizationMemberSchema),
 });
 
 export const PreviewProfileSchema = z.object({

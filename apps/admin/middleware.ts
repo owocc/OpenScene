@@ -15,6 +15,7 @@ export function middleware(request: NextRequest) {
   // Allow auth-related endpoints and login page
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/invite") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/v1/auth") ||
     pathname.startsWith("/api/v1/health")
@@ -24,6 +25,9 @@ export function middleware(request: NextRequest) {
 
   // Allow API routes to be handled by their respective route handlers (which return JSON errors/401)
   if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+  if (process.env.OPENSCENE_AUTH_MODE === "disabled") {
     return NextResponse.next();
   }
 

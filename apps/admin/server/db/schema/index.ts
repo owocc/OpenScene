@@ -15,6 +15,10 @@ import {
   account,
   verification,
   apikey,
+  organization,
+  member,
+  invitation,
+  organizationRole,
   userRelations,
   sessionRelations,
   accountRelations,
@@ -29,6 +33,7 @@ export const apps = sqliteTable(
   "apps",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id"),
     key: text("key").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
@@ -39,7 +44,10 @@ export const apps = sqliteTable(
     activeManifestRevisionId: text("active_manifest_revision_id"),
     ...timestamps,
   },
-  (table) => [uniqueIndex("apps_key_unique").on(table.key)],
+  (table) => [
+    uniqueIndex("apps_key_unique").on(table.key),
+    index("apps_organization_id_idx").on(table.organizationId),
+  ],
 );
 
 export const previewProfiles = sqliteTable(
@@ -339,6 +347,7 @@ export const aiConfig = sqliteTable(
   "ai_config",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id"),
     provider: text("provider", { enum: ["openai", "openai-responses", "anthropic"] }).notNull(),
     model: text("model").notNull(),
     baseUrl: text("base_url"),
@@ -346,15 +355,23 @@ export const aiConfig = sqliteTable(
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
     ...timestamps,
   },
-  (table) => [index("ai_config_provider_index").on(table.provider)],
+  (table) => [
+    index("ai_config_provider_index").on(table.provider),
+    uniqueIndex("ai_config_organization_id_unique").on(table.organizationId),
+  ],
 );
 
-export const systemPrompts = sqliteTable("system_prompts", {
-  id: text("id").primaryKey(),
-  prompt: text("prompt").notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  ...timestamps,
-});
+export const systemPrompts = sqliteTable(
+  "system_prompts",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id"),
+    prompt: text("prompt").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("system_prompts_organization_id_unique").on(table.organizationId)],
+);
 
 export const aiChatSessions = sqliteTable(
   "ai_chat_sessions",
@@ -424,6 +441,10 @@ export const schema = {
   account,
   verification,
   apikey,
+  organization,
+  member,
+  invitation,
+  organizationRole,
   userRelations,
   sessionRelations,
   accountRelations,
@@ -465,3 +486,8 @@ export type SystemPromptRow = typeof systemPrompts.$inferSelect;
 export type AiChatSessionRow = typeof aiChatSessions.$inferSelect;
 export type StorageObjectRow = typeof storageObjects.$inferSelect;
 export type AppStorageConfigRow = typeof appStorageConfigs.$inferSelect;
+
+export type OrganizationRow = typeof organization.$inferSelect;
+export type MemberRow = typeof member.$inferSelect;
+export type InvitationRow = typeof invitation.$inferSelect;
+export type OrganizationRoleRow = typeof organizationRole.$inferSelect;

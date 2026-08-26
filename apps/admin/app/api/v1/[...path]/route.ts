@@ -1,10 +1,12 @@
 import type { NextRequest } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { studioSessions, user } from "../../../../server/db/schema";
+import { member, studioSessions, user } from "../../../../server/db/schema";
 import {
   assertAppContext,
+  assertAppInOrganization,
   assertManagementCsrf,
+  assertPermission,
   authenticate,
   clearUiSessionCookie,
   createUiSessionCookie,
@@ -309,6 +311,27 @@ async function handleRequest(
       }
       throw notFound();
     }
+    if (path.length === 2 && path[0] === "organization" && path[1] === "members") {
+      if (method === "GET") {
+        const authContext = await authenticate(request, db, "management");
+        assertPermission(authContext, "member", "read");
+        const orgId = authContext.organizationId!;
+        const items = await db
+          .select({
+            id: member.id,
+            userId: member.userId,
+            name: user.name,
+            email: user.email,
+            role: member.role,
+            createdAt: member.createdAt,
+          })
+          .from(member)
+          .innerJoin(user, eq(member.userId, user.id))
+          .where(eq(member.organizationId, orgId));
+        return json({ items }, 200, { "cache-control": "no-store" });
+      }
+      throw notFound();
+    }
 
     if (path[0] === "ai") return await aiRoutes(request, db, method, path);
 
@@ -323,13 +346,35 @@ async function handleRequest(
         : path[0] === "apps" && path[2] === "manifest" && path[3] === "push"
           ? "publish-key"
           : "management";
-    await authenticate(request, db, requirement, appId);
-    if (requirement === "management") assertManagementCsrf(request, method);
+    const authContext = await authenticate(request, db, requirement, appId);
+    if (requirement === "management") {
+      assertManagementCsrf(request, method);
+      const orgId = authContext.organizationId!;
+      if (path[0] === "apps" && appId) {
+        await assertAppInOrganization(db, appId, orgId);
+      }
+      if (path[0] === "apps") {
+        if (path.length === 1) {
+          if (method === "GET") assertPermission(authContext, "app", "read");
+          if (method === "POST") assertPermission(authContext, "app", "create");
+        } else if (path.length === 2) {
+          if (method === "GET") assertPermission(authContext, "app", "read");
+          if (method === "PATCH") assertPermission(authContext, "app", "update");
+          if (method === "DELETE") assertPermission(authContext, "app", "delete");
+        } else {
+          if (method === "GET") {
+            assertPermission(authContext, "app", "read");
+          } else {
+            assertPermission(authContext, "app", "update");
+          }
+        }
+      }
+    }
     if (path[0] !== "apps") throw notFound();
     if (path.length === 1 && method === "GET")
-      return json(await listApps(db, request.nextUrl.searchParams));
+      return json(await listApps(db, request.nextUrl.searchParams, authContext.organizationId));
     if (path.length === 1 && method === "POST")
-      return json(await createApp(db, await body(request)), 201);
+      return json(await createApp(db, await body(request), authContext.organizationId), 201);
     if (path.length === 2) return await resourceCrud(request, db, method, "app", path[1]);
 
     if (path[2] === "preview-profiles") return await previewRoutes(request, db, method, path);
@@ -405,36 +450,41 @@ async function aiRoutes(
   method: Method,
   path: string[],
 ): Promise<Response> {
-  // Global, management-protected configuration endpoints.
+  // Organization, management-protected configuration endpoints.
   if (path[1] === "config") {
     if (method === "GET") {
-      await authenticate(request, db, "management");
-      return json(await getAiConfig(db));
+      const authContext = await authenticate(request, db, "management");
+      assertPermission(authContext, "ai", "manage");
+      return json(await getAiConfig(db, authContext.organizationId!));
     }
     if (method === "PATCH") {
-      await authenticate(request, db, "management");
+      const authContext = await authenticate(request, db, "management");
+      assertPermission(authContext, "ai", "manage");
       assertManagementCsrf(request, method);
       const input = await parseBody(request, AiConfigUpdateSchema);
-      return json(await upsertAiConfig(db, input));
+      return json(await upsertAiConfig(db, authContext.organizationId!, input));
     }
     if (path[2] === "test" && method === "POST") {
-      await authenticate(request, db, "management");
+      const authContext = await authenticate(request, db, "management");
+      assertPermission(authContext, "ai", "manage");
       assertManagementCsrf(request, method);
       const input = await parseBody(request, AiConfigUpdateSchema.partial());
-      return json(await testAiConfig(db, input));
+      return json(await testAiConfig(db, authContext.organizationId!, input));
     }
     throw notFound();
   }
   if (path[1] === "system-prompt") {
     if (method === "GET") {
-      await authenticate(request, db, "management");
-      return json(await getSystemPrompt(db));
+      const authContext = await authenticate(request, db, "management");
+      assertPermission(authContext, "ai", "manage");
+      return json(await getSystemPrompt(db, authContext.organizationId!));
     }
     if (method === "PATCH") {
-      await authenticate(request, db, "management");
+      const authContext = await authenticate(request, db, "management");
+      assertPermission(authContext, "ai", "manage");
       assertManagementCsrf(request, method);
       const input = await parseBody(request, SystemPromptUpdateSchema);
-      return json(await upsertSystemPrompt(db, input));
+      return json(await upsertSystemPrompt(db, authContext.organizationId!, input));
     }
     throw notFound();
   }
@@ -443,6 +493,9 @@ async function aiRoutes(
     const authContext = await authenticate(request, db, "client");
     const input = await parseBody(request, AiChatRequestSchema);
     const appId = authContext.appId ?? input.appId;
+    if (appId && authContext.organizationId) {
+      await assertAppInOrganization(db, appId, authContext.organizationId);
+    }
     assertAppContext(authContext, appId);
     return await chatWithAi(db, { ...input, appId });
   }
@@ -452,12 +505,14 @@ async function aiRoutes(
     const appId = authContext.appId ?? input.appId;
     if (!appId)
       throw validation("appId is required", [{ path: "appId", message: "appId is required" }]);
+    if (authContext.organizationId) {
+      await assertAppInOrganization(db, appId, authContext.organizationId);
+    }
     assertAppContext(authContext, appId);
     return json(await previewAppSystemPrompt(db, appId, input));
   }
   throw notFound();
 }
-
 async function previewRoutes(
   request: NextRequest,
   db: Awaited<ReturnType<typeof initializeDatabase>>["db"],

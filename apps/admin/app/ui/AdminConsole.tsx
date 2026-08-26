@@ -51,19 +51,26 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
-import { authClient, useSession, signOut } from "@/lib/auth-client";
+import {
+  authClient,
+  useSession,
+  signOut,
+  useActiveOrganization,
+  useListOrganizations,
+  useActiveMember,
+} from "@/lib/auth-client";
+import { defaultRoleStatements, hasStatement, statements } from "@/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { buildHref, isAppScopedPath } from "./navigation";
 import { clsx as cn } from "clsx";
 import type { components } from "@openscene-ai/api-client";
 import type { paths } from "@openscene-ai/api-client/generated";
 import { api, fetchClient } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
-import { isAppScopedPath } from "./navigation";
 import { OpenApiDocDetailView } from "./OpenApiDocDetailView";
-
 type App = components["schemas"]["App"];
 
 function getActiveManifest(data: unknown) {
@@ -134,12 +141,13 @@ type Resource = components["schemas"]["Resource"];
 export function AdminConsole() {
   const pathname = usePathname();
   const context = useAdminContext();
+  const { viewPath } = context;
   const { t } = useI18n();
   const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
 
-  if (pathname === "/apps") return <AppsView />;
-  if (pathname === "/keys") return <KeysView />;
-  if (pathname === "/system") return <SystemView />;
+  if (viewPath === "/apps") return <AppsView />;
+  if (viewPath === "/keys") return <KeysView />;
+  if (viewPath === "/system") return <SystemView />;
   if (
     isAppScopedPath(pathname) &&
     context.appId &&
@@ -173,28 +181,29 @@ export function AdminConsole() {
       />
     );
   }
-  if (pathname === "/overview") return <OverviewView />;
-  if (pathname === "/pages" || pathname === "/templates")
-    return <ResourceListView kind={pathname.slice(1) as "pages" | "templates"} />;
-  if (pathname.startsWith("/pages/") || pathname.startsWith("/templates/"))
+  if (viewPath === "/overview") return <OverviewView />;
+  if (viewPath === "/pages" || viewPath === "/templates")
+    return <ResourceListView kind={viewPath.slice(1) as "pages" | "templates"} />;
+  if (viewPath.startsWith("/pages/") || viewPath.startsWith("/templates/"))
     return <ResourceDetailView />;
-  if (pathname === "/preview-profiles") return <PreviewProfilesView />;
-  if (pathname === "/categories") return <CategoriesView />;
-  if (pathname === "/locales") return <LocalesView />;
-  if (pathname === "/assets") return <AssetsView />;
-  if (pathname === "/openapi-docs") return <OpenApiDocsView />;
-  if (pathname.startsWith("/openapi-docs/")) return <OpenApiDocDetailView />;
-  if (pathname === "/manifest" || pathname === "/meta") return <MetaView />;
-  if (pathname === "/components") return <ComponentsView />;
-  if (pathname.startsWith("/components/")) return <ComponentDetailView />;
-  if (pathname === "/settings") return <SettingsView />;
-  if (pathname === "/account") return <AccountView />;
-  if (pathname === "/prompts" || pathname === "/prompt") return <PromptsListView />;
-  if (pathname.startsWith("/prompts/") || pathname.startsWith("/prompt/"))
+  if (viewPath === "/preview-profiles") return <PreviewProfilesView />;
+  if (viewPath === "/categories") return <CategoriesView />;
+  if (viewPath === "/locales") return <LocalesView />;
+  if (viewPath === "/assets") return <AssetsView />;
+  if (viewPath === "/openapi-docs") return <OpenApiDocsView />;
+  if (viewPath.startsWith("/openapi-docs/")) return <OpenApiDocDetailView />;
+  if (viewPath === "/manifest" || viewPath === "/meta") return <MetaView />;
+  if (viewPath === "/components") return <ComponentsView />;
+  if (viewPath.startsWith("/components/")) return <ComponentDetailView />;
+  if (viewPath === "/organization") return <OrganizationView />;
+  if (viewPath === "/settings") return <SettingsView />;
+  if (viewPath === "/account") return <AccountView />;
+  if (viewPath === "/prompts" || viewPath === "/prompt") return <PromptsListView />;
+  if (viewPath.startsWith("/prompts/") || viewPath.startsWith("/prompt/"))
     return <PromptEditorView />;
 
-  if (pathname === "/ai") return <AiView />;
-  if (pathname === "/system-prompt") return <SystemPromptView />;
+  if (viewPath === "/ai") return <AiView />;
+  if (viewPath === "/system-prompt") return <SystemPromptView />;
   return <NotFoundView />;
 }
 
@@ -284,25 +293,21 @@ function AppsView() {
   const query = api.useQuery("get", "/api/v1/apps", {
     params: { query: { limit: "25", cursor } },
   });
-  const create = api.useMutation("post", "/api/v1/apps", {
-    onSuccess: () => {
-      setOpen(false);
-      toast.add({ title: t("created"), description: t("apps") });
-      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/apps"] });
-    },
-  });
+  const create = api.useMutation("post", "/api/v1/apps");
   const update = api.useMutation("patch", "/api/v1/apps/{appId}", {
     onSuccess: () => {
       setEditing(null);
       toast.add({ title: t("updated"), description: t("apps") });
-      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/apps"] });
+      void queryClient.invalidateQueries();
+      void query.refetch();
     },
   });
   const remove = api.useMutation("delete", "/api/v1/apps/{appId}", {
     onSuccess: () => {
       setDeleteId(null);
       toast.add({ title: t("deleted"), description: t("apps") });
-      void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/apps"] });
+      void queryClient.invalidateQueries();
+      void query.refetch();
       if (context.appId === deleteId)
         context.router.push(context.href("/apps", { appId: undefined }));
     },
@@ -319,17 +324,25 @@ function AppsView() {
     });
     setOpen(true);
   }
-  function submitCreate() {
-    create.mutate({
-      body: {
-        key: form.key,
-        name: form.name,
-        description: form.description,
-        type: form.type as AppType,
-        status: form.status as "active" | "disabled",
-        manifest: { mode: form.mode as "remote" | "push" },
-      },
-    });
+  async function submitCreate() {
+    try {
+      await create.mutateAsync({
+        body: {
+          key: form.key,
+          name: form.name,
+          description: form.description,
+          type: form.type as AppType,
+          status: form.status as "active" | "disabled",
+          manifest: { mode: form.mode as "remote" | "push" },
+        },
+      });
+      setOpen(false);
+      toast.add({ title: t("created"), description: t("apps") });
+      void queryClient.invalidateQueries();
+      await query.refetch();
+    } catch (err) {
+      console.error("Create app error:", err);
+    }
   }
 
   const apps = query.data?.items ?? [];
@@ -1297,13 +1310,12 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
 }
 
 function ResourceDetailView() {
-  const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
   const toast = useKumoToastManager();
   const queryClient = useQueryClient();
-  const kind = pathname.startsWith("/pages/") ? "page" : "template";
-  const id = pathname.split("/")[2] ?? "";
+  const kind = context.viewPath.startsWith("/pages/") ? "page" : "template";
+  const id = context.viewPath.split("/")[2] ?? "";
   const pageQuery = api.useQuery(
     "get",
     "/api/v1/apps/{appId}/pages/{pageId}",
@@ -3817,11 +3829,10 @@ function ComponentsView() {
 }
 
 function ComponentDetailView() {
-  const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
-  const componentKey = decodeURIComponent(pathname.slice("/components/".length));
+  const componentKey = decodeURIComponent(context.viewPath.slice("/components/".length));
   const query = api.useQuery("get", "/api/v1/apps/{appId}/manifest", {
     params: { path: { appId: context.appId ?? "" } },
   });
@@ -5298,7 +5309,6 @@ function PromptsListView() {
 }
 
 function PromptEditorView() {
-  const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -5306,9 +5316,9 @@ function PromptEditorView() {
   const appId = context.appId ?? "";
 
   const rawId = decodeURIComponent(
-    pathname.startsWith("/prompts/")
-      ? pathname.slice("/prompts/".length)
-      : pathname.slice("/prompt/".length),
+    context.viewPath.startsWith("/prompts/")
+      ? context.viewPath.slice("/prompts/".length)
+      : context.viewPath.slice("/prompt/".length),
   );
   const isNew = rawId === "new";
   const promptId = isNew ? "" : rawId;
@@ -5817,12 +5827,1065 @@ function SystemView() {
   );
 }
 
-function AccountView() {
+function OrganizationView() {
+  const context = useAdminContext();
   const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const queryClient = useQueryClient();
+  const { data: activeOrg } = useActiveOrganization();
+  const { data: activeMember } = useActiveMember();
+
+  const [activeTab, setActiveTab] = useState<"members" | "invitations" | "roles" | "settings">(
+    "members",
+  );
+
+  const [userInvitations, setUserInvitations] = useState<
+    Array<{
+      id: string;
+      organizationName?: string;
+      organizationId: string;
+      role: string;
+      status: string;
+    }>
+  >([]);
+  const [members, setMembers] = useState<
+    Array<{
+      id: string;
+      userId: string;
+      name: string;
+      email: string;
+      role: string;
+      createdAt: number;
+    }>
+  >([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  const [invitations, setInvitations] = useState<
+    Array<{ id: string; email: string; role: string; status: string; expiresAt?: string }>
+  >([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("member");
+  const [inviting, setInviting] = useState(false);
+
+  const [customRoles, setCustomRoles] = useState<
+    Array<{ id?: string; role: string; permission: Record<string, string[]> }>
+  >([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [createRoleDialog, setCreateRoleDialog] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRolePerms, setNewRolePerms] = useState<Record<string, string[]>>({});
+  const [savingRole, setSavingRole] = useState(false);
+
+  const [orgName, setOrgName] = useState(activeOrg?.name ?? "");
+  const [savingOrgName, setSavingOrgName] = useState(false);
+  const [createOrgDialog, setCreateOrgDialog] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [newOrgSlug, setNewOrgSlug] = useState("");
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [deletingOrg, setDeletingOrg] = useState(false);
+
+  const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
+  const hasApps = (appsQuery.data?.items?.length ?? 0) > 0;
+
+  useEffect(() => {
+    if (activeOrg?.name) setOrgName(activeOrg.name);
+  }, [activeOrg?.name]);
+
+  const loadUserInvitations = useCallback(async () => {
+    try {
+      const res = await authClient.organization.listUserInvitations();
+      if (res?.data) {
+        setUserInvitations(
+          res.data as unknown as Array<{
+            id: string;
+            organizationName?: string;
+            organizationId: string;
+            role: string;
+            status: string;
+          }>,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const loadMembers = useCallback(async () => {
+    setLoadingMembers(true);
+    try {
+      const res = await fetch("/api/v1/organization/members");
+      if (res.ok) {
+        const data = (await res.json()) as { items?: typeof members };
+        setMembers(data.items ?? []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
+  const loadInvitations = useCallback(async () => {
+    setLoadingInvitations(true);
+    try {
+      const res = await authClient.organization.listInvitations();
+      if (res?.data) {
+        setInvitations(
+          res.data as unknown as Array<{
+            id: string;
+            email: string;
+            role: string;
+            status: string;
+            expiresAt?: string;
+          }>,
+        );
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingInvitations(false);
+    }
+  }, []);
+
+  const loadRoles = useCallback(async () => {
+    setLoadingRoles(true);
+    try {
+      const res = await authClient.organization.listRoles();
+      if (res?.data) {
+        setCustomRoles(
+          (res.data as unknown as Array<{ id?: string; role: string; permission: unknown }>).map(
+            (r) => ({
+              ...r,
+              permission:
+                typeof r.permission === "string"
+                  ? (JSON.parse(r.permission) as Record<string, string[]>)
+                  : (r.permission as Record<string, string[]>),
+            }),
+          ),
+        );
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUserInvitations();
+  }, [loadUserInvitations]);
+
+  useEffect(() => {
+    if (activeOrg?.id) {
+      void loadMembers();
+      void loadInvitations();
+      void loadRoles();
+    }
+  }, [activeOrg?.id, loadMembers, loadInvitations, loadRoles]);
+
+  const memberRole = activeMember?.role;
+  let activeStatements: Record<string, readonly string[]> = defaultRoleStatements.owner;
+  if (memberRole && memberRole in defaultRoleStatements) {
+    activeStatements = defaultRoleStatements[memberRole];
+  } else if (memberRole) {
+    const custom = customRoles.find((r) => r.role === memberRole);
+    activeStatements = custom?.permission ?? defaultRoleStatements.admin;
+  }
+
+  const canReadMembers = hasStatement(activeStatements, "member", "read");
+  const canUpdateMembers = hasStatement(activeStatements, "member", "update");
+  const canDeleteMembers = hasStatement(activeStatements, "member", "delete");
+  const canCreateInvite = hasStatement(activeStatements, "invitation", "create");
+  const canCancelInvite = hasStatement(activeStatements, "invitation", "cancel");
+  const canManageRoles =
+    hasStatement(activeStatements, "ac", "create") ||
+    hasStatement(activeStatements, "ac", "update");
+  const canUpdateOrg = hasStatement(activeStatements, "organization", "update");
+  const canDeleteOrg = hasStatement(activeStatements, "organization", "delete");
+
+  const allAvailableRoles = useMemo(() => {
+    const defaultRoleKeys = Object.keys(defaultRoleStatements);
+    const customRoleKeys = customRoles.map((r) => r.role);
+    return Array.from(new Set([...defaultRoleKeys, ...customRoleKeys]));
+  }, [customRoles]);
+
+  async function handleAcceptInvite(invitationId: string) {
+    try {
+      await authClient.organization.acceptInvitation({ invitationId });
+      toast.add({ title: t("invitationAccepted"), type: "success" });
+      await loadUserInvitations();
+      void queryClient.invalidateQueries();
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleRejectInvite(invitationId: string) {
+    try {
+      await authClient.organization.rejectInvitation({ invitationId });
+      await loadUserInvitations();
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleInviteMember(e: React.FormEvent) {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const res = await authClient.organization.inviteMember({
+        email: inviteEmail.trim(),
+        role: inviteRole as "member",
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("invitationSent"), type: "success" });
+        setInviteEmail("");
+        await loadInvitations();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleUpdateMemberRole(memberId: string, role: string) {
+    try {
+      const res = await authClient.organization.updateMemberRole({
+        memberId,
+        role: role as "member",
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("memberRoleUpdated"), type: "success" });
+        await loadMembers();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    try {
+      const res = await authClient.organization.removeMember({
+        memberIdOrEmail: memberId,
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("memberRemoved"), type: "success" });
+        await loadMembers();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleCancelInvitation(invitationId: string) {
+    try {
+      const res = await authClient.organization.cancelInvitation({ invitationId });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("invitationCancelled"), type: "success" });
+        await loadInvitations();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleSaveOrgName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeOrg?.id || !orgName.trim()) return;
+    setSavingOrgName(true);
+    try {
+      const res = await authClient.organization.update({
+        organizationId: activeOrg.id,
+        data: { name: orgName.trim() },
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("orgUpdated"), type: "success" });
+        void queryClient.invalidateQueries();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    } finally {
+      setSavingOrgName(false);
+    }
+  }
+
+  async function handleCreateOrg(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newOrgName.trim() || !newOrgSlug.trim()) return;
+    setCreatingOrg(true);
+    try {
+      const res = await authClient.organization.create({
+        name: newOrgName.trim(),
+        slug: newOrgSlug.trim(),
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("orgCreated"), type: "success" });
+        setCreateOrgDialog(false);
+        const createdSlug = newOrgSlug.trim();
+        setNewOrgName("");
+        setNewOrgSlug("");
+        void queryClient.invalidateQueries();
+        context.router.push(
+          buildHref("/apps", { mode: context.mode, lang: context.language, orgSlug: createdSlug }),
+        );
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    } finally {
+      setCreatingOrg(false);
+    }
+  }
+
+  async function handleDeleteOrg() {
+    if (!activeOrg?.id) return;
+    setDeletingOrg(true);
+    try {
+      const res = await authClient.organization.delete({
+        organizationId: activeOrg.id,
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("orgDeleted"), type: "success" });
+        void queryClient.invalidateQueries();
+        window.location.reload();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    } finally {
+      setDeletingOrg(false);
+    }
+  }
+
+  async function handleCreateCustomRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newRoleName.trim()) return;
+    setSavingRole(true);
+    try {
+      const res = await authClient.organization.createRole({
+        role: newRoleName.trim(),
+        permission: newRolePerms as unknown as Record<string, string[]>,
+      });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("roleCreated"), type: "success" });
+        setCreateRoleDialog(false);
+        setNewRoleName("");
+        setNewRolePerms({});
+        await loadRoles();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function handleDeleteCustomRole(role: string) {
+    try {
+      const res = await authClient.organization.deleteRole({ roleName: role });
+      if (res?.error) {
+        toast.add({ title: res.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("roleDeleted"), type: "success" });
+        await loadRoles();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleToggleCustomRolePermission(
+    roleObj: { role: string; permission: Record<string, string[]> },
+    res: string,
+    act: string,
+  ) {
+    const currentList = roleObj.permission[res] ?? [];
+    const nextList = currentList.includes(act)
+      ? currentList.filter((a) => a !== act)
+      : [...currentList, act];
+    const nextPermission = { ...roleObj.permission, [res]: nextList };
+    try {
+      const updateRes = await authClient.organization.updateRole({
+        roleName: roleObj.role,
+        data: { permission: nextPermission as unknown as Record<string, string[]> },
+      });
+      if (updateRes?.error) {
+        toast.add({ title: updateRes.error.message || t("requestFailed"), type: "error" });
+      } else {
+        toast.add({ title: t("permissionsSaved"), type: "success" });
+        await loadRoles();
+      }
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title={t("organization")} description={t("organizationDescription")}>
+        <Button onClick={() => (window.location.href = "/organization/new")}>
+          <Plus size={16} />
+          {t("createOrganization")}
+        </Button>
+      </PageHeader>
+
+      {/* User pending invitations banner */}
+      {userInvitations.length > 0 && (
+        <div className="mb-6 rounded-lg border border-kumo-line bg-kumo-base p-4">
+          <div className="font-semibold text-sm mb-2">{t("userInvitations")}</div>
+          <div className="grid gap-2">
+            {userInvitations.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center justify-between gap-4 rounded-md border border-kumo-line bg-kumo-canvas p-3 text-sm"
+              >
+                <div>
+                  <span className="font-medium">{inv.organizationName || inv.organizationId}</span>
+                  <span className="ml-2 text-kumo-subtle">({inv.role})</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="xs" variant="primary" onClick={() => handleAcceptInvite(inv.id)}>
+                    {t("acceptInvitation")}
+                  </Button>
+                  <Button size="xs" variant="secondary" onClick={() => handleRejectInvite(inv.id)}>
+                    {t("cancelInvitation")}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="mb-6 flex gap-2 border-b border-kumo-line pb-3">
+        <Button
+          size="sm"
+          variant={activeTab === "members" ? "primary" : "secondary"}
+          onClick={() => setActiveTab("members")}
+        >
+          {t("members")}
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "invitations" ? "primary" : "secondary"}
+          onClick={() => setActiveTab("invitations")}
+        >
+          {t("invitations")}
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "roles" ? "primary" : "secondary"}
+          onClick={() => setActiveTab("roles")}
+        >
+          {t("roles")}
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "settings" ? "primary" : "secondary"}
+          onClick={() => setActiveTab("settings")}
+        >
+          {t("settings")}
+        </Button>
+      </div>
+
+      {/* Tab 1: Members */}
+      {activeTab === "members" && (
+        <div className="grid gap-4">
+          {!canReadMembers ? (
+            <Empty
+              title="Access restricted"
+              description="You do not have permission to view members."
+            />
+          ) : loadingMembers ? (
+            <LoadingState />
+          ) : members.length === 0 ? (
+            <Empty title={t("noMembers")} />
+          ) : (
+            <LayerCard className="w-full overflow-x-auto p-0">
+              <Table layout="fixed">
+                <colgroup>
+                  <col />
+                  <col />
+                  <col style={{ width: "160px" }} />
+                  <col style={{ width: "180px" }} />
+                  {canDeleteMembers && <col style={{ width: "100px" }} />}
+                </colgroup>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head>{t("name")}</Table.Head>
+                    <Table.Head>{t("email")}</Table.Head>
+                    <Table.Head>{t("role")}</Table.Head>
+                    <Table.Head>{t("joinedAt")}</Table.Head>
+                    {canDeleteMembers && (
+                      <Table.Head sticky="right">
+                        <span className="sr-only">{t("actions")}</span>
+                      </Table.Head>
+                    )}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {members.map((m) => (
+                    <Table.Row key={m.id}>
+                      <Table.Cell className="font-medium">{m.name || "—"}</Table.Cell>
+                      <Table.Cell className="text-kumo-subtle">{m.email}</Table.Cell>
+                      <Table.Cell>
+                        {canUpdateMembers ? (
+                          <Select
+                            value={m.role}
+                            items={Object.fromEntries(allAvailableRoles.map((r) => [r, r]))}
+                            onValueChange={(val) => {
+                              if (typeof val === "string" && val !== m.role) {
+                                void handleUpdateMemberRole(m.id, val);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <Badge variant="neutral">{m.role}</Badge>
+                        )}
+                      </Table.Cell>
+                      <Table.Cell className="text-kumo-subtle">
+                        {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "—"}
+                      </Table.Cell>
+                      {canDeleteMembers && (
+                        <Table.Cell sticky="right" className="text-right">
+                          <Button
+                            size="xs"
+                            variant="destructive"
+                            onClick={() => handleRemoveMember(m.id)}
+                          >
+                            <Trash size={14} />
+                          </Button>
+                        </Table.Cell>
+                      )}
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table>
+            </LayerCard>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Invitations */}
+      {activeTab === "invitations" && (
+        <div className="grid gap-6">
+          {canCreateInvite && (
+            <LayerCard className="max-w-2xl">
+              <LayerCard.Secondary>{t("inviteMember")}</LayerCard.Secondary>
+              <LayerCard.Primary>
+                <form onSubmit={handleInviteMember} className="grid gap-4">
+                  <Input
+                    label={t("inviteEmail")}
+                    type="email"
+                    placeholder="colleague@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                  />
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-kumo-secondary">
+                      {t("inviteRole")}
+                    </label>
+                    <Select
+                      value={inviteRole}
+                      items={Object.fromEntries(allAvailableRoles.map((r) => [r, r]))}
+                      onValueChange={(val) => {
+                        if (typeof val === "string") setInviteRole(val);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      loading={inviting}
+                      disabled={!inviteEmail}
+                    >
+                      {t("inviteMember")}
+                    </Button>
+                  </div>
+                </form>
+              </LayerCard.Primary>
+            </LayerCard>
+          )}
+
+          <div>
+            <div className="font-semibold text-sm mb-3">{t("pendingInvitations")}</div>
+            {loadingInvitations ? (
+              <LoadingState />
+            ) : invitations.length === 0 ? (
+              <Empty title={t("noPendingInvitations")} />
+            ) : (
+              <LayerCard className="w-full overflow-x-auto p-0">
+                <Table layout="fixed">
+                  <colgroup>
+                    <col />
+                    <col style={{ width: "160px" }} />
+                    <col style={{ width: "120px" }} />
+                    {canCancelInvite && <col style={{ width: "100px" }} />}
+                  </colgroup>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.Head>{t("email")}</Table.Head>
+                      <Table.Head>{t("role")}</Table.Head>
+                      <Table.Head>{t("status")}</Table.Head>
+                      {canCancelInvite && (
+                        <Table.Head sticky="right">
+                          <span className="sr-only">{t("actions")}</span>
+                        </Table.Head>
+                      )}
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {invitations.map((inv) => (
+                      <Table.Row key={inv.id}>
+                        <Table.Cell className="font-medium">{inv.email}</Table.Cell>
+                        <Table.Cell>
+                          <Badge variant="neutral">{inv.role}</Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge variant={inv.status === "pending" ? "outline" : "green"}>
+                            {inv.status}
+                          </Badge>
+                        </Table.Cell>
+                        {canCancelInvite && (
+                          <Table.Cell sticky="right" className="text-right">
+                            <Button
+                              size="xs"
+                              variant="secondary"
+                              onClick={() => handleCancelInvitation(inv.id)}
+                            >
+                              {t("cancelInvitation")}
+                            </Button>
+                          </Table.Cell>
+                        )}
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table>
+              </LayerCard>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Roles & Permissions */}
+      {activeTab === "roles" && (
+        <div className="grid gap-8">
+          {/* Default Roles Permission Matrix */}
+          <div>
+            <div className="font-semibold text-sm mb-2">
+              {t("defaultRoles")} ({t("permissionMatrix")})
+            </div>
+            <p className="text-sm text-kumo-subtle mb-4">
+              Built-in roles (owner, admin, member) provide standard permission presets and are
+              read-only.
+            </p>
+            <LayerCard className="w-full overflow-x-auto p-0">
+              <Table layout="fixed">
+                <colgroup>
+                  <col style={{ width: "180px" }} />
+                  <col style={{ width: "180px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                  <col style={{ width: "120px" }} />
+                </colgroup>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head>Resource</Table.Head>
+                    <Table.Head>Action</Table.Head>
+                    <Table.Head>Owner</Table.Head>
+                    <Table.Head>Admin</Table.Head>
+                    <Table.Head>Member</Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {Object.entries(statements).flatMap(([res, actions]) =>
+                    (actions as readonly string[]).map((action, idx) => (
+                      <Table.Row key={`${res}-${action}`}>
+                        <Table.Cell className={idx === 0 ? "font-medium" : "text-kumo-subtle"}>
+                          {idx === 0 ? res : ""}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Code code={action} lang="ts" />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Check className="text-kumo-success" size={18} />
+                        </Table.Cell>
+                        <Table.Cell>
+                          {defaultRoleStatements.admin[res]?.includes(action) ? (
+                            <Check className="text-kumo-success" size={18} />
+                          ) : (
+                            "—"
+                          )}
+                        </Table.Cell>
+                        <Table.Cell>
+                          {defaultRoleStatements.member[res]?.includes(action) ? (
+                            <Check className="text-kumo-success" size={18} />
+                          ) : (
+                            "—"
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    )),
+                  )}
+                </Table.Body>
+              </Table>
+            </LayerCard>
+          </div>
+
+          {/* Custom Roles Section */}
+          <div>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <div className="font-semibold text-sm">{t("customRoles")}</div>
+                <p className="text-sm text-kumo-subtle">
+                  Create tailored roles for your organization with granular statements.
+                </p>
+              </div>
+              {canManageRoles && (
+                <Button size="sm" onClick={() => setCreateRoleDialog(true)}>
+                  <Plus size={14} />
+                  {t("createRole")}
+                </Button>
+              )}
+            </div>
+
+            {loadingRoles ? (
+              <LoadingState />
+            ) : customRoles.length === 0 ? (
+              <Empty title={t("noRoles")} />
+            ) : (
+              <div className="grid gap-6">
+                {customRoles.map((cr) => (
+                  <LayerCard key={cr.role} className="w-full">
+                    <LayerCard.Secondary className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="blue">{cr.role}</Badge>
+                      </div>
+                      {canManageRoles && (
+                        <Button
+                          size="xs"
+                          variant="destructive"
+                          onClick={() => void handleDeleteCustomRole(cr.role)}
+                        >
+                          <Trash size={14} />
+                          {t("deleteRole")}
+                        </Button>
+                      )}
+                    </LayerCard.Secondary>
+                    <LayerCard.Primary className="p-0 overflow-x-auto">
+                      <Table layout="fixed">
+                        <colgroup>
+                          <col style={{ width: "180px" }} />
+                          <col style={{ width: "180px" }} />
+                          <col style={{ width: "120px" }} />
+                        </colgroup>
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.Head>Resource</Table.Head>
+                            <Table.Head>Action</Table.Head>
+                            <Table.Head>Allowed</Table.Head>
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
+                          {Object.entries(statements).flatMap(([res, actions]) =>
+                            (actions as readonly string[]).map((action, idx) => {
+                              const isChecked = (cr.permission[res] ?? []).includes(action);
+                              return (
+                                <Table.Row key={`${cr.role}-${res}-${action}`}>
+                                  <Table.Cell
+                                    className={idx === 0 ? "font-medium" : "text-kumo-subtle"}
+                                  >
+                                    {idx === 0 ? res : ""}
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <Code code={action} lang="ts" />
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={!canManageRoles}
+                                      onChange={() =>
+                                        void handleToggleCustomRolePermission(cr, res, action)
+                                      }
+                                      className="size-4 rounded border-kumo-line text-kumo-brand focus:ring-kumo-ring cursor-pointer"
+                                    />
+                                  </Table.Cell>
+                                </Table.Row>
+                              );
+                            }),
+                          )}
+                        </Table.Body>
+                      </Table>
+                    </LayerCard.Primary>
+                  </LayerCard>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Settings */}
+      {activeTab === "settings" && (
+        <div className="grid gap-6 max-w-2xl">
+          <LayerCard>
+            <LayerCard.Secondary>{t("orgSettings")}</LayerCard.Secondary>
+            <LayerCard.Primary>
+              <form onSubmit={handleSaveOrgName} className="grid gap-4">
+                <Input
+                  label={t("orgName")}
+                  type="text"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  disabled={!canUpdateOrg}
+                  required
+                />
+                <div className="grid gap-1">
+                  <p className="text-sm text-kumo-subtle">{t("orgSlug")}</p>
+                  <Code code={activeOrg?.slug || "default"} lang="ts" />
+                </div>
+                {canUpdateOrg && (
+                  <div>
+                    <Button type="submit" variant="primary" loading={savingOrgName}>
+                      {t("save")}
+                    </Button>
+                  </div>
+                )}
+              </form>
+            </LayerCard.Primary>
+          </LayerCard>
+
+          {canDeleteOrg && (
+            <LayerCard className="border-kumo-danger/30">
+              <LayerCard.Secondary className="text-kumo-danger">
+                {t("deleteOrganization")}
+              </LayerCard.Secondary>
+              <LayerCard.Primary className="grid gap-4">
+                <p className="text-sm text-kumo-subtle">
+                  {hasApps ? t("deleteOrganizationHint") : "Permanently delete this organization."}
+                </p>
+                <div>
+                  <Button
+                    variant="destructive"
+                    loading={deletingOrg}
+                    disabled={hasApps}
+                    onClick={() => void handleDeleteOrg()}
+                  >
+                    {t("deleteOrganization")}
+                  </Button>
+                </div>
+              </LayerCard.Primary>
+            </LayerCard>
+          )}
+        </div>
+      )}
+
+      {/* Dialog: Create Custom Role */}
+      <Dialog.Root open={createRoleDialog} onOpenChange={setCreateRoleDialog}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("createRole")}</Dialog.Title>
+          <Dialog.Description>
+            Define a new role and configure its initial permissions.
+          </Dialog.Description>
+          <form onSubmit={handleCreateCustomRole} className="grid gap-4 mt-4">
+            <Input
+              label={t("roleName")}
+              placeholder="e.g. editor, viewer"
+              value={newRoleName}
+              onChange={(e) => setNewRoleName(e.target.value)}
+              required
+            />
+            <div className="grid gap-2 max-h-60 overflow-y-auto border border-kumo-line rounded-md p-3">
+              <div className="text-sm font-medium">{t("rolePermissions")}</div>
+              {Object.entries(statements).map(([res, actions]) => (
+                <div key={res} className="grid gap-1 mb-2">
+                  <span className="text-xs font-semibold uppercase text-kumo-subtle">{res}</span>
+                  <div className="flex flex-wrap gap-3">
+                    {(actions as readonly string[]).map((action) => {
+                      const checked = (newRolePerms[res] ?? []).includes(action);
+                      return (
+                        <label
+                          key={action}
+                          className="flex items-center gap-1.5 text-xs text-kumo-secondary cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const cur = newRolePerms[res] ?? [];
+                              const next = checked
+                                ? cur.filter((a) => a !== action)
+                                : [...cur, action];
+                              setNewRolePerms({ ...newRolePerms, [res]: next });
+                            }}
+                          />
+                          {action}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 mt-2">
+              <Button type="button" variant="secondary" onClick={() => setCreateRoleDialog(false)}>
+                {t("cancel")}
+              </Button>
+              <Button type="submit" variant="primary" loading={savingRole} disabled={!newRoleName}>
+                {t("create")}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      </Dialog.Root>
+
+      {/* Dialog: Create Organization */}
+      <Dialog.Root open={createOrgDialog} onOpenChange={setCreateOrgDialog}>
+        <Dialog size="lg" className="px-8 py-6">
+          <Dialog.Title>{t("createOrganization")}</Dialog.Title>
+          <Dialog.Description>Create a new organization workspace.</Dialog.Description>
+          <form onSubmit={handleCreateOrg} className="grid gap-4 mt-4">
+            <Input
+              label={t("orgName")}
+              placeholder="e.g. Acme Corp"
+              value={newOrgName}
+              onChange={(e) => {
+                setNewOrgName(e.target.value);
+                if (!newOrgSlug) {
+                  setNewOrgSlug(
+                    e.target.value
+                      .toLowerCase()
+                      .trim()
+                      .replace(/[^a-z0-9]+/g, "-"),
+                  );
+                }
+              }}
+              required
+            />
+            <Input
+              label={t("orgSlug")}
+              placeholder="e.g. acme-corp"
+              value={newOrgSlug}
+              onChange={(e) => setNewOrgSlug(e.target.value)}
+              required
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <Button type="button" variant="secondary" onClick={() => setCreateOrgDialog(false)}>
+                {t("cancel")}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={creatingOrg}
+                disabled={!newOrgName || !newOrgSlug}
+              >
+                {t("create")}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      </Dialog.Root>
+    </>
+  );
+}
+
+function AccountView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const queryClient = useQueryClient();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const sessionQuery = api.useQuery("get", "/api/v1/auth/session");
   const session = sessionQuery.data;
   const { data: betterAuthSession } = useSession();
+  const { data: orgs } = useListOrganizations();
+  const { data: activeOrg } = useActiveOrganization();
+
+  const [userInvitations, setUserInvitations] = useState<
+    Array<{
+      id: string;
+      organizationName?: string;
+      organizationId: string;
+      role: string;
+      status: string;
+    }>
+  >([]);
+
+  const loadUserInvitations = useCallback(async () => {
+    try {
+      const res = await authClient.organization.listUserInvitations();
+      if (res?.data) {
+        setUserInvitations(
+          res.data as unknown as Array<{
+            id: string;
+            organizationName?: string;
+            organizationId: string;
+            role: string;
+            status: string;
+          }>,
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUserInvitations();
+  }, [loadUserInvitations]);
+
+  async function handleAcceptInvite(invitationId: string) {
+    try {
+      await authClient.organization.acceptInvitation({ invitationId });
+      toast.add({ title: t("invitationAccepted"), type: "success" });
+      await loadUserInvitations();
+      void queryClient.invalidateQueries();
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleRejectInvite(invitationId: string) {
+    try {
+      await authClient.organization.rejectInvitation({ invitationId });
+      await loadUserInvitations();
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
+
+  async function handleSwitchOrg(orgId: string, orgSlug: string) {
+    try {
+      await authClient.organization.setActive({ organizationId: orgId });
+      void queryClient.invalidateQueries();
+      context.router.push(
+        buildHref("/apps", { mode: context.mode, lang: context.language, orgSlug }),
+      );
+    } catch (err) {
+      toast.add({ title: err instanceof Error ? err.message : t("requestFailed"), type: "error" });
+    }
+  }
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -5841,53 +6904,130 @@ function AccountView() {
     <>
       <PageHeader title={t("account")} description={t("accountDescription")} />
       {sessionQuery.error ? <ErrorState error={sessionQuery.error} /> : null}
-      <LayerCard className="max-w-2xl">
-        <LayerCard.Secondary>{t("account")}</LayerCard.Secondary>
-        <LayerCard.Primary className="grid gap-4">
-          <div className="grid gap-2">
-            <Text variant="secondary">{t("status")}</Text>
+      <div className="grid gap-6 max-w-2xl">
+        <LayerCard>
+          <LayerCard.Secondary>{t("account")}</LayerCard.Secondary>
+          <LayerCard.Primary className="grid gap-4">
+            <div className="grid gap-2">
+              <Text variant="secondary">{t("status")}</Text>
+              <div>
+                <StatusBadge
+                  status={betterAuthSession?.user || session?.authenticated ? "active" : "disabled"}
+                />
+              </div>
+            </div>
+            {betterAuthSession?.user && (
+              <>
+                <div className="grid gap-1">
+                  <Text variant="secondary">User</Text>
+                  <Text>{betterAuthSession.user.name || "Administrator"}</Text>
+                </div>
+                <div className="grid gap-1">
+                  <Text variant="secondary">Email</Text>
+                  <Text>{betterAuthSession.user.email}</Text>
+                </div>
+              </>
+            )}
+            {session?.mode ? (
+              <div className="grid gap-1">
+                <Text variant="secondary">{t("authMode")}</Text>
+                <Text>{session.mode}</Text>
+              </div>
+            ) : null}
+            {betterAuthSession?.session?.expiresAt ? (
+              <div className="grid gap-1">
+                <Text variant="secondary">Expires</Text>
+                <Text>{new Date(betterAuthSession.session.expiresAt).toLocaleString()}</Text>
+              </div>
+            ) : session?.expiresAt ? (
+              <div className="grid gap-1">
+                <Text variant="secondary">Expires</Text>
+                <Text>{new Date(session.expiresAt).toLocaleString()}</Text>
+              </div>
+            ) : null}
             <div>
-              <StatusBadge
-                status={betterAuthSession?.user || session?.authenticated ? "active" : "disabled"}
-              />
+              <Button variant="destructive" loading={isSigningOut} onClick={handleSignOut}>
+                {t("signOut")}
+              </Button>
             </div>
-          </div>
-          {betterAuthSession?.user && (
-            <>
-              <div className="grid gap-1">
-                <Text variant="secondary">User</Text>
-                <Text>{betterAuthSession.user.name || "Administrator"}</Text>
-              </div>
-              <div className="grid gap-1">
-                <Text variant="secondary">Email</Text>
-                <Text>{betterAuthSession.user.email}</Text>
-              </div>
-            </>
-          )}
-          {session?.mode ? (
-            <div className="grid gap-1">
-              <Text variant="secondary">{t("authMode")}</Text>
-              <Text>{session.mode}</Text>
-            </div>
-          ) : null}
-          {betterAuthSession?.session?.expiresAt ? (
-            <div className="grid gap-1">
-              <Text variant="secondary">Expires</Text>
-              <Text>{new Date(betterAuthSession.session.expiresAt).toLocaleString()}</Text>
-            </div>
-          ) : session?.expiresAt ? (
-            <div className="grid gap-1">
-              <Text variant="secondary">Expires</Text>
-              <Text>{new Date(session.expiresAt).toLocaleString()}</Text>
-            </div>
-          ) : null}
-          <div>
-            <Button variant="destructive" loading={isSigningOut} onClick={handleSignOut}>
-              {t("signOut")}
-            </Button>
-          </div>
-        </LayerCard.Primary>
-      </LayerCard>
+          </LayerCard.Primary>
+        </LayerCard>
+
+        {/* My Organizations */}
+        {orgs && orgs.length > 0 && (
+          <LayerCard>
+            <LayerCard.Secondary>{t("myOrganizations")}</LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-3">
+              {(orgs as Array<{ id: string; name: string; slug: string }>).map((org) => {
+                const isActive = org.id === activeOrg?.id;
+                return (
+                  <div
+                    key={org.id}
+                    className="flex items-center justify-between gap-4 rounded-md border border-kumo-line bg-kumo-base p-3 text-sm"
+                  >
+                    <div>
+                      <span className="font-medium">{org.name}</span>
+                      <span className="ml-2 text-xs text-kumo-subtle">({org.slug})</span>
+                      {isActive && (
+                        <Badge variant="green" className="ml-2">
+                          {t("activeOrg")}
+                        </Badge>
+                      )}
+                    </div>
+                    {!isActive && (
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => void handleSwitchOrg(org.id, org.slug)}
+                      >
+                        {t("switchOrg")}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </LayerCard.Primary>
+          </LayerCard>
+        )}
+
+        {/* User Pending Invitations */}
+        {userInvitations.length > 0 && (
+          <LayerCard>
+            <LayerCard.Secondary>{t("userInvitations")}</LayerCard.Secondary>
+            <LayerCard.Primary className="grid gap-3">
+              {userInvitations.map((inv) => (
+                <div
+                  key={inv.id}
+                  className="flex items-center justify-between gap-4 rounded-md border border-kumo-line bg-kumo-base p-3 text-sm"
+                >
+                  <div>
+                    <span className="font-medium">
+                      {inv.organizationName || inv.organizationId}
+                    </span>
+                    <span className="ml-2 text-kumo-subtle">({inv.role})</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="xs"
+                      variant="primary"
+                      onClick={() => void handleAcceptInvite(inv.id)}
+                    >
+                      {t("acceptInvitation")}
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => void handleRejectInvite(inv.id)}
+                    >
+                      {t("cancelInvitation")}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </LayerCard.Primary>
+          </LayerCard>
+        )}
+      </div>
     </>
   );
 }

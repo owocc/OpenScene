@@ -127,7 +127,7 @@ test.describe("Admin OpenAPI docs", () => {
 
     // Switch to Schemas tab
     await page.getByRole("button", { name: "Schemas (1)" }).click();
-    await expect(page.getByText("Pet")).toBeVisible();
+    await expect(page.getByText("Pet", { exact: true })).toBeVisible();
 
     // Switch to JSON Source tab
     await page.getByRole("button", { name: "JSON Source" }).click();
@@ -145,7 +145,7 @@ test.describe("Admin OpenAPI docs", () => {
     // Edit OpenAPI
     await page.getByRole("button", { name: "Edit OpenAPI" }).click();
     const editDialog = page.getByRole("dialog");
-    await expect(editDialog.getByText("Edit OpenAPI document")).toBeVisible();
+    await expect(editDialog.getByText("Edit OpenAPI", { exact: true })).toBeVisible();
     await editDialog.getByLabel("Name").fill(`${docName}-updated`);
     await editDialog.getByRole("button", { name: "Save" }).click();
 

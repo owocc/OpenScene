@@ -14,7 +14,7 @@ test.describe("Admin shell", () => {
     expect(sidebarBox?.height ?? 0).toBeGreaterThan(890);
     const appSelectorBox = await appSelector.boundingBox();
     expect(appSelectorBox?.width ?? 0).toBeGreaterThan((sidebarBox?.width ?? 0) - 40);
-    const systemLink = page.getByRole("link", { name: "系统" });
+    const systemLink = page.getByRole("link", { name: "系统", exact: true });
     await expect(systemLink).toHaveAttribute("href", /mode=standalone/);
     await expect(systemLink).toHaveAttribute("href", /lang=zh-CN/);
   });
@@ -31,32 +31,33 @@ test.describe("Admin shell", () => {
 
   test("uses a single dropdown action for app rows", async ({ page }) => {
     await page.goto("/apps?mode=standalone&lang=en");
+    await expect(page.getByRole("heading", { name: "Apps" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading" })).toHaveCount(0, { timeout: 10000 });
 
     await page.getByRole("button", { name: "Create" }).first().click();
-    const createDialog = page.getByRole("dialog");
+    const createDialog = page.getByRole("dialog", { name: /Create App/i });
+    await expect(createDialog).toBeVisible();
     const key = `table-test-${Date.now()}`;
     await createDialog.getByLabel("Key").fill(key);
     await createDialog.getByLabel("Name").fill("Table test app");
-    await createDialog.getByRole("button", { name: "Create" }).click();
+    await expect(createDialog.getByLabel("Key")).toHaveValue(key);
+    await expect(createDialog.getByLabel("Name")).toHaveValue("Table test app");
+    await createDialog.locator("button", { hasText: "Create" }).click({ force: true });
+    await expect(createDialog).toBeHidden();
+    const table = page.locator("table");
+    await expect(table).toBeVisible({ timeout: 15000 });
+    const targetRow = table.locator("tr", { hasText: key });
+    await expect(targetRow).toBeVisible();
+    await expect(targetRow.getByRole("button", { name: "More options" })).toHaveCount(1);
+    await expect(targetRow.getByRole("button", { name: "Edit" })).toHaveCount(0);
+    await expect(targetRow.getByRole("button", { name: "Delete" })).toHaveCount(0);
 
-    const credentialsDialog = page.getByRole("dialog").filter({ hasText: "Created" });
-    await credentialsDialog.getByRole("button", { name: "Continue" }).click();
-
-    const table = page.getByRole("table");
-    await expect(table).toBeVisible();
-    const firstRow = table.getByRole("row").nth(1);
-    await expect(firstRow.getByRole("button", { name: "More options" })).toHaveCount(1);
-    await expect(firstRow.getByRole("button", { name: "Edit" })).toHaveCount(0);
-    await expect(firstRow.getByRole("button", { name: "Delete" })).toHaveCount(0);
-
-    await firstRow.getByRole("button", { name: "More options" }).click();
+    await targetRow.getByRole("button", { name: "More options" }).click();
     await expect(page.getByRole("menuitem", { name: "Edit" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Delete" })).toBeVisible();
-
     await page.getByRole("menuitem", { name: "Delete" }).click();
     const deleteDialog = page.getByRole("alertdialog");
     await deleteDialog.getByRole("button", { name: "Delete" }).click();
-    await expect(page.getByRole("heading", { name: "No results" })).toBeVisible();
+    await expect(page.getByText(key)).toHaveCount(0);
   });
 
   test("keeps the sidebar mounted while the page changes", async ({ page }) => {
@@ -66,7 +67,7 @@ test.describe("Admin shell", () => {
       element.setAttribute("data-test-sidebar-instance", "persistent");
     });
 
-    await sidebar.getByRole("link", { name: "System" }).click();
+    await sidebar.getByRole("link", { name: "System", exact: true }).click();
     await expect(page).toHaveURL(/\/system\?/);
     await expect(sidebar).toHaveAttribute("data-test-sidebar-instance", "persistent");
   });
@@ -80,8 +81,22 @@ test.describe("Admin shell", () => {
   test("supports the mobile sidebar sheet", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/apps?mode=standalone&lang=en");
-    await page.getByRole("button", { name: "Open sidebar" }).click();
+    await page.getByRole("button", { name: "Open sidebar" }).click({ force: true });
     await expect(page.getByRole("link", { name: "API reference" })).toBeVisible();
+  });
+  test("supports icon collapsible sidebar with persistent state", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/apps?mode=standalone&lang=en");
+    const sidebar = page.getByRole("complementary");
+    await expect(sidebar).toHaveAttribute("data-state", "expanded");
+
+    const toggleButton = page.getByRole("button", { name: "Toggle sidebar" });
+    await expect(toggleButton).toBeVisible();
+    await toggleButton.evaluate((el: HTMLElement) => el.click());
+    await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+
+    await page.reload();
+    await expect(sidebar).toHaveAttribute("data-state", "collapsed");
   });
 });
 

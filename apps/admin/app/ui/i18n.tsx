@@ -1,8 +1,16 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildHref, parseLanguage, parseMode, type AdminLanguage } from "./navigation";
+import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
+import { buildHref, extractOrgSlugAndPath, parseLanguage, type AdminLanguage } from "./navigation";
+import { useActiveOrganization } from "../../lib/auth-client";
+
+export const adminQueryParsers = {
+  appId: parseAsString.withDefault(""),
+  mode: parseAsStringLiteral(["standalone", "embedded"] as const).withDefault("standalone"),
+  lang: parseAsStringLiteral(["en", "zh-CN"] as const),
+};
 
 export const messages = {
   en: {
@@ -83,6 +91,9 @@ export const messages = {
     deployment: "Deployment",
     developer: "Developer",
     app: "App",
+    resources: "Resources",
+    content: "Content",
+    development: "Development",
     selectApp: "Select an app",
     chooseApp: "Choose an app to continue",
     chooseAppDescription: "This page is scoped to an app. Select one from the app list first.",
@@ -296,6 +307,79 @@ export const messages = {
       "Foundational JSONL patch streaming specification and generation rules for the AI engine. Built-in and read-only.",
     collapse: "Collapse",
     expand: "Expand",
+    createAccount: "Create account",
+    organization: "Organization",
+    organizationDescription: "Manage organization members, invitations, roles and permissions.",
+    orgSwitcher: "Organization",
+    createOrganization: "Create organization",
+    orgName: "Organization name",
+    orgSlug: "Organization slug",
+    members: "Members",
+    invitations: "Invitations",
+    roles: "Roles",
+    rolesAndPermissions: "Roles & Permissions",
+    permissionMatrix: "Permission matrix",
+    inviteMember: "Invite member",
+    inviteEmail: "Email address",
+    inviteRole: "Role",
+    pendingInvitations: "Pending invitations",
+    acceptInvitation: "Accept",
+    cancelInvitation: "Cancel",
+    removeMember: "Remove member",
+    changeRole: "Change role",
+    createRole: "Create custom role",
+    deleteRole: "Delete role",
+    roleName: "Role name",
+    rolePermissions: "Role permissions",
+    orgSettings: "Organization settings",
+    deleteOrganization: "Delete organization",
+    deleteOrganizationHint:
+      "Organizations containing applications cannot be deleted. Please delete or migrate apps first.",
+    noOrganizations: "No organizations",
+    sidebarToggle: "Toggle sidebar",
+    myOrganizations: "My organizations",
+    activeOrg: "Active",
+    switchOrg: "Switch",
+    customRoles: "Custom roles",
+    defaultRoles: "Default roles",
+    role: "Role",
+    email: "Email",
+    name: "Name",
+    joinedAt: "Joined at",
+    invitedAt: "Invited at",
+    userInvitations: "Pending invitations for you",
+    noPendingInvitations: "No pending invitations",
+    noMembers: "No members found",
+    noRoles: "No custom roles configured",
+    permissionsSaved: "Permissions saved",
+    memberRemoved: "Member removed",
+    memberRoleUpdated: "Member role updated",
+    invitationSent: "Invitation sent",
+    invitationCancelled: "Invitation cancelled",
+    invitationAccepted: "Invitation accepted",
+    roleCreated: "Role created",
+    roleDeleted: "Role deleted",
+    roleUpdated: "Role updated",
+    orgUpdated: "Organization updated",
+    orgCreated: "Organization created",
+    orgDeleted: "Organization deleted",
+    userAlreadyExists: "An account with this email already exists. Please sign in instead.",
+    selectOrganization: "Select organization",
+    selectOrgDescription: "Choose an organization workspace to enter, or create a new one.",
+    enterOrg: "Enter workspace",
+    createNewOrg: "Create new organization",
+    inviteToJoinOrg: "Invitation to Join Organization",
+    acceptAndEnter: "Accept & Enter",
+    decline: "Decline",
+    invitationExpiredOrInvalid: "This invitation is invalid or has expired.",
+    invitationForEmail: "Invitation sent to",
+    noOrgsYet: "No Organizations Yet",
+    createFirstOrgDescription:
+      "Create your first organization to start managing applications and inviting team members.",
+    createOrgDescription: "Create a new organization workspace with a custom unique slug.",
+    signInToAccept: "Sign in to accept invitation",
+    createAccountToAccept: "Create account to accept invitation",
+    declineInvitation: "Decline invitation",
   },
   "zh-CN": {
     apps: "应用",
@@ -373,6 +457,9 @@ export const messages = {
     deployment: "部署",
     developer: "开发者",
     app: "应用",
+    resources: "资源",
+    content: "内容",
+    development: "开发与配置",
     selectApp: "选择应用",
     chooseApp: "选择一个应用继续",
     chooseAppDescription: "此页面属于某个应用，请先从应用列表中选择应用。",
@@ -571,6 +658,77 @@ export const messages = {
     storageDeleted: "存储设置已删除",
     deleteStorage: "删除存储配置",
     deleteStorageConfirm: "确定要删除此应用的存储桶配置吗？",
+    createAccount: "创建账号",
+    organization: "组织管理",
+    organizationDescription: "管理组织成员、邀请、自定义角色与权限控制矩阵。",
+    orgSwitcher: "组织切换",
+    createOrganization: "创建组织",
+    orgName: "组织名称",
+    orgSlug: "组织标识 (Slug)",
+    members: "成员列表",
+    invitations: "邀请管理",
+    roles: "角色与权限",
+    rolesAndPermissions: "角色与权限",
+    permissionMatrix: "权限矩阵",
+    inviteMember: "邀请成员",
+    inviteEmail: "成员邮箱",
+    inviteRole: "初始角色",
+    pendingInvitations: "待处理邀请",
+    acceptInvitation: "接受邀请",
+    cancelInvitation: "取消邀请",
+    removeMember: "移除成员",
+    changeRole: "更改角色",
+    createRole: "新建自定义角色",
+    deleteRole: "删除角色",
+    roleName: "角色标识 (Role Name)",
+    rolePermissions: "角色权限配置",
+    orgSettings: "组织设置",
+    deleteOrganization: "删除组织",
+    deleteOrganizationHint: "含有应用的组织无法被删除，请先清理或迁移其中的应用。",
+    noOrganizations: "暂无组织",
+    sidebarToggle: "折叠/展开侧边栏",
+    myOrganizations: "我的组织",
+    activeOrg: "当前组织",
+    switchOrg: "切换组织",
+    customRoles: "自定义角色",
+    defaultRoles: "系统内置角色",
+    role: "角色",
+    email: "邮箱",
+    name: "姓名",
+    joinedAt: "加入时间",
+    invitedAt: "邀请时间",
+    userInvitations: "发给您的待处理邀请",
+    noPendingInvitations: "暂无待处理邀请",
+    noMembers: "未找到成员",
+    noRoles: "暂无自定义角色",
+    permissionsSaved: "权限设置已保存",
+    memberRemoved: "成员已移除",
+    memberRoleUpdated: "成员角色已更新",
+    invitationSent: "邀请已发送",
+    invitationCancelled: "邀请已取消",
+    invitationAccepted: "已加入组织",
+    roleCreated: "角色创建成功",
+    roleDeleted: "角色已删除",
+    roleUpdated: "角色更新成功",
+    orgUpdated: "组织信息已更新",
+    orgCreated: "组织创建成功",
+    orgDeleted: "组织已删除",
+    userAlreadyExists: "该邮箱已被注册，请直接登录。",
+    selectOrganization: "选择组织",
+    selectOrgDescription: "选择要进入的组织工作区，或创建新组织。",
+    enterOrg: "进入组织工作区",
+    createNewOrg: "创建新组织",
+    inviteToJoinOrg: "加入组织邀请",
+    acceptAndEnter: "接受邀请并进入",
+    decline: "拒绝",
+    invitationExpiredOrInvalid: "此邀请已失效或已过期。",
+    invitationForEmail: "邀请发送至",
+    noOrgsYet: "暂未加入任何组织",
+    createFirstOrgDescription: "创建您的第一个组织，开始管理应用与团队成员。",
+    createOrgDescription: "创建带有唯一标识的全新组织工作区。",
+    signInToAccept: "登录以接受邀请",
+    createAccountToAccept: "注册账号以接受邀请",
+    declineInvitation: "拒绝邀请",
   },
 } as const;
 
@@ -579,12 +737,16 @@ export type MessageKey = keyof typeof messages.en;
 export function useAdminContext() {
   const pathname = usePathname();
   const router = useRouter();
-  const params = useSearchParams();
+  const [{ appId: queryAppId, mode, lang: queryLang }] = useQueryStates(adminQueryParsers, {
+    shallow: false,
+  });
+  const { data: activeOrg } = useActiveOrganization();
+  const { orgSlug: pathOrgSlug, viewPath } = extractOrgSlugAndPath(pathname);
+  const orgSlug = activeOrg?.slug || pathOrgSlug || "default";
+
   const [cookieLanguage, setCookieLanguage] = useState<AdminLanguage | undefined>();
-  const queryLanguage = parseLanguage(params.get("lang"));
-  const language = queryLanguage ?? cookieLanguage ?? "en";
-  const mode = parseMode(params.get("mode"));
-  const appId = params.get("appId") || undefined;
+  const language = queryLang ?? cookieLanguage ?? "en";
+  const appId = queryAppId || undefined;
 
   useEffect(() => {
     const cookieValue = document.cookie
@@ -600,27 +762,29 @@ export function useAdminContext() {
   useEffect(() => {
     document.cookie = `openscene_admin_lang=${language}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }, [language]);
+
   const href = useCallback(
     (path: string, extra?: Record<string, string | undefined>) =>
-      buildHref(path, { mode, lang: language, appId }, extra),
-    [appId, language, mode],
+      buildHref(path, { mode, lang: language, orgSlug, appId }, extra),
+    [appId, language, mode, orgSlug],
   );
 
   const setLanguage = useCallback(
     (next: AdminLanguage) => {
       document.cookie = `openscene_admin_lang=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
-      router.replace(buildHref(pathname, { mode, lang: next, appId }));
+      router.replace(buildHref(pathname, { mode, lang: next, orgSlug, appId }));
     },
-    [appId, mode, pathname, router],
+    [appId, mode, orgSlug, pathname, router],
   );
 
   const dictionary = useMemo(() => messages[language], [language]);
   return {
     pathname,
+    viewPath,
     router,
-    params,
     mode,
     language,
+    orgSlug,
     appId,
     href,
     setLanguage,

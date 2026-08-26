@@ -15,10 +15,10 @@ export default defineConfig({
   plugins: lazyPlugins(() => [solid(), solidV2Compat]),
   pack: {
     entry: ["src/index.tsx", "src/server.ts", "src/vite.ts"],
-    dts: true
+    dts: true,
   },
   lint: {
-    options: { typeAware: true, typeCheck: true }
+    options: { typeAware: true, typeCheck: true },
   },
-  fmt: {}
+  fmt: {},
 });

@@ -49,6 +49,7 @@ beforeAll(async () => {
   expect(responseA.status).toBe(201);
   const bodyA = await responseA.json();
   expect(bodyA.type).toBe(APP_TYPE_WEB);
+  expect(bodyA.organizationId).toBe("org_default");
   appA = { id: bodyA.id };
   const responseB = await call("POST", ["apps"], {
     key: "app-b",
@@ -85,6 +86,12 @@ describe("Admin API HTTP flow", () => {
     expect(pageA.sourceTemplate).toBeNull();
     const foreign = await call("GET", ["apps", appB.id, "pages", pageA.id]);
     expect(foreign.status).toBe(404);
+  });
+  test("lists organization members in default organization", async () => {
+    const res = await call("GET", ["organization", "members"]);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.items)).toBe(true);
   });
 
   test("persists and exposes the source Template association on Pages", async () => {

@@ -690,6 +690,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organization/members": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["listOrganizationMembers"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/storage/health": {
     parameters: {
       query?: never;
@@ -1045,6 +1061,7 @@ export interface components {
     };
     App: {
       id: string;
+      organizationId?: string;
       key: string;
       name: string;
       description: string;
@@ -1431,6 +1448,14 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    OrganizationMember: {
+      id: string;
+      userId: string;
+      name?: string | null;
+      email: string;
+      role: string;
+      createdAt: number | string;
     };
     PreviewProfile: {
       id: string;
@@ -2831,6 +2856,7 @@ export interface operations {
           "application/json": {
             items: {
               id: string;
+              organizationId?: string;
               key: string;
               name: string;
               description: string;
@@ -3017,6 +3043,7 @@ export interface operations {
         content: {
           "application/json": {
             id: string;
+            organizationId?: string;
             key: string;
             name: string;
             description: string;
@@ -3173,6 +3200,7 @@ export interface operations {
         content: {
           "application/json": {
             id: string;
+            organizationId?: string;
             key: string;
             name: string;
             description: string;
@@ -3491,6 +3519,7 @@ export interface operations {
         content: {
           "application/json": {
             id: string;
+            organizationId?: string;
             key: string;
             name: string;
             description: string;
@@ -14048,6 +14077,149 @@ export interface operations {
               driver?: "s3" | "memory" | "none" | "deprecated";
               detail?: string;
             };
+          };
+        };
+      };
+      /** @description Bad request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Authentication required */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Resource conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Validation failed */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": {
+            type: string;
+            title: string;
+            status: number;
+            detail: string;
+            instance: string;
+            errors?: {
+              path: string;
+              message: string;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  listOrganizationMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: {
+              id: string;
+              userId: string;
+              name?: string | null;
+              email: string;
+              role: string;
+              createdAt: number | string;
+            }[];
           };
         };
       };

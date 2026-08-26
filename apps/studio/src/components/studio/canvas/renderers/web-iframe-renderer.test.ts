@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import { APP_TYPE_WEB } from "@openscene-ai/core";
-import { RendererPortMessageSchema,
-StudioPortMessageSchema,
-createBridgeEnvelope,
-createEmptySceneDocument, } from "@openscene-ai/core";
+import {
+  RendererPortMessageSchema,
+  StudioPortMessageSchema,
+  createBridgeEnvelope,
+  createEmptySceneDocument,
+} from "@openscene-ai/core";
 
 import { isRendererReadyForSession } from "./web-iframe-renderer";
 

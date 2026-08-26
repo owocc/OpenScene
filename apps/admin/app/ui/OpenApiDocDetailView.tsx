@@ -30,7 +30,6 @@ import { Switch } from "@cloudflare/kumo/components/switch";
 import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { api } from "./api";
 import { useAdminContext, useI18n } from "./i18n";
@@ -155,7 +154,6 @@ interface EndpointOperation {
 }
 
 export function OpenApiDocDetailView() {
-  const pathname = usePathname();
   const context = useAdminContext();
   const { t } = useI18n();
   const toast = useKumoToastManager();
@@ -176,8 +174,8 @@ export function OpenApiDocDetailView() {
   });
   const [jsonValidationError, setJsonValidationError] = useState<string | null>(null);
 
-  // Extract openApiDocId from pathname, e.g. /openapi-docs/123
-  const openApiDocId = pathname.slice("/openapi-docs/".length);
+  // Extract openApiDocId from viewPath, e.g. /openapi-docs/123
+  const openApiDocId = context.viewPath.slice("/openapi-docs/".length);
 
   const query = api.useQuery("get", "/api/v1/apps/{appId}/openapi-docs/{openApiDocId}", {
     params: {

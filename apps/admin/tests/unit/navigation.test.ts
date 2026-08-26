@@ -23,9 +23,12 @@ describe("admin navigation context", () => {
     expect(parseTheme("dark")).toBe("dark");
   });
 
-  test("preserves mode, language, and app scope in links", () => {
+  test("preserves mode, language, org slug, and app scope in links", () => {
+    expect(
+      buildHref("/pages", { mode: "embedded", lang: "zh-CN", orgSlug: "acme", appId: "app_1" }),
+    ).toBe("/acme/pages?mode=embedded&lang=zh-CN&appId=app_1");
     expect(buildHref("/pages", { mode: "embedded", lang: "zh-CN", appId: "app_1" })).toBe(
-      "/pages?mode=embedded&lang=zh-CN&appId=app_1",
+      "/default/pages?mode=embedded&lang=zh-CN&appId=app_1",
     );
   });
 
@@ -34,9 +37,18 @@ describe("admin navigation context", () => {
   });
 
   test("includes app-scoped Components navigation", () => {
-    const navigationItems = navigationGroups.reduce<
-      Array<{ href: string; key: string; icon: string }>
-    >((items, group) => [...items, ...group.items], []);
+    const navigationItems: Array<{ href?: string; key: string; icon?: string }> = [];
+    for (const group of navigationGroups) {
+      for (const item of group.items) {
+        if ("type" in item && item.type === "sub") {
+          for (const sub of item.items) {
+            navigationItems.push(sub);
+          }
+        } else {
+          navigationItems.push(item);
+        }
+      }
+    }
 
     expect(navigationItems).toContainEqual({
       href: "/components",
@@ -53,6 +65,7 @@ describe("admin navigation context", () => {
   test("identifies non-app-scoped and app-scoped paths correctly", () => {
     expect(isAppScopedPath("/settings")).toBe(false);
     expect(isAppScopedPath("/account")).toBe(false);
+    expect(isAppScopedPath("/organization")).toBe(false);
     expect(isAppScopedPath("/apps")).toBe(false);
     expect(isAppScopedPath("/system")).toBe(false);
     expect(isAppScopedPath("/login")).toBe(false);
@@ -69,6 +82,11 @@ describe("admin navigation context", () => {
   test("includes Settings and Account navigation in System group", () => {
     const systemGroup = navigationGroups.find((group) => group.label === "System");
     expect(systemGroup?.items).toContainEqual({
+      href: "/organization",
+      key: "organization",
+      icon: "buildings",
+    });
+    expect(systemGroup?.items).toContainEqual({
       href: "/settings",
       key: "settings",
       icon: "sliders",
@@ -78,6 +96,16 @@ describe("admin navigation context", () => {
       key: "account",
       icon: "user",
     });
+  });
+  test("groups pages, templates, and assets in nested Resources sub-menu under App", () => {
+    const appGroup = navigationGroups.find((group) => group.label === "App");
+    const resourcesSub = appGroup?.items.find(
+      (item) => "type" in item && item.type === "sub" && item.key === "resources",
+    );
+    expect(resourcesSub).toBeDefined();
+    if (resourcesSub && "type" in resourcesSub && resourcesSub.type === "sub") {
+      expect(resourcesSub.items.map((i) => i.key)).toEqual(["pages", "templates", "assets"]);
+    }
   });
 
   test("includes API reference navigation in Developer group with _blank target", () => {

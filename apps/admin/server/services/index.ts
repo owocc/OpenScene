@@ -111,15 +111,27 @@ const EmptyDocument = createEmptySceneDocument();
 export async function listApps(
   db: AppDatabase,
   query: URLSearchParams,
+  organizationId?: string,
 ): Promise<{ items: unknown[]; nextCursor: string | null }> {
   const limit = parseLimit(query.get("limit"));
-  const rows = await db.select().from(apps).orderBy(asc(apps.createdAt), asc(apps.id)).all();
   const offset = decodeCursor(query.get("cursor"));
+  const rows = organizationId
+    ? await db
+        .select()
+        .from(apps)
+        .where(eq(apps.organizationId, organizationId))
+        .orderBy(desc(apps.createdAt), desc(apps.id))
+        .all()
+    : await db.select().from(apps).orderBy(desc(apps.createdAt), desc(apps.id)).all();
   const items = rows.slice(offset, offset + limit).map((row) => appRecord(row));
   return { items, nextCursor: offset + limit < rows.length ? encodeCursor(offset + limit) : null };
 }
 
-export async function createApp(db: AppDatabase, input: unknown): Promise<unknown> {
+export async function createApp(
+  db: AppDatabase,
+  input: unknown,
+  organizationId?: string,
+): Promise<unknown> {
   const body = AppCreateSchema.parse(input);
   if (body.manifest.mode === "remote" && !body.manifest.url)
     throw validation("Remote manifest mode requires a manifest URL");
@@ -131,6 +143,7 @@ export async function createApp(db: AppDatabase, input: unknown): Promise<unknow
         .insert(apps)
         .values({
           id,
+          organizationId: organizationId ?? "org_default",
           key: body.key,
           name: body.name,
           description: body.description,
@@ -2356,6 +2369,7 @@ async function getResourceRow(
 function appRecord(row: typeof apps.$inferSelect): unknown {
   return {
     id: row.id,
+    organizationId: row.organizationId,
     key: row.key,
     name: row.name,
     description: row.description,

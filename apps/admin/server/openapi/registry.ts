@@ -23,6 +23,8 @@ import {
   OpenApiDocPatchSchema,
   OpenApiDocSchema,
   OpenApiDocSummarySchema,
+  OrganizationMemberSchema,
+  OrganizationMembersResponseSchema,
   PreviewProfileCreateSchema,
   PreviewProfilePatchSchema,
   PreviewProfileSchema,
@@ -77,7 +79,7 @@ const schemas = [
   ["ManifestRevision", ManifestRevisionSchema],
   ["Bootstrap", OpenApiJsonObjectSchema],
   ["OpenApiDocSummary", OpenApiDocSummarySchema],
-
+  ["OrganizationMember", OrganizationMemberSchema],
   ["Problem", ProblemSchema],
   ["OpenApiDoc", OpenApiDocSchema],
   ["AiConfig", AiConfigSchema],
@@ -170,6 +172,13 @@ const operations: Operation[] = [
     operationId: "getStorageHealth",
     tag: "System",
     response: JsonObjectSchema,
+  },
+  {
+    method: "get",
+    path: "/api/v1/organization/members",
+    operationId: "listOrganizationMembers",
+    tag: "System",
+    response: OrganizationMembersResponseSchema,
   },
   {
     method: "get",

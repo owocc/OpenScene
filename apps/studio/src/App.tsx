@@ -9,11 +9,13 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { useQueryStore, useStudioStore } from "@/stores";
 import { useI18n } from "@/i18n";
 import { createOpenSceneClient, isApiProblem } from "@openscene-ai/api-client";
-import { applyAgentUiActionsToDocument,
-SceneDocumentSchema,
-type AgentUiAction,
-type AppManifest,
-type SceneDocument, } from "@openscene-ai/core";
+import {
+  applyAgentUiActionsToDocument,
+  SceneDocumentSchema,
+  type AgentUiAction,
+  type AppManifest,
+  type SceneDocument,
+} from "@openscene-ai/core";
 import type { JsonValue } from "@/core/document";
 import { createEditorState, editorReducer, type EditorElement } from "@/core/editor-state";
 import { defaultProps } from "@/core/meta";
