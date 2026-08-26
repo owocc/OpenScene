@@ -86,7 +86,6 @@ export function buildHref(
 
   const params = new URLSearchParams();
   if (context.mode) params.set("mode", context.mode);
-  if (context.lang) params.set("lang", context.lang);
   if (context.appId && !isPersonal) params.set("appId", context.appId);
 
   for (const [key, value] of Object.entries(extra)) {

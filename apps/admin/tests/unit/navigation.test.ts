@@ -25,12 +25,12 @@ describe("admin navigation context", () => {
     expect(parseTheme("dark")).toBe("dark");
   });
 
-  test("preserves mode, language, org slug, and app scope in links", () => {
+  test("preserves mode, org slug, and app scope in links without leaking language to url", () => {
     expect(
       buildHref("/pages", { mode: "embedded", lang: "zh-CN", orgSlug: "acme", appId: "app_1" }),
-    ).toBe("/acme/pages?mode=embedded&lang=zh-CN&appId=app_1");
+    ).toBe("/acme/pages?mode=embedded&appId=app_1");
     expect(buildHref("/pages", { mode: "embedded", lang: "zh-CN", appId: "app_1" })).toBe(
-      "/pages?mode=embedded&lang=zh-CN&appId=app_1",
+      "/pages?mode=embedded&appId=app_1",
     );
   });
   test("distinguishes personal routes from org-scoped routes", () => {

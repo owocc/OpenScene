@@ -9,8 +9,21 @@ import { useActiveOrganization } from "../../lib/auth-client";
 export const adminQueryParsers = {
   appId: parseAsString.withDefault(""),
   mode: parseAsStringLiteral(["standalone", "embedded"] as const).withDefault("standalone"),
-  lang: parseAsStringLiteral(["en", "zh-CN"] as const),
 };
+
+function getInitialLanguage(): AdminLanguage {
+  if (typeof document === "undefined") return "en";
+  const cookieValue = document.cookie
+    .split(";")
+    .map((item) => item.trim().split("="))
+    .find(([key]) => key === "openscene_admin_lang")?.[1];
+  const saved = parseLanguage(cookieValue);
+  if (saved) return saved;
+  if (typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("zh")) {
+    return "zh-CN";
+  }
+  return "en";
+}
 
 export const messages = {
   en: {
@@ -741,15 +754,14 @@ export type MessageKey = keyof typeof messages.en;
 export function useAdminContext() {
   const pathname = usePathname();
   const router = useRouter();
-  const [{ appId: queryAppId, mode, lang: queryLang }] = useQueryStates(adminQueryParsers, {
+  const [{ appId: queryAppId, mode }] = useQueryStates(adminQueryParsers, {
     shallow: false,
   });
   const { data: activeOrg } = useActiveOrganization();
   const { orgSlug: pathOrgSlug, viewPath } = extractOrgSlugAndPath(pathname);
-  const orgSlug = activeOrg?.slug || pathOrgSlug || "default";
+  const orgSlug = activeOrg?.slug || pathOrgSlug || "";
 
-  const [cookieLanguage, setCookieLanguage] = useState<AdminLanguage | undefined>();
-  const language = queryLang ?? cookieLanguage ?? "en";
+  const [language, setLanguageState] = useState<AdminLanguage>(getInitialLanguage);
   const appId = queryAppId || undefined;
 
   useEffect(() => {
@@ -758,28 +770,21 @@ export function useAdminContext() {
       .map((item) => item.trim().split("="))
       .find(([key]) => key === "openscene_admin_lang")?.[1];
     const saved = parseLanguage(cookieValue);
-    setCookieLanguage(
-      saved ?? (navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en"),
-    );
-  }, []);
-
-  useEffect(() => {
-    document.cookie = `openscene_admin_lang=${language}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    if (saved && saved !== language) {
+      setLanguageState(saved);
+    }
   }, [language]);
 
   const href = useCallback(
     (path: string, extra?: Record<string, string | undefined>) =>
-      buildHref(path, { mode, lang: language, orgSlug, appId }, extra),
-    [appId, language, mode, orgSlug],
+      buildHref(path, { mode, orgSlug, appId }, extra),
+    [appId, mode, orgSlug],
   );
 
-  const setLanguage = useCallback(
-    (next: AdminLanguage) => {
-      document.cookie = `openscene_admin_lang=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
-      router.replace(buildHref(pathname, { mode, lang: next, orgSlug, appId }));
-    },
-    [appId, mode, orgSlug, pathname, router],
-  );
+  const setLanguage = useCallback((next: AdminLanguage) => {
+    document.cookie = `openscene_admin_lang=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    setLanguageState(next);
+  }, []);
 
   const dictionary = useMemo(() => messages[language], [language]);
   return {
