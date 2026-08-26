@@ -3,7 +3,9 @@ import { messages } from "../../app/ui/i18n";
 import {
   buildHref,
   isAppScopedPath,
+  isPersonalPath,
   navigationGroups,
+  personalNavigationGroups,
   parseLanguage,
   parseMode,
   parseTheme,
@@ -28,7 +30,34 @@ describe("admin navigation context", () => {
       buildHref("/pages", { mode: "embedded", lang: "zh-CN", orgSlug: "acme", appId: "app_1" }),
     ).toBe("/acme/pages?mode=embedded&lang=zh-CN&appId=app_1");
     expect(buildHref("/pages", { mode: "embedded", lang: "zh-CN", appId: "app_1" })).toBe(
-      "/default/pages?mode=embedded&lang=zh-CN&appId=app_1",
+      "/pages?mode=embedded&lang=zh-CN&appId=app_1",
+    );
+  });
+  test("distinguishes personal routes from org-scoped routes", () => {
+    expect(isPersonalPath("/")).toBe(true);
+    expect(isPersonalPath("/account")).toBe(true);
+    expect(isPersonalPath("/settings")).toBe(true);
+    expect(isPersonalPath("/organization/new")).toBe(true);
+    expect(isPersonalPath("/organization/select")).toBe(true);
+    expect(isPersonalPath("/login")).toBe(true);
+    expect(isPersonalPath("/invite/123")).toBe(true);
+
+    expect(isPersonalPath("/apps")).toBe(false);
+    expect(isPersonalPath("/acme/apps")).toBe(false);
+    expect(isPersonalPath("/acme/overview")).toBe(false);
+    expect(isPersonalPath("/acme/organization")).toBe(false);
+  });
+
+  test("never prefixes org slug to personal routes in buildHref", () => {
+    expect(buildHref("/", { orgSlug: "acme" })).toBe("/");
+    expect(buildHref("/account", { orgSlug: "acme" })).toBe("/account");
+    expect(buildHref("/settings", { orgSlug: "acme" })).toBe("/settings");
+    expect(buildHref("/organization/new", { orgSlug: "acme" })).toBe("/organization/new");
+
+    // Org-scoped routes correctly receive orgSlug
+    expect(buildHref("/apps", { orgSlug: "acme" })).toBe("/acme/apps");
+    expect(buildHref("/overview", { orgSlug: "acme", appId: "app_1" })).toBe(
+      "/acme/overview?appId=app_1",
     );
   });
 
@@ -79,22 +108,13 @@ describe("admin navigation context", () => {
     expect(isAppScopedPath("/meta")).toBe(true);
   });
 
-  test("includes Settings and Account navigation in System group", () => {
-    const systemGroup = navigationGroups.find((group) => group.label === "System");
-    expect(systemGroup?.items).toContainEqual({
-      href: "/organization",
-      key: "organization",
+  test("includes personal navigation in personalNavigationGroups", () => {
+    const personalSystem = personalNavigationGroups.find((group) => group.label === "Account");
+    expect(personalSystem?.items).toContainEqual({
+      href: "/",
+      key: "organizations",
       icon: "buildings",
-    });
-    expect(systemGroup?.items).toContainEqual({
-      href: "/settings",
-      key: "settings",
-      icon: "sliders",
-    });
-    expect(systemGroup?.items).toContainEqual({
-      href: "/account",
-      key: "account",
-      icon: "user",
+      badge: "Beta",
     });
   });
   test("groups pages, templates, and assets in nested Resources sub-menu under App", () => {

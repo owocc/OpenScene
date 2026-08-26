@@ -1,13 +1,13 @@
 import { Suspense, type ReactNode } from "react";
-
-function StandaloneFallback() {
-  return <div className="h-dvh min-h-dvh w-full bg-kumo-canvas" aria-hidden="true" />;
-}
+import { AdminShell } from "../ui/AdminShell";
+import { FullPageSkeleton, PageSkeleton } from "../ui/PageSkeleton";
 
 export default function StandaloneLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-dvh w-full bg-kumo-canvas text-kumo-default flex flex-col justify-center items-center p-4 sm:p-6">
-      <Suspense fallback={<StandaloneFallback />}>{children}</Suspense>
-    </div>
+    <Suspense fallback={<FullPageSkeleton />}>
+      <AdminShell>
+        <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+      </AdminShell>
+    </Suspense>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
-import { Surface } from "@cloudflare/kumo/components/surface";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Text } from "@cloudflare/kumo/components/text";
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient, useSession } from "@/lib/auth-client";
@@ -71,8 +71,8 @@ export default function StandaloneOrganizationNewPage() {
   }
 
   return (
-    <main className="w-full max-w-lg mx-auto">
-      <Surface className="p-6 sm:p-8 rounded-2xl border border-kumo-line bg-kumo-canvas shadow-sm">
+    <div className="w-full max-w-lg mx-auto py-4">
+      <LayerCard className="p-6 sm:p-8 rounded-xl shadow-sm ring ring-kumo-line">
         <div className="mb-6">
           <Text variant="heading" as="h1" size="lg">
             {t("createNewOrg")}
@@ -110,7 +110,7 @@ export default function StandaloneOrganizationNewPage() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => router.back()}
+              onClick={() => router.push("/organization/select")}
               disabled={loading}
             >
               {t("cancel")}
@@ -125,7 +125,7 @@ export default function StandaloneOrganizationNewPage() {
             </Button>
           </div>
         </form>
-      </Surface>
-    </main>
+      </LayerCard>
+    </div>
   );
 }

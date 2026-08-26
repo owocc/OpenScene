@@ -51,6 +51,7 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
+import { PageSkeleton, type PageSkeletonVariant } from "./PageSkeleton";
 import {
   authClient,
   useSession,
@@ -229,12 +230,18 @@ function PageHeader({
   );
 }
 
-function LoadingState() {
-  return (
-    <div className="grid place-items-center py-12">
-      <Loader aria-label="Loading" />
-    </div>
-  );
+function LoadingState({
+  variant = "table",
+  hasHeader = true,
+  rows = 5,
+  count = 6,
+}: {
+  variant?: PageSkeletonVariant;
+  hasHeader?: boolean;
+  rows?: number;
+  count?: number;
+}) {
+  return <PageSkeleton variant={variant} hasHeader={hasHeader} rows={rows} count={count} />;
 }
 
 function ErrorState({ error }: { error: unknown }) {
@@ -358,7 +365,7 @@ function AppsView() {
       </PageHeader>
       {query.error ? <ErrorState error={query.error} /> : null}
       {query.isLoading ? (
-        <LoadingState />
+        <LoadingState variant="table" hasHeader={false} />
       ) : apps.length === 0 ? (
         <Empty
           title={t("noResults")}
@@ -635,7 +642,7 @@ function OverviewView() {
     params: { path: { appId: context.appId ?? "" } },
   });
   const healthQuery = api.useQuery("get", "/api/v1/health");
-  if (appQuery.isLoading) return <LoadingState />;
+  if (appQuery.isLoading) return <LoadingState variant="overview" />;
   if (appQuery.error || !appQuery.data) return <ErrorState error={appQuery.error} />;
   const app = appQuery.data;
   return (
@@ -1032,7 +1039,7 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
       </div>
       {result.error ? <ErrorState error={result.error} /> : null}
       {result.isLoading ? (
-        <LoadingState />
+        <LoadingState variant="table" hasHeader={false} />
       ) : resources.length === 0 ? (
         <Empty
           title={t("noResults")}
@@ -1495,7 +1502,7 @@ function ResourceDetailView() {
       );
     }
   }
-  if (pageQuery.isLoading || templateQuery.isLoading) return <LoadingState />;
+  if (pageQuery.isLoading || templateQuery.isLoading) return <LoadingState variant="detail" />;
   if (!resource) return <ErrorState error={pageQuery.error || templateQuery.error} />;
   const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
   const json = JSON.stringify(
@@ -2128,7 +2135,7 @@ function PreviewProfilesView() {
       </PageHeader>
       {query.error ? <ErrorState error={query.error} /> : null}
       {query.isLoading ? (
-        <LoadingState />
+        <LoadingState variant="cards" hasHeader={false} />
       ) : profiles.length === 0 ? (
         <Empty
           title={t("noResults")}
@@ -3989,7 +3996,7 @@ function MetaView() {
     toast.add({ title: t("copied") });
   };
 
-  if (app.isLoading || manifest.isLoading) return <LoadingState />;
+  if (app.isLoading || manifest.isLoading) return <LoadingState variant="cards" />;
   if (app.error) return <ErrorState error={app.error} />;
 
   return (
@@ -5163,7 +5170,7 @@ function PromptsListView() {
 
   const items = query.data ?? [];
 
-  if (query.isLoading) return <LoadingState />;
+  if (query.isLoading) return <LoadingState variant="cards" />;
   if (query.error) return <ErrorState error={query.error} />;
 
   return (
@@ -5526,7 +5533,7 @@ function PromptEditorView() {
     }
   }
 
-  if (!isNew && promptQuery.isLoading) return <LoadingState />;
+  if (!isNew && promptQuery.isLoading) return <LoadingState variant="detail" />;
   if (!isNew && promptQuery.error) return <ErrorState error={promptQuery.error} />;
 
   const isSaving = create.isPending || update.isPending;
@@ -6315,7 +6322,7 @@ function OrganizationView() {
               description="You do not have permission to view members."
             />
           ) : loadingMembers ? (
-            <LoadingState />
+            <LoadingState variant="table" hasHeader={false} rows={3} />
           ) : members.length === 0 ? (
             <Empty title={t("noMembers")} />
           ) : (
@@ -6430,7 +6437,7 @@ function OrganizationView() {
           <div>
             <div className="font-semibold text-sm mb-3">{t("pendingInvitations")}</div>
             {loadingInvitations ? (
-              <LoadingState />
+              <LoadingState variant="table" hasHeader={false} rows={3} />
             ) : invitations.length === 0 ? (
               <Empty title={t("noPendingInvitations")} />
             ) : (
@@ -6570,7 +6577,7 @@ function OrganizationView() {
             </div>
 
             {loadingRoles ? (
-              <LoadingState />
+              <LoadingState variant="table" hasHeader={false} rows={3} />
             ) : customRoles.length === 0 ? (
               <Empty title={t("noRoles")} />
             ) : (

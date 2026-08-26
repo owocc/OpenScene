@@ -1,14 +1,15 @@
 import { Suspense, type ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AdminShell } from "../ui/AdminShell";
+import { FullPageSkeleton, PageSkeleton } from "../ui/PageSkeleton";
 import { getServerSessionAndOrganizations } from "../../server/auth";
 
 function AdminShellFallback() {
-  return <div className="h-dvh min-h-dvh w-full bg-kumo-canvas" aria-hidden="true" />;
+  return <FullPageSkeleton />;
 }
 
 function AdminContentFallback() {
-  return <div className="min-h-96 w-full" aria-hidden="true" />;
+  return <PageSkeleton />;
 }
 
 export default async function AdminLayout({
@@ -27,19 +28,19 @@ export default async function AdminLayout({
   }
 
   if (!isAuthDisabled) {
-    if (organizations.length === 0) {
-      redirect("/organization/select");
-    }
-
     const requestedSlug = resolvedParams?.orgSlug;
     if (requestedSlug) {
       const isMemberOfRequested = organizations.some((o) => o.slug === requestedSlug);
       if (!isMemberOfRequested) {
-        const targetOrg =
-          activeOrgId && organizations.some((o) => o.id === activeOrgId)
-            ? organizations.find((o) => o.id === activeOrgId)!
-            : organizations[0];
-        redirect(`/${targetOrg.slug}/apps`);
+        if (organizations.length > 0) {
+          const targetOrg =
+            activeOrgId && organizations.some((o) => o.id === activeOrgId)
+              ? organizations.find((o) => o.id === activeOrgId)!
+              : organizations[0];
+          redirect(`/${targetOrg.slug}/apps`);
+        } else {
+          redirect("/");
+        }
       }
     }
   }

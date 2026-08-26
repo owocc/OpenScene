@@ -3,8 +3,10 @@
 import {
   BookOpen,
   Buildings,
+  CaretUpDown,
   ChartLine,
   ChatText,
+  Cloud,
   Code,
   Copy,
   Cube,
@@ -15,15 +17,22 @@ import {
   Globe,
   Image,
   Key,
+  MagnifyingGlass,
+  Plus,
+  Question,
   ShieldWarning,
+  SignOut,
   SlidersHorizontal,
   Sparkle,
   SquaresFour,
+  SunDim,
   Tag,
   User,
 } from "@phosphor-icons/react";
+import { CloudflareLogo } from "@cloudflare/kumo";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
@@ -36,12 +45,19 @@ import {
   useSession,
 } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 import { defaultRoleStatements, hasStatement } from "@/lib/permissions";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
-import { buildHref, navigationGroups } from "./navigation";
+import {
+  buildHref,
+  isPersonalPath,
+  navigationGroups,
+  personalNavigationGroups,
+} from "./navigation";
+import { FullPageSkeleton } from "./PageSkeleton";
 const icons = {
   book: BookOpen,
   buildings: Buildings,
@@ -68,6 +84,7 @@ const icons = {
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const context = useAdminContext();
+  const { theme, setTheme } = useTheme();
   const { t } = useI18n();
   const { data: session, isPending: isSessionPending } = useSession();
   const { data: orgs } = useListOrganizations();
@@ -103,17 +120,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
     // When logged in via session, verify organization access
     if (session?.user && Array.isArray(orgs)) {
-      const isExemptPath =
-        context.viewPath === "/organization/new" ||
-        context.viewPath === "/organization/select" ||
-        context.viewPath.startsWith("/invite");
+      const isPersonal = isPersonalPath(pathname) || isPersonalPath(context.viewPath);
 
-      if (orgs.length === 0 && !isExemptPath) {
-        context.router.replace("/organization/select");
+      if (orgs.length === 0 && !isPersonal) {
+        context.router.replace("/");
         return;
       }
 
-      if (orgs.length > 0 && !isExemptPath) {
+      if (orgs.length > 0 && !isPersonal) {
         const userOrgs = orgs as Array<{ id: string; slug: string; name: string }>;
         const hasMatchingOrg = userOrgs.some((o) => o.slug === context.orgSlug);
         if (!hasMatchingOrg) {
@@ -131,13 +145,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
       }
     }
   }, [pathname, isAuthenticated, isChecking, session, orgs, activeOrg, context]);
+
   const [navigationSearch, setNavigationSearch] = useState("");
   const appsQuery = api.useQuery("get", "/api/v1/apps", {
     params: { query: { limit: "100" } },
   });
-  const appItems = Object.fromEntries(
-    (appsQuery.data?.items ?? []).map((app) => [app.id, app.name]),
-  );
+  const apps = appsQuery.data?.items ?? [];
+  const currentApp = apps.find((app) => app.id === context.appId);
+  const appItems = Object.fromEntries(apps.map((app) => [app.id, app.name]));
 
   const memberRole = activeMember?.role;
   let activeStatements: Record<string, readonly string[]> = defaultRoleStatements.owner;
@@ -148,8 +163,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
   const canManageAi = hasStatement(activeStatements, "ai", "manage");
 
+  const isPersonal = isPersonalPath(pathname) || isPersonalPath(context.viewPath);
+  const activeNavGroups = isPersonal ? personalNavigationGroups : navigationGroups;
+
   const normalizedNavigationSearch = navigationSearch.trim().toLocaleLowerCase();
-  const filteredNavigationGroups = navigationGroups
+  const filteredNavigationGroups = activeNavGroups
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
@@ -178,6 +196,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (pathname === "/login") return <main className="min-h-dvh">{children}</main>;
   if (context.mode === "embedded") return <main className="min-h-dvh">{children}</main>;
   if (!isAuthenticated && !isChecking) return null;
+  if (isChecking) return <FullPageSkeleton />;
   return (
     <Sidebar.Provider
       open={sidebarOpen}
@@ -195,29 +214,81 @@ export function AdminShell({ children }: { children: ReactNode }) {
       className="h-dvh min-h-0 overflow-hidden"
     >
       <Sidebar className="h-full border-r border-kumo-line" fullScreenOnMobile>
-        <Sidebar.Header className="w-full border-b border-kumo-line">
-          <div className="w-full min-w-0">
-            <Select
-              aria-label={t("selectApp")}
-              placeholder={t("selectApp")}
-              value={context.appId ?? null}
-              items={appItems}
-              className="!w-full min-w-0"
-              onValueChange={(value) => {
-                if (typeof value === "string")
-                  context.router.push(context.href("/overview", { appId: value }));
-              }}
-            />
+        <Sidebar.Header className="w-full border-b border-kumo-line p-2.5">
+          <div className="flex h-8 items-center justify-between gap-2 px-1">
+            <a href="/" className="flex items-center shrink-0" aria-label="Home">
+              <CloudflareLogo variant="glyph" className="h-6 w-auto" color="color" />
+            </a>
+
+            {!isPersonal && (
+              <DropdownMenu>
+                <DropdownMenu.Trigger
+                  render={
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg px-2 py-1 text-left text-sm font-semibold transition-colors hover:bg-kumo-fill cursor-pointer group-data-[state=collapsed]/sidebar:hidden"
+                    >
+                      <span className="truncate text-kumo-default">
+                        {currentApp?.name || t("selectApp")}
+                      </span>
+                      <CaretUpDown size={14} className="shrink-0 text-kumo-subtle" />
+                    </button>
+                  }
+                />
+                <DropdownMenu.Content align="start" className="w-56">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-kumo-subtle uppercase">
+                    {t("apps")}
+                  </div>
+                  {apps.map((app) => {
+                    const isSelected = app.id === context.appId;
+                    return (
+                      <DropdownMenu.Item
+                        key={app.id}
+                        selected={isSelected}
+                        icon={SquaresFour}
+                        onClick={() => {
+                          context.router.push(context.href("/overview", { appId: app.id }));
+                        }}
+                      >
+                        <span className="truncate">{app.name}</span>
+                      </DropdownMenu.Item>
+                    );
+                  })}
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Item
+                    icon={Plus}
+                    onClick={() => context.router.push(context.href("/apps"))}
+                  >
+                    {t("create")}
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    icon={SquaresFour}
+                    onClick={() => context.router.push(context.href("/apps"))}
+                  >
+                    {t("apps")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu>
+            )}
           </div>
         </Sidebar.Header>
         <Sidebar.Content className="min-h-0 flex-1 overflow-y-auto">
-          <Input
-            aria-label={t("search")}
-            placeholder={t("search")}
-            value={navigationSearch}
-            onChange={(event) => setNavigationSearch(event.target.value)}
-            className="mb-3 w-full"
-          />
+          {/* Quick search (matching Image #1 and Image #2) */}
+          <div className="relative mb-3 w-full">
+            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-kumo-subtle">
+              <MagnifyingGlass size={15} />
+            </span>
+            <Input
+              aria-label={t("search")}
+              placeholder="Quick search..."
+              value={navigationSearch}
+              onChange={(event) => setNavigationSearch(event.target.value)}
+              className="!pl-8 !pr-8 w-full text-xs"
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[10px] font-medium text-kumo-subtle">
+              ⌘K
+            </span>
+          </div>
           {filteredNavigationGroups.map((group) => (
             <Sidebar.Group key={group.label}>
               <Sidebar.GroupLabel>{t(group.key as MessageKey) || group.label}</Sidebar.GroupLabel>
@@ -275,21 +346,34 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   };
                   const Icon = icons[directItem.icon];
                   const active =
-                    context.viewPath === directItem.href ||
-                    (directItem.href !== "/apps" &&
-                      context.viewPath.startsWith(`${directItem.href}/`));
+                    (directItem.href === "/" &&
+                      (context.viewPath === "/" || context.viewPath === "/organization/select")) ||
+                    (directItem.href !== "/" &&
+                      (context.viewPath === directItem.href ||
+                        (directItem.href !== "/apps" &&
+                          context.viewPath.startsWith(`${directItem.href}/`))));
                   const isExternal = directItem.target === "_blank";
+                  const itemHref = isExternal
+                    ? directItem.href
+                    : isPersonal
+                      ? directItem.href
+                      : context.href(directItem.href);
                   return (
                     <Sidebar.MenuButton
                       key={directItem.href}
-                      href={isExternal ? directItem.href : context.href(directItem.href)}
+                      href={itemHref}
                       icon={Icon}
                       active={active}
                       tooltip={t(directItem.key as MessageKey)}
                       target={isExternal ? "_blank" : undefined}
                       rel={isExternal ? "noreferrer noopener" : undefined}
                     >
-                      {t(directItem.key as MessageKey)}
+                      <span className="flex-1 truncate">{t(directItem.key as MessageKey)}</span>
+                      {(directItem as { badge?: string }).badge ? (
+                        <span className="ml-auto rounded border border-dashed border-kumo-line px-1.5 py-0.5 text-[10px] font-medium text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden">
+                          {(directItem as { badge?: string }).badge}
+                        </span>
+                      ) : null}
                     </Sidebar.MenuButton>
                   );
                 })}
@@ -305,64 +389,179 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-10 flex min-h-14 items-center justify-between gap-4 border-b border-kumo-line bg-kumo-canvas px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Sidebar.Trigger aria-label="Open sidebar" />
-            <Breadcrumbs size="sm">
-              <Breadcrumbs.Link href={context.href("/apps")}>
-                {activeOrg?.name || t("apps")}
-              </Breadcrumbs.Link>
-              <Breadcrumbs.Separator />
-              <Breadcrumbs.Current>
-                {t((context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey)}
-              </Breadcrumbs.Current>
-            </Breadcrumbs>
+            {isPersonal ? (
+              <Breadcrumbs size="sm">
+                <Breadcrumbs.Current>
+                  {context.viewPath === "/organization/new"
+                    ? t("createNewOrg")
+                    : context.viewPath === "/account"
+                      ? t("account")
+                      : context.viewPath === "/settings"
+                        ? t("settings")
+                        : t("organizations")}
+                </Breadcrumbs.Current>
+              </Breadcrumbs>
+            ) : (
+              <Breadcrumbs size="sm">
+                <Breadcrumbs.Link href={context.href("/apps")}>
+                  {activeOrg?.name || t("apps")}
+                </Breadcrumbs.Link>
+                <Breadcrumbs.Separator />
+                <Breadcrumbs.Current>
+                  {t((context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey)}
+                </Breadcrumbs.Current>
+              </Breadcrumbs>
+            )}
           </div>
           <div className="flex items-center gap-3">
-            {orgs && orgs.length > 0 && (
-              <div className="w-40 sm:w-48">
-                <Select
-                  aria-label={t("orgSwitcher")}
-                  placeholder={t("orgSwitcher")}
-                  value={activeOrg?.id ?? orgs[0]?.id ?? null}
-                  items={Object.fromEntries(
-                    (orgs as Array<{ id: string; name: string }>).map((org) => [org.id, org.name]),
-                  )}
-                  className="!w-full min-w-0"
-                  onValueChange={async (value) => {
-                    if (typeof value === "string") {
-                      await authClient.organization.setActive({ organizationId: value });
-                      void queryClient.invalidateQueries();
-                      const targetOrg = (
-                        orgs as Array<{ id: string; slug: string }> | undefined
-                      )?.find((o) => o.id === value);
-                      const nextSlug = targetOrg?.slug || "default";
-                      context.router.push(
-                        buildHref(context.viewPath, {
-                          mode: context.mode,
-                          lang: context.language,
-                          orgSlug: nextSlug,
-                          appId: context.appId,
-                        }),
-                      );
-                    }
-                  }}
-                />
-              </div>
-            )}
+            {/* Support Link */}
+            <LinkButton
+              variant="ghost"
+              size="sm"
+              icon={Question}
+              href="https://openscene.dev"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="hidden sm:inline-flex text-kumo-subtle hover:text-kumo-default gap-1.5 font-medium"
+            >
+              Support
+            </LinkButton>
+
+            {/* Profile Dropdown Menu */}
             {session?.user && (
-              <div className="flex items-center gap-3 text-sm text-kumo-subtle">
-                <span className="hidden sm:inline-block truncate max-w-[180px]">
-                  {session.user.name || session.user.email}
-                </span>
-                <Button
-                  size="xs"
-                  variant="secondary"
-                  onClick={async () => {
-                    await signOut();
-                    window.location.href = "/login";
-                  }}
-                >
-                  {t("signOut")}
-                </Button>
-              </div>
+              <DropdownMenu>
+                <DropdownMenu.Trigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label="User profile menu"
+                      className="flex size-8 items-center justify-center rounded-full bg-kumo-fill text-kumo-subtle hover:bg-kumo-line hover:text-kumo-default transition-colors cursor-pointer"
+                    >
+                      <User size={18} weight="fill" />
+                    </button>
+                  }
+                />
+                <DropdownMenu.Content align="end" className="w-56">
+                  <div className="px-3 py-2 text-xs font-medium text-kumo-subtle truncate max-w-[210px]">
+                    {session.user.email || session.user.name}
+                  </div>
+                  <DropdownMenu.Separator />
+
+                  {/* Organizations / Switch Organization */}
+                  {orgs && orgs.length > 1 ? (
+                    <DropdownMenu.Sub>
+                      <DropdownMenu.SubTrigger icon={Buildings}>
+                        {t("organizations")}
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.SubContent className="w-56">
+                        <div className="px-3 py-1.5 text-xs font-semibold text-kumo-subtle uppercase">
+                          {t("organizations")}
+                        </div>
+                        {(orgs as Array<{ id: string; name: string; slug: string }>).map((org) => {
+                          const isSelected =
+                            org.id === activeOrg?.id || org.slug === context.orgSlug;
+                          return (
+                            <DropdownMenu.Item
+                              key={org.id}
+                              selected={isSelected}
+                              icon={Buildings}
+                              onClick={async () => {
+                                await authClient.organization.setActive({ organizationId: org.id });
+                                void queryClient.invalidateQueries();
+                                context.router.push(buildHref("/apps", { orgSlug: org.slug }));
+                              }}
+                            >
+                              <span className="truncate">{org.name}</span>
+                            </DropdownMenu.Item>
+                          );
+                        })}
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          icon={Plus}
+                          onClick={() => context.router.push("/organization/new")}
+                        >
+                          {t("createNewOrg")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          icon={SquaresFour}
+                          onClick={() => context.router.push("/")}
+                        >
+                          {t("organizations")}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.SubContent>
+                    </DropdownMenu.Sub>
+                  ) : (
+                    <DropdownMenu.Item icon={Buildings} onClick={() => context.router.push("/")}>
+                      {t("organizations")}
+                    </DropdownMenu.Item>
+                  )}
+                  <DropdownMenu.Item icon={User} onClick={() => context.router.push("/account")}>
+                    {t("account")}
+                  </DropdownMenu.Item>
+
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger icon={SunDim}>{t("theme")}</DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item
+                        selected={theme === "system"}
+                        onClick={() => setTheme("system")}
+                      >
+                        {t("themeSystem")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        selected={theme === "light"}
+                        onClick={() => setTheme("light")}
+                      >
+                        {t("themeLight")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        selected={theme === "dark"}
+                        onClick={() => setTheme("dark")}
+                      >
+                        {t("themeDark")}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  <DropdownMenu.Sub>
+                    <DropdownMenu.SubTrigger icon={Globe}>{t("language")}</DropdownMenu.SubTrigger>
+                    <DropdownMenu.SubContent>
+                      <DropdownMenu.Item
+                        selected={context.language === "en"}
+                        onClick={() => context.setLanguage("en")}
+                      >
+                        {t("english")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        selected={context.language === "zh-CN"}
+                        onClick={() => context.setLanguage("zh-CN")}
+                      >
+                        {t("chinese")}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Sub>
+
+                  <DropdownMenu.Item
+                    icon={SlidersHorizontal}
+                    onClick={() => context.router.push("/settings")}
+                  >
+                    {t("settings")}
+                  </DropdownMenu.Item>
+
+                  <DropdownMenu.Separator />
+
+                  <DropdownMenu.Item
+                    variant="danger"
+                    icon={SignOut}
+                    onClick={async () => {
+                      await signOut();
+                      window.location.href = "/login";
+                    }}
+                  >
+                    {t("signOut")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu>
             )}
           </div>
         </header>

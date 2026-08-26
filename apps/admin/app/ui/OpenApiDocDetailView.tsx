@@ -29,6 +29,7 @@ import { Surface } from "@cloudflare/kumo/components/surface";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
+import { PageSkeleton } from "./PageSkeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { api } from "./api";
@@ -411,11 +412,7 @@ export function OpenApiDocDetailView() {
   };
 
   if (query.isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader size="lg" />
-      </div>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   if (query.error || !doc) {

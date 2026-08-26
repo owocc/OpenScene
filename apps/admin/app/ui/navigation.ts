@@ -14,13 +14,40 @@ export function parseTheme(value: string | null | undefined): AdminTheme | undef
   return value === "system" || value === "light" || value === "dark" ? value : undefined;
 }
 
+/**
+ * Checks if a path is a personal/global route (doesn't require an organization slug).
+ */
+export function isPersonalPath(pathname: string): boolean {
+  const clean = pathname.split("?")[0];
+  const segments = clean.split("/").filter(Boolean);
+  if (segments.length === 0) return true; // root "/" is the personal organizations selection view
+  const first = segments[0];
+  return (
+    first === "account" ||
+    first === "settings" ||
+    first === "login" ||
+    first === "invite" ||
+    (first === "organization" && (segments[1] === "new" || segments[1] === "select"))
+  );
+}
+
 export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; viewPath: string } {
   const clean = pathname.split("?")[0];
   const segments = clean.split("/").filter(Boolean);
-  if (segments.length === 0) return { orgSlug: "default", viewPath: "/apps" };
+  if (segments.length === 0) return { orgSlug: "", viewPath: "/" };
 
-  if (segments[0] === "login" || segments[0] === "api" || segments[0] === "invite") {
-    return { orgSlug: "default", viewPath: `/${segments.join("/")}` };
+  if (
+    segments[0] === "login" ||
+    segments[0] === "api" ||
+    segments[0] === "invite" ||
+    segments[0] === "account" ||
+    segments[0] === "settings"
+  ) {
+    return { orgSlug: "", viewPath: `/${segments.join("/")}` };
+  }
+
+  if (segments[0] === "organization" && (segments[1] === "new" || segments[1] === "select")) {
+    return { orgSlug: "", viewPath: `/${segments.join("/")}` };
   }
 
   const knownRootViews = [
@@ -48,7 +75,7 @@ export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; view
   ];
 
   if (knownRootViews.includes(segments[0])) {
-    return { orgSlug: "default", viewPath: `/${segments.join("/")}` };
+    return { orgSlug: "", viewPath: `/${segments.join("/")}` };
   }
 
   const orgSlug = segments[0];
@@ -59,17 +86,18 @@ export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; view
 
 export function buildHref(
   path: string,
-  context: { mode?: AdminMode; lang?: AdminLanguage; orgSlug?: string; appId?: string },
+  context: { mode?: AdminMode; lang?: AdminLanguage; orgSlug?: string; appId?: string } = {},
   extra: Record<string, string | undefined> = {},
 ): string {
   const { viewPath: cleanViewPath, orgSlug: extractedSlug } = extractOrgSlugAndPath(path);
-  const orgSlug = context.orgSlug || extractedSlug || "default";
+  const isPersonal = isPersonalPath(cleanViewPath);
+  const orgSlug = isPersonal ? "" : context.orgSlug || extractedSlug || "";
   const basePath = orgSlug ? `/${orgSlug}${cleanViewPath}` : cleanViewPath;
 
   const params = new URLSearchParams();
   if (context.mode) params.set("mode", context.mode);
   if (context.lang) params.set("lang", context.lang);
-  if (context.appId) params.set("appId", context.appId);
+  if (context.appId && !isPersonal) params.set("appId", context.appId);
 
   for (const [key, value] of Object.entries(extra)) {
     if (value) params.set(key, value);
@@ -83,6 +111,7 @@ export function buildHref(
 export function isAppScopedPath(pathname: string): boolean {
   const { viewPath } = extractOrgSlugAndPath(pathname);
   return (
+    viewPath !== "/" &&
     viewPath !== "/apps" &&
     viewPath !== "/keys" &&
     viewPath !== "/system" &&
@@ -99,6 +128,24 @@ export function isAppScopedPath(pathname: string): boolean {
   );
 }
 
+/**
+ * Personal navigation items for the sidebar when in personal/global view mode.
+ */
+export const personalNavigationGroups = [
+  {
+    label: "Account",
+    key: "system",
+    items: [
+      { href: "/", key: "organizations", icon: "buildings", badge: "Beta" },
+      { href: "/account", key: "account", icon: "user" },
+      { href: "/settings", key: "settings", icon: "sliders" },
+    ],
+  },
+] as const;
+
+/**
+ * Organization-scoped navigation items (account, settings & org switcher moved to header navigation).
+ */
 export const navigationGroups = [
   {
     label: "System",
@@ -106,12 +153,9 @@ export const navigationGroups = [
     items: [
       { href: "/apps", key: "apps", icon: "squares" },
       { href: "/keys", key: "keys", icon: "key" },
-      { href: "/organization", key: "organization", icon: "buildings" },
       { href: "/system", key: "system", icon: "gear" },
       { href: "/ai", key: "ai", icon: "sparkle" },
       { href: "/system-prompt", key: "systemPrompt", icon: "shieldWarning" },
-      { href: "/settings", key: "settings", icon: "sliders" },
-      { href: "/account", key: "account", icon: "user" },
     ],
   },
   {
