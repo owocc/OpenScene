@@ -1,10 +1,10 @@
 import { createContext, useContext } from "react";
 import type { OpenSceneClient, OpenSceneClientState } from "@openscene-ai/javascript";
-import type { OpenSceneReactApp } from "./catalog.ts";
+import type { OpenSceneReactRuntime } from "./catalog.ts";
 
 export interface OpenSceneContextValue {
   client: OpenSceneClient;
-  app: OpenSceneReactApp;
+  runtime: OpenSceneReactRuntime;
   snapshot: OpenSceneClientState;
   /** Live document revision pushed by the Studio over the bridge. */
   revision: number | null;

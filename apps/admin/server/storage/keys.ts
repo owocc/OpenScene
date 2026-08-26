@@ -30,6 +30,15 @@ export function releaseObjectKey(appId: string, releaseId: string): string {
   return `apps/${safeSegment(appId)}/releases/${safeSegment(releaseId)}/document.json`;
 }
 
+export function pageObjectKey(appId: string, pageKey: string): string {
+  const pathSegments = pageKey
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, "_"))
+    .join("/");
+  return `apps/${safeSegment(appId)}/pages/${pathSegments || "home"}.json`;
+}
+
 export function safeFileName(fileName: string): string {
   const base = path.basename(fileName).normalize("NFKC");
   const value = base.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");

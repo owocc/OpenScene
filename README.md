@@ -230,31 +230,32 @@ server {
 
 ---
 
-## Deploying Host Renderer App (e.g. React Vite)
+## Deploying a Host Renderer (e.g. React Vite)
 
-The host app (such as `examples/react-vite`) renders published pages for end users and serves as the canvas iframe inside Studio.
+The host application owns its UI and only mounts the OpenScene renderer. Published page JSON is read directly from S3/CloudFront; Studio editor mode is selected by the existing query parameters and uses the Protocol v2 bridge.
 
 ### 1. Environment Configuration (`.env`)
 
 ```bash
-# Browser runtime config
-VITE_OPENSCENE_ADMIN_URL=https://admin.yourdomain.com
-VITE_OPENSCENE_APP_KEY=your-app-key
+# Browser runtime config: public S3/CloudFront directory containing page JSON.
+VITE_OPENSCENE_BASE_URL=https://cdn.yourdomain.com/openscene/apps/app_xxx/pages
 
-# CI/CD build-time manifest publish config (optional)
+# CI/CD build-time manifest publishing config.
 OPENSCENE_ADMIN_URL=https://admin.yourdomain.com
 OPENSCENE_APP_ID=app_xxxxxxxxxxxxxxxxx
-OPENSCENE_APP_KEY=appkey_xxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENSCENE_PUBLISH_KEY=osc_publish_xxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+The browser never receives the Publish Key. App ID identifies the Admin target; the Publish Key is a Better Auth API key scoped to `manifest:write` for that App and is managed from the Admin **Publish keys** page (`/keys`).
 
 ### 2. Build & Deploy
 
 ```bash
-# Build static bundle (Vite plugin automatically publishes manifest to Admin during closeBundle)
-vp -C examples/react-vite build
+# The Vite plugin publishes the component catalog when the three build variables are set.
+vp -C examples/react-vite-tailwind build
 ```
 
-Deploy the generated `examples/react-vite/dist` to your web server or CDN.
+The runtime requests `{VITE_OPENSCENE_BASE_URL}/{page-key}.json`; `/` maps to `home.json`. Deploy the host bundle and the page JSON release directory independently.
 
 ---
 
@@ -266,7 +267,7 @@ vp install
 
 # Run test suites
 vp test packages/sdk/react
-vp test examples/react-vite
+vp test examples/react-vite-tailwind
 vp run -r test
 
 # Code quality and type checks

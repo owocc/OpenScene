@@ -1,26 +1,15 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 // @ts-expect-error jsdom ships no type declarations
 import { JSDOM } from "jsdom";
-import type * as Core from "@openscene-ai/core";
-
-
-import { createBridgeEnvelope,
-createEmptySceneDocument,
-type SceneDocument, } from "@openscene-ai/core";
-
+import {
+  createBridgeEnvelope,
+  createEmptySceneDocument,
+  PublishedSceneDocumentSchema,
+  StudioPortMessageSchema,
+  type SceneDocument,
+} from "@openscene-ai/core";
 import { OpenSceneController, type OpenSceneClientOptions } from "./client.js";
 import { createIndexedDbDraftStore } from "./draft-store.js";
-import type { AppManifest } from "@openscene-ai/core";
-
-const manifest: AppManifest = {
-  protocolVersion: "2",
-  app: { key: "web", type: "web" },
-  components: {
-    View: { title: "View", props: {} },
-    Text: { title: "Text", props: {} },
-    Button: { title: "Button", props: {} },
-  },
-};
 
 const EDITOR_URL =
   "http://localhost:5174/?openscene-editor=1&openscene-studio-origin=http%3A%2F%2Flocalhost%3A5173&openscene-editor-session=session-test";
@@ -42,12 +31,10 @@ function makeDocument(text: string): SceneDocument {
 
 function makeController(window: Window): OpenSceneController {
   const options: OpenSceneClientOptions = {
-    apiBaseUrl: "http://localhost:3000",
+    baseUrl: "https://cdn.example.test/app/releases/current",
     pageKey: "home",
-    manifest,
   };
-  const controller = new OpenSceneController(options, window);
-  return controller as unknown as OpenSceneController;
+  return new OpenSceneController(options, window);
 }
 
 describe("OpenScene bridge sync", () => {
@@ -75,8 +62,6 @@ describe("OpenScene bridge sync", () => {
       "FIRST-VERSION",
     );
 
-    // A second DOCUMENT_SET with changed props replaces the document and bumps
-    // the snapshot, which is what drives the Solid provider to re-render.
     internals.replaceDocument(makeDocument("SECOND-VERSION"), 2);
     expect(internals.getSnapshot().revision).toBe(2);
     expect(internals.getSnapshot().document?.spec.elements["text-1"].props.text).toBe(
@@ -90,19 +75,42 @@ describe("OpenScene bridge sync", () => {
       document: makeDocument("THIRD-VERSION"),
       revision: 3,
     });
-    const { StudioPortMessageSchema } =
-      require("@openscene-ai/core") as typeof Core;
     expect(StudioPortMessageSchema.safeParse(envelope).success).toBe(true);
   });
 });
 
+describe("OpenScene static page loading", () => {
+  it("loads a page JSON file from the configured base URL", async () => {
+    const dom = new JSDOM("<!doctype html>", { url: "https://example.test/pricing" });
+    const payload = {
+      schemaVersion: "1",
+      page: { key: "pricing", title: "Pricing" },
+      document: makeDocument("STATIC-VERSION"),
+    };
+    expect(PublishedSceneDocumentSchema.safeParse(payload).success).toBe(true);
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => new Response(JSON.stringify(payload), { status: 200 }));
+    const controller = new OpenSceneController(
+      { baseUrl: "https://cdn.example.test/app", pageKey: "pricing" },
+      dom.window as unknown as Window,
+    );
+    await controller.loadPage();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cdn.example.test/app/pricing.json",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(controller.getSnapshot().status).toBe("ready");
+    expect(controller.getSnapshot().document?.spec.elements["text-1"].props.text).toBe(
+      "STATIC-VERSION",
+    );
+    controller.destroy();
+    fetchMock.mockRestore();
+  });
+});
+
 describe("IndexedDB draft store", () => {
-  it("round-trips a draft keyed by session id", async () => {
-    const dom = new JSDOM("<!doctype html>", { url: "http://localhost:5173/" });
-    const originalOpen = dom.window.indexedDB;
-    // JSDOM has no IndexedDB; guard the browser-only store by requiring a real
-    // implementation is present before exercising it.
+  it("exposes the browser-only draft store factory", () => {
     expect(createIndexedDbDraftStore).toBeTypeOf("function");
-    void originalOpen;
   });
 });

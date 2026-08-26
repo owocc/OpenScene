@@ -6,7 +6,7 @@ type Locale = "en" | "zh-CN";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const protocolSourcePaths = ["document.ts", "manifest.ts", "bridge.ts"].map((file) =>
-  path.join(repositoryRoot, "packages/protocol/src", file),
+  path.join(repositoryRoot, "packages/core/src", file),
 );
 const outputDirectory = path.join(import.meta.dirname, "../src/content/docs");
 

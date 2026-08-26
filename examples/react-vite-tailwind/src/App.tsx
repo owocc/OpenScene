@@ -1,18 +1,8 @@
-import { OpenSceneProvider, OpenSceneRenderer, type OpenSceneClient } from "@openscene-ai/react";
-import type { ReactApp } from "./openscene.tsx";
+import { Renderer } from "./lib/render/renderer.tsx";
 
-interface AppProps {
-  client: OpenSceneClient;
-  app: ReactApp;
-}
-
-/** The example owns no page document; Admin release or Studio supplies it at runtime. */
-function App(props: AppProps) {
-  return (
-    <OpenSceneProvider client={props.client} app={props.app}>
-      <OpenSceneRenderer />
-    </OpenSceneProvider>
-  );
+/** The host application only mounts the OpenScene renderer. */
+function App() {
+  return <Renderer />;
 }
 
 export default App;

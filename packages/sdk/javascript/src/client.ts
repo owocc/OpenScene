@@ -1,17 +1,20 @@
-import { BridgeEnvelopeSchema,
-RendererPortMessageSchema,
-RendererWindowMessageSchema,
-RuntimePageDeliverySchema,
-StudioPortMessageSchema,
-StudioWindowMessageSchema,
-createBridgeEnvelope,
-getEditorConnection,
-type AppManifest,
-type EditorConnection,
-type ElementRect,
-type RendererPortMessage,
-type SceneDocument,
-type StudioPortMessage, } from "@openscene-ai/core";
+import {
+  BridgeEnvelopeSchema,
+  PublishedSceneDocumentSchema,
+  RendererPortMessageSchema,
+  RendererWindowMessageSchema,
+  StudioPortMessageSchema,
+  StudioWindowMessageSchema,
+  APP_TYPE_WEB,
+  createBridgeEnvelope,
+  getEditorConnection,
+  type AppType,
+  type EditorConnection,
+  type ElementRect,
+  type RendererPortMessage,
+  type SceneDocument,
+  type StudioPortMessage,
+} from "@openscene-ai/core";
 import { createStateStore, type StateStore } from "@json-render/core";
 
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown
@@ -26,9 +29,10 @@ export type OpenSceneStatus = "loading" | "ready" | "error";
 export type OpenSceneInteractionMode = "select" | "preview";
 
 export interface OpenSceneClientOptions {
-  apiBaseUrl: string;
+  /** Public S3/CloudFront directory containing page JSON files. */
+  baseUrl: string;
   pageKey: string;
-  manifest: AppManifest;
+  appType?: AppType;
 }
 
 export interface OpenSceneClientState {
@@ -51,8 +55,7 @@ export interface SelectionReport {
 }
 
 export interface OpenSceneClient {
-  readonly manifest: AppManifest;
-  readonly appType: AppManifest["app"]["type"];
+  readonly appType: AppType;
   getSnapshot(): OpenSceneClientState;
   subscribe(listener: () => void): () => void;
   loadPage(pageKey?: string): Promise<void>;
@@ -97,12 +100,22 @@ function asError(error: unknown): Error {
   return new Error("OpenScene client request failed");
 }
 
-function baseApiUrl(apiBaseUrl: string): string {
-  return apiBaseUrl.endsWith("/") ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+function baseUrl(value: string): string {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
-function runtimeUrl(options: OpenSceneClientOptions, pageKey: string): string {
-  return `${baseApiUrl(options.apiBaseUrl)}/api/v1/runtime/apps/${encodeURIComponent(options.manifest.app.key)}/pages/${encodeURIComponent(pageKey)}`;
+export function pageKeyFromPathname(pathname: string): string {
+  const normalized = decodeURIComponent(pathname).replace(/^\/+|\/+$/g, "");
+  return normalized || "home";
+}
+
+function pageUrl(options: OpenSceneClientOptions, pageKey: string): string {
+  const encodedPath = pageKey
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  return `${baseUrl(options.baseUrl)}/${encodedPath || "home"}.json`;
 }
 
 function errorMessage(error: unknown): string {
@@ -110,15 +123,8 @@ function errorMessage(error: unknown): string {
     error instanceof Error ? error.message : typeof error === "string" ? error : "Renderer error";
   return message.trim() || "Renderer error";
 }
-
-/**
- * Owns the transport and runtime document state. Framework adapters subscribe
- * to this controller; they never need to know whether a document came from
- * Admin or a Studio MessagePort.
- */
 export class OpenSceneController implements OpenSceneClient {
-  readonly manifest: AppManifest;
-  readonly appType: AppManifest["app"]["type"];
+  readonly appType: AppType;
 
   private readonly options: OpenSceneClientOptions;
   private readonly listeners = new Set<() => void>();
@@ -142,9 +148,8 @@ export class OpenSceneController implements OpenSceneClient {
   ) {
     this.targetWindow = targetWindow;
     this.pageKey = options.pageKey;
-    this.manifest = freezeDeep(structuredClone(options.manifest));
-    this.options = { ...options, manifest: this.manifest };
-    this.appType = this.manifest.app.type;
+    this.options = { ...options };
+    this.appType = options.appType ?? APP_TYPE_WEB;
     const connection = targetWindow ? getEditorConnection(targetWindow.location.search) : null;
     const editorRequested = targetWindow
       ? new URLSearchParams(targetWindow.location.search).has("openscene-editor")
@@ -159,6 +164,7 @@ export class OpenSceneController implements OpenSceneClient {
       void this.loadPage();
     }
   }
+
   getSnapshot(): OpenSceneClientState {
     return this.state;
   }
@@ -178,23 +184,18 @@ export class OpenSceneController implements OpenSceneClient {
     this.setState({ status: "loading", error: null });
     const targetPageKey = pageKey ?? this.options.pageKey ?? "";
     try {
-      const response = await fetch(runtimeUrl(this.options, targetPageKey), {
+      const response = await fetch(pageUrl(this.options, targetPageKey), {
         method: "GET",
         headers: { accept: "application/json" },
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`Runtime page request failed (${response.status})`);
+      if (!response.ok) throw new Error(`OpenScene page request failed (${response.status})`);
       const payload: unknown = await response.json();
-      const parsed = RuntimePageDeliverySchema.safeParse(payload);
-      if (!parsed.success) throw new Error("Runtime page response failed protocol validation");
-      if (
-        parsed.data.app.key !== this.manifest.app.key ||
-        parsed.data.app.type !== this.manifest.app.type
-      ) {
-        throw new Error("Runtime page response app identity does not match the manifest");
+      const parsed = PublishedSceneDocumentSchema.safeParse(payload);
+      if (!parsed.success) throw new Error("OpenScene page response failed protocol validation");
+      if (parsed.data.page.key !== targetPageKey) {
+        throw new Error("OpenScene page response key does not match the requested page");
       }
-      if (parsed.data.page.key !== pageKey)
-        throw new Error("Runtime page response key does not match the requested page");
       this.replaceDocument(parsed.data.document, null);
     } catch (error) {
       if (controller.signal.aborted || this.destroyed) return;

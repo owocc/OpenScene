@@ -9,9 +9,6 @@ const envSchema = z.object({
   OPENSCENE_TRUSTED_PROXY_HEADER: z.string().min(1).default("x-authenticated-user"),
   OPENSCENE_TRUSTED_PROXY_VALUE: z.string().optional(),
   OPENSCENE_MANAGEMENT_ORIGINS: z.string().default(""),
-  OPENSCENE_APP_KEY_HEADER: z.string().min(1).default("x-openscene-app-key"),
-  OPENSCENE_RUNTIME_KEY_HEADER: z.string().min(1).default("x-openscene-runtime-key"),
-  OPENSCENE_RUNTIME_PUBLIC: z.enum(["true", "false"]).default("false"),
   OPENSCENE_ENCRYPTION_KEY: z.string().min(1).optional(),
   OPENSCENE_STUDIO_PUBLIC_BASE_URL: z.string().url().default("http://localhost:5173"),
   OPENSCENE_API_PUBLIC_BASE_URL: z.string().url().default("http://localhost:3000"),
@@ -37,9 +34,6 @@ export type AppConfig = {
     trustedProxyHeader: string;
     trustedProxyValue?: string;
     managementOrigins: string[];
-    appKeyHeader: string;
-    runtimeKeyHeader: string;
-    runtimePublic: boolean;
   };
   encryption: { key: string };
   api: { publicBaseUrl: string };
@@ -77,9 +71,6 @@ export function getConfig(): AppConfig {
       trustedProxyHeader: env.OPENSCENE_TRUSTED_PROXY_HEADER,
       trustedProxyValue: env.OPENSCENE_TRUSTED_PROXY_VALUE,
       managementOrigins: splitCsv(env.OPENSCENE_MANAGEMENT_ORIGINS),
-      appKeyHeader: env.OPENSCENE_APP_KEY_HEADER,
-      runtimeKeyHeader: env.OPENSCENE_RUNTIME_KEY_HEADER,
-      runtimePublic: env.OPENSCENE_RUNTIME_PUBLIC === "true",
     },
     api: { publicBaseUrl: env.OPENSCENE_API_PUBLIC_BASE_URL },
     studio: {

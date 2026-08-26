@@ -9,6 +9,8 @@ import React, {
 import {
   type OpenSceneClient,
   type OpenSceneClientState,
+  installOpenScene,
+  pageKeyFromPathname,
   evaluateDynamicValue,
   openSceneDirectives,
 } from "@openscene-ai/javascript";
@@ -19,15 +21,20 @@ import {
   type ComponentRegistry,
 } from "@json-render/react";
 import type { Spec, UIElement } from "@json-render/core";
-import type { SceneDocument } from "@openscene-ai/core";
-import type { OpenSceneReactApp } from "./catalog.ts";
+import type { AppType, SceneDocument } from "@openscene-ai/core";
+import type {
+  OpenSceneReactActionDefinition,
+  OpenSceneReactComponentDefinition,
+  OpenSceneReactRuntime,
+} from "./catalog.ts";
+import { createOpenSceneReactRuntime } from "./catalog.ts";
 import { OpenSceneContext, useOpenScene, type OpenSceneContextValue } from "./context.ts";
 import { OpenSceneNodeProvider } from "./node.tsx";
 import { SelectionCanvas } from "./selection.tsx";
 
 export interface OpenSceneProviderProps {
   client?: OpenSceneClient;
-  app: OpenSceneReactApp;
+  runtime: OpenSceneReactRuntime;
   children?: ReactNode;
 }
 
@@ -46,13 +53,13 @@ function subscribeClient(
 }
 
 function createRuntimeHandlers(
-  app: OpenSceneReactApp,
+  runtime: OpenSceneReactRuntime,
   store: OpenSceneClientState["runtimeStore"],
 ): Record<string, (params: Record<string, unknown>) => Promise<void>> | undefined {
-  if (!store || !app.handlers) return undefined;
-  const handlerFactory = app.handlers as unknown;
+  if (!store || !runtime.handlers) return undefined;
+  const handlerFactory = runtime.handlers as unknown;
   if (typeof handlerFactory !== "function") {
-    return app.handlers as unknown as Record<
+    return runtime.handlers as unknown as Record<
       string,
       (params: Record<string, unknown>) => Promise<void>
     >;
@@ -82,7 +89,6 @@ function createRuntimeHandlers(
     () => store.getSnapshot(),
   );
 }
-
 export function OpenSceneProvider(props: OpenSceneProviderProps): React.JSX.Element {
   const client = props.client ?? getDefaultClient();
   const [snapshot, setSnapshot] = useState<OpenSceneClientState>(() => client.getSnapshot());
@@ -93,25 +99,25 @@ export function OpenSceneProvider(props: OpenSceneProviderProps): React.JSX.Elem
 
   const store = snapshot.runtimeStore ?? undefined;
   const handlers = useMemo(
-    () => createRuntimeHandlers(props.app, store ?? null),
-    [props.app, store],
+    () => createRuntimeHandlers(props.runtime, store ?? null),
+    [props.runtime, store],
   );
   const revision = snapshot.revision ?? null;
 
   const value = useMemo<OpenSceneContextValue>(
     () => ({
       client,
-      app: props.app,
+      runtime: props.runtime,
       snapshot,
       revision,
     }),
-    [client, props.app, snapshot, revision],
+    [client, props.runtime, snapshot, revision],
   );
 
   return (
     <OpenSceneContext.Provider value={value}>
       <JSONUIProvider
-        registry={props.app.registry as ComponentRegistry}
+        registry={props.runtime.registry as ComponentRegistry}
         store={store}
         handlers={handlers}
         directives={[...openSceneDirectives]}
@@ -187,7 +193,7 @@ interface PreparedSpec {
   state?: Record<string, unknown>;
 }
 
-function prepareSpec(document: SceneDocument, app: OpenSceneReactApp): PreparedSpec {
+function prepareSpec(document: SceneDocument, runtime: OpenSceneReactRuntime): PreparedSpec {
   const source = document.spec;
   const cleanElements: Record<string, UIElement> = {};
 
@@ -218,7 +224,7 @@ function prepareSpec(document: SceneDocument, app: OpenSceneReactApp): PreparedS
   };
 
   if (source.root !== null) {
-    const validation = app.catalog.validate(cleanSpec);
+    const validation = runtime.catalog.validate(cleanSpec);
     if (!validation.success) {
       const issue = validation.error?.issues[0];
       throw new Error(issue?.message ?? "OpenScene React catalog validation failed");
@@ -294,9 +300,9 @@ export function OpenSceneRenderer(): React.JSX.Element {
   };
 
   const identityRegistry = useMemo(
-    () => createIdentityRegistry(context.app.registry, stateGetter),
+    () => createIdentityRegistry(context.runtime.registry, stateGetter),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [context.app.registry, snapshot.document, snapshot.runtimeStore],
+    [context.runtime.registry, snapshot.document, snapshot.runtimeStore],
   );
 
   const prepared = useMemo(() => {
@@ -304,7 +310,7 @@ export function OpenSceneRenderer(): React.JSX.Element {
     if (!document) return { spec: null, error: null };
     try {
       return {
-        spec: prepareSpec(document as unknown as SceneDocument, context.app),
+        spec: prepareSpec(document as unknown as SceneDocument, context.runtime),
         error: null,
       };
     } catch (error) {
@@ -313,7 +319,7 @@ export function OpenSceneRenderer(): React.JSX.Element {
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }
-  }, [snapshot.document, context.app]);
+  }, [snapshot.document, context.runtime]);
 
   const statusError = snapshot.status === "error" ? snapshot.error : null;
 
@@ -340,5 +346,43 @@ export function OpenSceneRenderer(): React.JSX.Element {
         />
       </OpenSceneErrorBoundary>
     </SelectionCanvas>
+  );
+}
+export interface OpenSceneProps {
+  baseUrl: string;
+  pageKey?: string;
+  appType?: AppType;
+  components?:
+    | OpenSceneReactComponentDefinition<any>[]
+    | Record<string, OpenSceneReactComponentDefinition<any>>;
+  actions?: OpenSceneReactActionDefinition[] | Record<string, OpenSceneReactActionDefinition>;
+  children?: ReactNode;
+}
+
+/** Query-driven OpenScene runtime: static page JSON in production, Studio bridge in editor mode. */
+export function OpenScene(props: OpenSceneProps): React.JSX.Element {
+  const runtime = useMemo(
+    () =>
+      createOpenSceneReactRuntime({
+        appType: props.appType,
+        components: props.components,
+        actions: props.actions,
+      }),
+    [props.appType, props.components, props.actions],
+  );
+  const pageKey =
+    props.pageKey ??
+    (typeof window === "undefined" ? "home" : pageKeyFromPathname(window.location.pathname));
+  const client = useMemo(
+    () => installOpenScene({ baseUrl: props.baseUrl, pageKey, appType: runtime.appType }),
+    [props.baseUrl, pageKey, runtime.appType],
+  );
+
+  useEffect(() => () => client.destroy(), [client]);
+
+  return (
+    <OpenSceneProvider client={client} runtime={runtime}>
+      {props.children ?? <OpenSceneRenderer />}
+    </OpenSceneProvider>
   );
 }

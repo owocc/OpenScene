@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
@@ -84,6 +84,39 @@ export const verification = sqliteTable(
       .notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
+);
+
+export const apikey = sqliteTable(
+  "apikey",
+  {
+    id: text("id").primaryKey(),
+    configId: text("config_id").notNull().default("default"),
+    name: text("name"),
+    start: text("start"),
+    prefix: text("prefix"),
+    key: text("key").notNull(),
+    referenceId: text("reference_id").notNull(),
+    refillInterval: integer("refill_interval"),
+    refillAmount: integer("refill_amount"),
+    lastRefillAt: integer("last_refill_at", { mode: "timestamp_ms" }),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    rateLimitEnabled: integer("rate_limit_enabled", { mode: "boolean" }).notNull().default(true),
+    rateLimitTimeWindow: integer("rate_limit_time_window").notNull().default(86_400_000),
+    rateLimitMax: integer("rate_limit_max").notNull().default(1000),
+    requestCount: integer("request_count").notNull().default(0),
+    remaining: integer("remaining"),
+    lastRequest: integer("last_request", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    permissions: text("permissions"),
+    metadata: text("metadata"),
+  },
+  (table) => [
+    uniqueIndex("apikey_key_unique").on(table.key),
+    index("apikey_reference_id_idx").on(table.referenceId),
+    index("apikey_config_id_idx").on(table.configId),
+  ],
 );
 
 export const userRelations = relations(user, ({ many }) => ({

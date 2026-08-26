@@ -1,0 +1,1 @@
+ALTER TABLE `manifest_revisions` DROP COLUMN `app_key`;

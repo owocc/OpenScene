@@ -7,6 +7,17 @@ import { buildHref, parseLanguage, parseMode, type AdminLanguage } from "./navig
 export const messages = {
   en: {
     apps: "Apps",
+    keys: "Publish keys",
+    keysDescription: "Create and revoke scoped keys for manifest publishing.",
+    createKey: "Create publish key",
+    keyName: "Key name",
+    targetApp: "Target app",
+    publishManifest: "Manifest write",
+    expiresAt: "Expires at",
+    neverExpires: "Never expires",
+    keyCreated: "Publish key created",
+    keyCreatedDescription: "Copy this key now. It will not be shown again.",
+    revokeKey: "Revoke key",
     system: "System",
     apiReference: "API reference",
     overview: "Overview",
@@ -153,14 +164,6 @@ export const messages = {
     serverDetail: "Server detail",
     notFound: "Resource not found",
     requestFailed: "The request failed",
-    appKey: "App Key",
-    rotateAppKey: "Rotate App Key",
-    rotateAppKeyDescription: "Generate a replacement App Key for build and manifest publishing.",
-    rotateAppKeyConfirmTitle: "Rotate App Key?",
-    rotateAppKeyConfirmDescription:
-      "Your current App Key will be revoked immediately. Builds and manifest publishing that use it will stop working.",
-    appKeyRotated: "App Key rotated",
-    appKeyRotatedDescription: "This replacement key is shown once. Copy it before closing.",
 
     storageSettings: "Storage Settings",
     storageSettingsDescription:
@@ -228,7 +231,7 @@ export const messages = {
     aiSaved: "AI configuration saved",
     aiConsumption: "Client consumption",
     aiConsumptionDescription:
-      "Apps call the AI through a dedicated endpoint. Every request must include a valid App Key.",
+      "Apps call the AI through a dedicated endpoint. Requests require a Studio Session or management authorization.",
     aiConsumptionHint: "Supports json, text and stream (SSE) response formats.",
     prompts: "Prompts",
     promptsDescription:
@@ -296,6 +299,17 @@ export const messages = {
   },
   "zh-CN": {
     apps: "应用",
+    keys: "发布密钥",
+    keysDescription: "创建和撤销仅允许发布 Manifest 的受限密钥。",
+    createKey: "创建发布密钥",
+    keyName: "密钥名称",
+    targetApp: "目标应用",
+    publishManifest: "Manifest 写入",
+    expiresAt: "过期时间",
+    neverExpires: "永不过期",
+    keyCreated: "发布密钥已创建",
+    keyCreatedDescription: "请立即复制此密钥，之后不会再次显示。",
+    revokeKey: "撤销密钥",
     system: "系统",
     apiReference: "API 文档",
     overview: "概览",
@@ -436,12 +450,6 @@ export const messages = {
     serverDetail: "服务端详情",
     notFound: "资源不存在",
     requestFailed: "请求失败",
-    appKey: "应用密钥",
-    rotateAppKey: "轮换应用密钥",
-    rotateAppKeyDescription: "为构建和 Manifest 发布生成新的应用密钥。",
-    rotateAppKeyConfirmTitle: "轮换应用密钥？",
-    rotateAppKeyConfirmDescription:
-      "当前应用密钥将立即失效。使用该密钥的构建和 Manifest 发布将无法继续。",
     prompts: "提示词",
     promptsDescription: "管理本应用在不同模块、业务场景与组件组合下的 AI 提示词配置。",
     promptKey: "标识符 (Key)",
@@ -500,7 +508,6 @@ export const messages = {
       "AI 生成引擎底层的 JSONL Patch 流式协议与结构输出核心规则。作为系统底座内置生效，不可修改。",
     collapse: "收起",
     expand: "展开",
-    appKeyRotated: "应用密钥已轮换",
 
     ai: "AI",
     aiDescription: "配置所有应用共用的全局 AI 提供商。",
@@ -518,9 +525,8 @@ export const messages = {
     aiTestFailed: "连接失败",
     aiSaved: "AI 配置已保存",
     aiConsumption: "客户端调用",
-    aiConsumptionDescription: "应用通过专用接口调用 AI，每次请求都必须携带有效的应用密钥。",
+    aiConsumptionDescription: "应用通过专用接口调用 AI，需要 Studio 会话或管理端授权。",
     aiConsumptionHint: "支持 json、text 与 stream（SSE）多种响应格式。",
-    appKeyRotatedDescription: "此替换密钥仅显示一次，请在关闭前复制。",
     storageSettings: "存储设置",
     storageSettingsDescription:
       "配置本应用的存储模式与对象存储。可选择存储在数据库中，或绑定专用的 S3 存储桶。",

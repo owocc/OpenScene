@@ -1,11 +1,9 @@
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
+import { APP_TYPE_WEB, type ComponentManifest, type SceneManifest } from "@openscene-ai/core";
 import { z } from "zod";
 import type {
-  OpenSceneHandlerFactory,
   OpenSceneReactActionDefinition,
-  OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
+  OpenSceneReactCatalogOptions,
 } from "./catalog.ts";
 
 function schemaJson(schema: z.ZodType | undefined): Record<string, unknown> {
@@ -135,27 +133,14 @@ export const defineOpenSceneComponent = defineOpenSceneReactComponent;
 export const defineOpenSceneAction = defineOpenSceneReactAction;
 
 export type {
-  DefineOpenSceneReactAppOptions,
   OpenSceneHandlerFactory,
   OpenSceneReactActionDefinition,
-  OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
+  OpenSceneReactCatalogOptions,
   ReactRenderer,
 } from "./catalog.ts";
 
-export function defineOpenSceneReactApp(
-  options: {
-    appKey?: string;
-    appType?: AppType;
-    app?: { key: string; type?: AppType; [key: string]: unknown };
-    components?:
-      | OpenSceneReactComponentDefinition<any>[]
-      | Record<string, OpenSceneReactComponentDefinition<any>>;
-    actions?: OpenSceneReactActionDefinition[] | Record<string, OpenSceneReactActionDefinition>;
-  } = {},
-): OpenSceneReactApp {
-  const appKey = options.app?.key ?? options.appKey ?? "openscene-react";
-  const appType = options.app?.type ?? options.appType ?? APP_TYPE_WEB;
+export function createOpenSceneManifest(options: OpenSceneReactCatalogOptions = {}): SceneManifest {
   const rawComponents = options.components
     ? Array.isArray(options.components)
       ? Object.fromEntries(options.components.map((item) => [item.type, item]))
@@ -166,34 +151,23 @@ export function defineOpenSceneReactApp(
       ? Object.fromEntries(options.actions.map((item) => [item.key, item]))
       : options.actions
     : {};
-  const manifest: AppManifest = {
-    protocolVersion: "2",
-    app: { key: appKey, type: appType },
-    components: Object.fromEntries(
-      Object.entries(rawComponents).map(([type, item]) => [type, componentManifest(item)]),
-    ),
-    actions: Object.fromEntries(
-      Object.entries(rawActions).map(([key, item]) => [key, actionManifest(item)]),
-    ),
-  };
+  const components = { ...baseReactComponents, ...rawComponents };
+  const appType = options.appType ?? APP_TYPE_WEB;
   return {
+    protocolVersion: "2",
     appType,
-    catalog: {
-      data: { components: {}, actions: {} },
-      validate: () => ({ success: true, data: undefined as never }),
-      componentNames: Object.keys(rawComponents),
-      actionNames: Object.keys(rawActions),
-    } as unknown as OpenSceneReactApp["catalog"],
-    registry: {},
-    handlers: (() => ({})) as OpenSceneHandlerFactory,
-    componentDefinitions: rawComponents,
-    actionDefinitions: rawActions,
-    manifest,
+    components: Object.fromEntries(
+      Object.entries(components).map(([type, item]) => [type, componentManifest(item)]),
+    ),
+    ...(Object.keys(rawActions).length === 0
+      ? {}
+      : {
+          actions: Object.fromEntries(
+            Object.entries(rawActions).map(([key, item]) => [key, actionManifest(item)]),
+          ),
+        }),
   };
 }
-
-export const defineOpenSceneApp = defineOpenSceneReactApp;
-
 export {
   installOpenScene,
   OpenSceneController,
@@ -216,29 +190,35 @@ export type {
   SelectionReport,
 } from "@openscene-ai/javascript";
 
-export { APP_TYPE_WEB,
-APP_TYPE_REACT_NATIVE,
-APP_TYPE_FLUTTER,
-APP_TYPES,
-COMPONENT_DRAG_MIME, } from "@openscene-ai/core";
+export {
+  APP_TYPE_WEB,
+  APP_TYPE_REACT_NATIVE,
+  APP_TYPE_FLUTTER,
+  APP_TYPES,
+  COMPONENT_DRAG_MIME,
+} from "@openscene-ai/core";
 export type { AppType } from "@openscene-ai/core";
 
 export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene-ai/schema";
 
-export { SCENE_DOCUMENT_SCHEMA_VERSION,
-SceneDocumentSchema,
-createEmptySceneDocument,
-AppManifestSchema,
-ComponentManifestSchema,
-RuntimePageDeliverySchema, } from "@openscene-ai/core";
-export type { AppManifest,
-ComponentManifest,
-RuntimePageDelivery,
-SceneDocument,
-SceneGlobalConfig,
-ScenePageInfo,
-Spec,
-UIElement, } from "@openscene-ai/core";
+export {
+  SCENE_DOCUMENT_SCHEMA_VERSION,
+  SceneDocumentSchema,
+  createEmptySceneDocument,
+  AppManifestSchema,
+  ComponentManifestSchema,
+  RuntimePageDeliverySchema,
+} from "@openscene-ai/core";
+export type {
+  AppManifest,
+  ComponentManifest,
+  RuntimePageDelivery,
+  SceneDocument,
+  SceneGlobalConfig,
+  ScenePageInfo,
+  Spec,
+  UIElement,
+} from "@openscene-ai/core";
 
 // ---------------------------------------------------------------------------
 // OpenAPI request action — server/Node stubs

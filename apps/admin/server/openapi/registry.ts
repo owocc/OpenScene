@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   AppCreateSchema,
   AppPatchSchema,
-  AppKeyRotationSchema,
   AppSchema,
   AssetCompleteSchema,
   AssetPatchSchema,
@@ -19,6 +18,7 @@ import {
   LocaleCreateSchema,
   LocalePatchSchema,
   LocaleSchema,
+  ManifestRevisionSchema,
   OpenApiDocCreateSchema,
   OpenApiDocPatchSchema,
   OpenApiDocSchema,
@@ -74,11 +74,10 @@ const schemas = [
   ["Version", VersionSchema],
   ["Release", ReleaseSchema],
   ["Manifest", OpenApiJsonObjectSchema],
-  ["ManifestRevision", OpenApiJsonObjectSchema],
+  ["ManifestRevision", ManifestRevisionSchema],
   ["Bootstrap", OpenApiJsonObjectSchema],
   ["OpenApiDocSummary", OpenApiDocSummarySchema],
 
-  ["AppKeyRotation", AppKeyRotationSchema],
   ["Problem", ProblemSchema],
   ["OpenApiDoc", OpenApiDocSchema],
   ["AiConfig", AiConfigSchema],
@@ -110,7 +109,7 @@ const ResourceQuerySchema = z.object({
   status: z.string().optional(),
   categoryId: z.string().optional(),
 });
-const AppKeyHeaderSchema = z.object({ "x-openscene-app-key": z.string().min(1) });
+const PublishKeyHeaderSchema = z.object({ authorization: z.string().min(1) });
 const JsonObjectSchema = z.object({}).catchall(z.unknown());
 const ListAppSchema = ListResponseSchema(AppSchema);
 const ListPreviewSchema = z.array(PreviewProfileSchema);
@@ -131,7 +130,7 @@ type Operation = {
   body?: z.ZodType;
   params?: boolean;
   query?: typeof AppQuerySchema | typeof ResourceQuerySchema;
-  headers?: typeof AppKeyHeaderSchema;
+  headers?: typeof PublishKeyHeaderSchema;
 };
 
 const operations: Operation[] = [
@@ -214,14 +213,6 @@ const operations: Operation[] = [
     response: z.void(),
     params: true,
     status: 204,
-  },
-  {
-    method: "post",
-    path: "/api/v1/apps/{appId}/app-keys/rotate",
-    operationId: "rotateAppKey",
-    tag: "Apps",
-    response: AppKeyRotationSchema,
-    params: true,
   },
   {
     method: "get",
@@ -350,7 +341,7 @@ const operations: Operation[] = [
     response: JsonObjectSchema,
     body: JsonObjectSchema,
     params: true,
-    headers: AppKeyHeaderSchema,
+    headers: PublishKeyHeaderSchema,
   },
   ...resourceOperations("pages", "page"),
   ...resourceOperations("templates", "template"),
@@ -582,22 +573,6 @@ const operations: Operation[] = [
     body: AssetCompleteSchema,
     params: true,
   },
-  {
-    method: "get",
-    path: "/api/v1/runtime/apps/{appKey}/pages/{pageKey}",
-    operationId: "getRuntimePage",
-    tag: "Runtime",
-    response: JsonObjectSchema,
-    params: true,
-  },
-  {
-    method: "get",
-    path: "/api/v1/runtime/apps/{appKey}/releases/{releaseId}",
-    operationId: "getRuntimeRelease",
-    tag: "Runtime",
-    response: JsonObjectSchema,
-    params: true,
-  },
 
   {
     method: "get",
@@ -629,7 +604,7 @@ const operations: Operation[] = [
     tag: "AI",
     response: AiChatResponseSchema,
     body: AiChatRequestSchema,
-    headers: AppKeyHeaderSchema,
+    headers: PublishKeyHeaderSchema,
   },
   {
     method: "get",

@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { AppManifestSchema, type AppManifest } from "@openscene-ai/core";
+import { SceneManifestSchema, type SceneManifest } from "@openscene-ai/core";
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export interface OpenSceneManifestPluginOptions {
-  manifest: AppManifest;
+  manifest: SceneManifest;
 }
 
 interface ViteResolvedConfig {
@@ -52,7 +52,7 @@ function loadEnv(mode: string, envDir: string, _prefix = ""): Record<string, str
 
 function configurationError(): Error {
   return new Error(
-    "OpenScene manifest push requires OPENSCENE_ADMIN_URL, OPENSCENE_APP_ID, and OPENSCENE_APP_KEY",
+    "OpenScene manifest push requires OPENSCENE_ADMIN_URL, OPENSCENE_APP_ID, and OPENSCENE_PUBLISH_KEY",
   );
 }
 
@@ -98,8 +98,8 @@ function getFetchDispatcher(env?: Record<string, string>): unknown {
 }
 
 /**
- * Pushes a build manifest once after a successful Vite build. The app key is
- * sent only as a request header and is never injected into generated assets.
+ * Pushes a component catalog manifest to an existing App once after a successful Vite build.
+ * App ID identifies the destination; the publish key is the only write credential.
  */
 export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions): VitePlugin {
   const manifest = options.manifest;
@@ -118,10 +118,10 @@ export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions)
       const env = loadEnv(config.mode, config.envDir, "");
       const adminUrl = env.OPENSCENE_ADMIN_URL?.trim() ?? "";
       const appId = env.OPENSCENE_APP_ID?.trim() ?? "";
-      const appKey = env.OPENSCENE_APP_KEY?.trim() ?? "";
-      if (!adminUrl && !appId && !appKey) return;
-      if (!adminUrl || !appId || !appKey) throw configurationError();
-      const parsedManifest = AppManifestSchema.parse(manifest);
+      const publishKey = env.OPENSCENE_PUBLISH_KEY?.trim() ?? "";
+      if (!publishKey) return;
+      if (!adminUrl || !appId) throw configurationError();
+      const parsedManifest = SceneManifestSchema.parse(manifest);
 
       const dispatcher = getFetchDispatcher(env);
       const fetchFn = dispatcher ? undiciFetch : globalThis.fetch;
@@ -134,7 +134,7 @@ export function openSceneManifestPlugin(options: OpenSceneManifestPluginOptions)
             headers: {
               accept: "application/json",
               "content-type": "application/json",
-              "x-openscene-app-key": appKey,
+              authorization: `Bearer ${publishKey}`,
             },
             body: JSON.stringify(parsedManifest),
             ...(dispatcher ? { dispatcher } : {}),

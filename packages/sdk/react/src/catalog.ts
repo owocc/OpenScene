@@ -1,7 +1,7 @@
 import { defineCatalog, type Catalog } from "@json-render/core";
 import { schema } from "@json-render/react/schema";
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
+import { APP_TYPE_WEB, type AppType, type SceneManifest } from "@openscene-ai/core";
+import type { ComponentManifest } from "@openscene-ai/core";
 import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import { z } from "zod";
@@ -92,14 +92,14 @@ export type OpenSceneHandlerFactory = (
   getState: () => Record<string, unknown>,
 ) => Record<string, (params: Record<string, unknown>) => Promise<void>>;
 
-export interface OpenSceneReactApp {
+export interface OpenSceneReactRuntime {
   readonly appType: AppType;
   readonly catalog: Catalog;
   readonly registry: Record<string, unknown>;
   readonly handlers: OpenSceneHandlerFactory;
   readonly componentDefinitions: Record<string, OpenSceneReactComponentDefinition>;
   readonly actionDefinitions: Record<string, OpenSceneReactActionDefinition>;
-  readonly manifest: AppManifest;
+  readonly manifest: SceneManifest;
 }
 
 function zodJsonSchema(value: z.ZodType): Record<string, unknown> {
@@ -182,11 +182,10 @@ export const defineOpenSceneComponent = defineOpenSceneReactComponent;
 export const defineOpenSceneAction = defineOpenSceneReactAction;
 
 function createManifest(
-  appKey: string,
   appType: AppType,
   components: Record<string, OpenSceneReactComponentDefinition>,
   actions: Record<string, OpenSceneReactActionDefinition>,
-): AppManifest {
+): SceneManifest {
   const componentManifest: Record<string, ComponentManifest> = {};
   for (const [type, definition] of Object.entries(components)) {
     const propSchema = definition.schema ?? definition.props;
@@ -217,29 +216,36 @@ function createManifest(
   }
   return {
     protocolVersion: "2",
-    app: { key: appKey, type: appType },
+    appType,
     components: componentManifest,
     ...(Object.keys(actionManifest).length === 0 ? {} : { actions: actionManifest }),
   };
 }
 
-export interface DefineOpenSceneReactAppOptions {
-  appKey?: string;
+export interface OpenSceneReactCatalogOptions {
   appType?: AppType;
-  app?: { key: string; type?: AppType; [key: string]: unknown };
   components?:
     | OpenSceneReactComponentDefinition<any>[]
     | Record<string, OpenSceneReactComponentDefinition<any>>;
   actions?: OpenSceneReactActionDefinition[] | Record<string, OpenSceneReactActionDefinition>;
 }
+function normalizeCatalogOptions(options: OpenSceneReactCatalogOptions) {
+  const customComponents = mergeComponentDefinitions(options.components);
+  const customActions = mergeActionDefinitions(options.actions);
+  const components = normalizeComponents({ ...baseReactComponents, ...customComponents });
+  const actions = normalizeActions({ ...baseReactActions, ...customActions });
+  return { appType: options.appType ?? APP_TYPE_WEB, components, actions };
+}
 
-export function defineOpenSceneReactApp(
-  options: DefineOpenSceneReactAppOptions = {},
-): OpenSceneReactApp {
-  const appKey = options.app?.key ?? options.appKey ?? "openscene-react";
-  const appType = options.app?.type ?? options.appType ?? APP_TYPE_WEB;
-  const components = normalizeComponents(mergeComponentDefinitions(options.components));
-  const actions = normalizeActions(mergeActionDefinitions(options.actions));
+export function createOpenSceneManifest(options: OpenSceneReactCatalogOptions = {}): SceneManifest {
+  const { appType, components, actions } = normalizeCatalogOptions(options);
+  return createManifest(appType, components, actions);
+}
+
+export function createOpenSceneReactRuntime(
+  options: OpenSceneReactCatalogOptions = {},
+): OpenSceneReactRuntime {
+  const { appType, components, actions } = normalizeCatalogOptions(options);
   const catalogData = {
     components: Object.fromEntries(
       Object.entries(components).map(([type, definition]) => [
@@ -275,7 +281,6 @@ export function defineOpenSceneReactApp(
     Object.keys(actions).length > 0
       ? createRegistry(catalog, { components: componentFns, actions: actionFns })
       : createRegistry(catalog, { components: componentFns });
-  const manifest = createManifest(appKey, appType, components, actions);
   return {
     appType,
     catalog,
@@ -283,11 +288,9 @@ export function defineOpenSceneReactApp(
     handlers: registryResult.handlers as OpenSceneHandlerFactory,
     componentDefinitions: components,
     actionDefinitions: actions,
-    manifest,
+    manifest: createManifest(appType, components, actions),
   };
 }
-
-export const defineOpenSceneApp = defineOpenSceneReactApp;
 
 const viewSchema = z
   .object({

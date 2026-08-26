@@ -33,6 +33,7 @@ export function buildHref(
 export function isAppScopedPath(pathname: string): boolean {
   return (
     pathname !== "/apps" &&
+    pathname !== "/keys" &&
     pathname !== "/system" &&
     pathname !== "/login" &&
     pathname !== "/ai" &&
@@ -48,6 +49,7 @@ export const navigationGroups = [
     label: "System",
     items: [
       { href: "/apps", key: "apps", icon: "squares" },
+      { href: "/keys", key: "keys", icon: "key" },
       { href: "/system", key: "system", icon: "gear" },
       { href: "/ai", key: "ai", icon: "sparkle" },
       { href: "/system-prompt", key: "systemPrompt", icon: "shieldWarning" },

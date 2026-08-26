@@ -1,16 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  APP_TYPE_WEB,
-  defineAppManifest,
+  buildOpenApiRequest,
+  createOpenSceneManifest,
+  defineOpenApiRequestAction,
+  defineOpenSceneReactAction,
+  defineOpenSceneReactComponent,
+  executeOpenApiRequest,
   openApiMethods,
   type OpenApiValue,
-  defineOpenSceneReactAction,
-  defineOpenSceneReactApp,
-  defineOpenSceneReactComponent,
-  defineOpenApiRequestAction,
-  buildOpenApiRequest,
-  executeOpenApiRequest,
-  type OpenSceneReactApp,
+  type OpenSceneReactActionDefinition,
+  type OpenSceneReactComponentDefinition,
   useOpenSceneNode,
 } from "@openscene-ai/react";
 import { z } from "zod";
@@ -263,19 +262,20 @@ const openApiRequest = defineOpenApiRequestAction({
   description: "Execute an OpenAPI endpoint and store the response in state.",
 });
 
-export function createReactApp(appKey: string): OpenSceneReactApp {
-  return defineOpenSceneReactApp({
-    app: { key: appKey, type: APP_TYPE_WEB },
-    components: [Image, Callout, StatusCard, OpenApiProvider],
-    actions: [setNotice, openApiRequest],
+export const reactComponents: OpenSceneReactComponentDefinition<any>[] = [
+  Image,
+  Callout,
+  StatusCard,
+  OpenApiProvider,
+];
+export const reactActions: OpenSceneReactActionDefinition[] = [setNotice, openApiRequest];
+
+/** The serializable component catalog shared by the browser renderer and Vite plugin. */
+export function createManifest() {
+  return createOpenSceneManifest({
+    components: reactComponents,
+    actions: reactActions,
   });
-}
-
-export type ReactApp = OpenSceneReactApp;
-
-/** The serializable manifest shared by the browser client and Vite plugin. */
-export function createManifest(appKey: string) {
-  return defineAppManifest(createReactApp(appKey).manifest);
 }
 
 export { Image, imageProps, Callout, StatusCard, OpenApiProvider, setNotice };

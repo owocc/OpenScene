@@ -1,12 +1,12 @@
 import { openSceneManifestPlugin } from "@openscene-ai/react/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
+import { defineConfig, lazyPlugins } from "vite-plus";
 import { createManifest } from "./src/openscene.tsx";
 import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "VITE_");
-  const manifest = createManifest(env.VITE_OPENSCENE_APP_KEY || "react-vite");
+  void mode;
+  const manifest = createManifest();
 
   return {
     lint: {

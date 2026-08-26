@@ -16,9 +16,17 @@ export type {
 export {
   AppManifestSchema,
   ComponentManifestSchema,
+  PublishedSceneDocumentSchema,
   RuntimePageDeliverySchema,
+  SceneManifestSchema,
 } from "./manifest.ts";
-export type { AppManifest, ComponentManifest, RuntimePageDelivery } from "./manifest.ts";
+export type {
+  AppManifest,
+  ComponentManifest,
+  PublishedSceneDocument,
+  RuntimePageDelivery,
+  SceneManifest,
+} from "./manifest.ts";
 
 export {
   BridgeEnvelopeSchema,

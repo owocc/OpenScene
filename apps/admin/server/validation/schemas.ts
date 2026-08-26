@@ -1,23 +1,29 @@
 import { APP_TYPES } from "@openscene-ai/core";
-import { AgentUiActionSchema,
-AppManifestSchema,
-ComponentManifestSchema,
-RuntimePageDeliverySchema,
-SceneDocumentSchema, } from "@openscene-ai/core";
+import {
+  AgentUiActionSchema,
+  AppManifestSchema,
+  ComponentManifestSchema,
+  PublishedSceneDocumentSchema,
+  RuntimePageDeliverySchema,
+  SceneDocumentSchema,
+  SceneManifestSchema,
+} from "@openscene-ai/core";
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
 export {
   AppManifestSchema,
   ComponentManifestSchema,
+  PublishedSceneDocumentSchema,
   RuntimePageDeliverySchema,
   SceneDocumentSchema,
+  SceneManifestSchema,
 };
-export const ManifestSchema = AppManifestSchema;
 
 extendZodWithOpenApi(z);
 
-export type { AppManifest as Manifest, SceneDocument } from "@openscene-ai/core";
+export type { SceneManifest as Manifest, SceneDocument } from "@openscene-ai/core";
+export const ManifestSchema = SceneManifestSchema;
 
 export const IdSchema = z.string().min(1).max(256);
 export const KeySchema = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/);
@@ -39,12 +45,9 @@ export const AppSchema = z.object({
     url: z.string().url().optional(),
     activeRevisionId: IdSchema.optional(),
   }),
-  runtime: z.object({ publicBaseUrl: z.string().url().optional() }),
   createdAt: IsoDateSchema,
   updatedAt: IsoDateSchema,
-  credentials: z.object({ appKey: z.string(), runtimeKey: z.string() }).optional(),
 });
-export const AppKeyRotationSchema = z.object({ appKey: z.string().min(1) });
 
 export const PreviewProfileSchema = z.object({
   id: IdSchema,
@@ -157,8 +160,8 @@ export const ManifestRevisionSchema = z.object({
   id: IdSchema,
   appId: IdSchema,
   protocolVersion: z.string(),
-  appKey: KeySchema,
-  manifest: AppManifestSchema,
+  appType: z.enum(APP_TYPES),
+  manifest: SceneManifestSchema,
   checksum: z.string(),
   source: z.enum(["push", "sync"]),
   createdAt: IsoDateSchema,
@@ -253,7 +256,6 @@ export const AppCreateSchema = z.object({
   manifest: z
     .object({ mode: z.enum(["remote", "push"]).default("push"), url: z.string().url().optional() })
     .default({ mode: "push" }),
-  runtimePublicBaseUrl: z.string().url().optional(),
 });
 export const AppPatchSchema = AppCreateSchema.omit({ type: true })
   .partial()

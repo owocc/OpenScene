@@ -29,7 +29,7 @@ import {
   APP_TYPE_FLUTTER,
   APP_TYPE_REACT_NATIVE,
   APP_TYPE_WEB,
-  AppManifestSchema,
+  SceneManifestSchema,
   type AppType,
   type ComponentManifest,
 } from "@openscene-ai/core";
@@ -51,7 +51,7 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { Text } from "@cloudflare/kumo/components/text";
 import { Textarea } from "@cloudflare/kumo/components/input";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
-import { useSession, signOut } from "@/lib/auth-client";
+import { authClient, useSession, signOut } from "@/lib/auth-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { usePathname } from "next/navigation";
@@ -67,7 +67,7 @@ import { OpenApiDocDetailView } from "./OpenApiDocDetailView";
 type App = components["schemas"]["App"];
 
 function getActiveManifest(data: unknown) {
-  const result = AppManifestSchema.safeParse(
+  const result = SceneManifestSchema.safeParse(
     typeof data === "object" && data !== null && "manifest" in data ? data.manifest : undefined,
   );
   return result.success ? result.data : null;
@@ -138,6 +138,7 @@ export function AdminConsole() {
   const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
 
   if (pathname === "/apps") return <AppsView />;
+  if (pathname === "/keys") return <KeysView />;
   if (pathname === "/system") return <SystemView />;
   if (
     isAppScopedPath(pathname) &&
@@ -270,7 +271,6 @@ function AppsView() {
   const [cursor, setCursor] = useState<string | undefined>();
   const [history, setHistory] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
-  const [credentials, setCredentials] = useState<App | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<App | null>(null);
   const [form, setForm] = useState({
@@ -285,9 +285,8 @@ function AppsView() {
     params: { query: { limit: "25", cursor } },
   });
   const create = api.useMutation("post", "/api/v1/apps", {
-    onSuccess: (data) => {
+    onSuccess: () => {
       setOpen(false);
-      setCredentials(data as App);
       toast.add({ title: t("created"), description: t("apps") });
       void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/apps"] });
     },
@@ -483,7 +482,7 @@ function AppsView() {
             {t("create")} {t("app")}
           </Dialog.Title>
           <Dialog.Description>
-            Create an app and keep the generated credentials safe.
+            Create an OpenScene project. Publishing keys are managed separately.
           </Dialog.Description>
           <div className="grid gap-4 py-4">
             <Input
@@ -575,30 +574,6 @@ function AppsView() {
         </Dialog>
       </Dialog.Root>
       <Dialog.Root
-        open={Boolean(credentials)}
-        onOpenChange={(value) => {
-          if (!value) setCredentials(null);
-        }}
-      >
-        <Dialog size="lg" className="px-8 py-6">
-          <Dialog.Title>{t("created")}</Dialog.Title>
-          <Dialog.Description>
-            These credentials are shown once. Copy them before closing.
-          </Dialog.Description>
-          <div className="grid gap-3 py-4">
-            {credentials?.credentials ? (
-              <Credential label="App Key" value={credentials.credentials.appKey} />
-            ) : null}
-            {credentials?.credentials ? (
-              <Credential label="Runtime Key" value={credentials.credentials.runtimeKey} />
-            ) : null}
-          </div>
-          <div className="flex justify-end">
-            <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
-          </div>
-        </Dialog>
-      </Dialog.Root>
-      <Dialog.Root
         role="alertdialog"
         open={Boolean(deleteId)}
         onOpenChange={(value) => {
@@ -625,29 +600,6 @@ function AppsView() {
         </Dialog>
       </Dialog.Root>
     </>
-  );
-}
-
-function Credential({ label, value }: { label: string; value: string }) {
-  const toast = useKumoToastManager();
-  const { t } = useI18n();
-  return (
-    <div className="grid gap-1">
-      <Text variant="secondary">{label}</Text>
-      <div className="flex items-center gap-2">
-        <Code code={value} lang="ts" />
-        <Button
-          size="sm"
-          shape="square"
-          icon={Copy}
-          aria-label={t("copied")}
-          onClick={() => {
-            void navigator.clipboard.writeText(value);
-            toast.add({ title: t("copied") });
-          }}
-        />
-      </div>
-    </div>
   );
 }
 
@@ -3984,7 +3936,7 @@ function MetaView() {
     },
   });
   const [json, setJson] = useState("");
-  const [appKey, setAppKey] = useState("");
+  const [publishKey, setPublishKey] = useState("");
 
   const appJson = useMemo(() => JSON.stringify(app.data ?? {}, null, 2), [app.data]);
   const manifestJson = useMemo(() => JSON.stringify(manifest.data ?? {}, null, 2), [manifest.data]);
@@ -4068,10 +4020,6 @@ function MetaView() {
             <div>
               <Text variant="secondary">App ID</Text>
               <span className="font-mono">{app.data?.id ?? "—"}</span>
-            </div>
-            <div>
-              <Text variant="secondary">App Key</Text>
-              <span className="font-mono">{app.data?.key ?? "—"}</span>
             </div>
             <div>
               <Text variant="secondary">Type</Text>
@@ -4229,28 +4177,28 @@ function MetaView() {
             推送 Manifest
           </Text>
           <Input
-            label="Temporary App Key"
+            label="Publish Key"
             type="password"
-            value={appKey}
-            onChange={(e) => setAppKey(e.target.value)}
+            value={publishKey}
+            onChange={(e) => setPublishKey(e.target.value)}
           />
           <Textarea
             label="Manifest JSON"
             value={json}
             rows={5}
             onChange={(e) => setJson(e.target.value)}
-            description="Credentials are not persisted."
+            description="Publish keys are managed on the Publish Keys page."
           />
           <Button
             variant="primary"
             loading={push.isPending}
-            disabled={!json || !appKey}
+            disabled={!json || !publishKey}
             onClick={() => {
               try {
                 push.mutate({
                   params: {
                     path: { appId: context.appId ?? "" },
-                    header: { "x-openscene-app-key": appKey },
+                    header: { authorization: `Bearer ${publishKey}` },
                   },
                   body: JSON.parse(json),
                 });
@@ -4290,6 +4238,178 @@ function MetaView() {
         )}
       </Surface>
     </>
+  );
+}
+
+function keyAppId(metadata: unknown): string | null {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && "appId" in metadata) {
+    return typeof metadata.appId === "string" ? metadata.appId : null;
+  }
+  return null;
+}
+
+function KeysView() {
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const appsQuery = api.useQuery("get", "/api/v1/apps", {
+    params: { query: { limit: "100" } },
+  });
+  const [keys, setKeys] = useState<Array<Record<string, unknown>>>([]);
+  const [name, setName] = useState("");
+  const [appId, setAppId] = useState("");
+  const [expiresIn, setExpiresIn] = useState("");
+  const [newKey, setNewKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = () => {
+    void authClient.apiKey.list({ query: { limit: 100 } }).then((result) => {
+      if (result.error) {
+        setError(result.error.message ?? "Unable to list publish keys");
+        return;
+      }
+      const records = result.data?.apiKeys;
+      setKeys(Array.isArray(records) ? (records as Array<Record<string, unknown>>) : []);
+    });
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  const create = () => {
+    const selectedAppId = appId || appsQuery.data?.items[0]?.id || "";
+    if (!name.trim() || !selectedAppId) {
+      setError("A key name and target App are required");
+      return;
+    }
+    setError(null);
+    const parsedExpiresIn = Number(expiresIn);
+    void authClient.apiKey
+      .create({
+        name: name.trim(),
+        prefix: "osc_publish_",
+        metadata: { appId: selectedAppId, scope: "manifest:write" },
+        permissions: { manifest: ["write"] },
+        ...(Number.isInteger(parsedExpiresIn) && parsedExpiresIn > 0
+          ? { expiresIn: parsedExpiresIn * 86_400 }
+          : {}),
+      })
+      .then((result) => {
+        if (result.error || !result.data) {
+          setError(result.error?.message ?? "The publish key could not be created");
+          return;
+        }
+        setNewKey(result.data.key);
+        setName("");
+        setExpiresIn("");
+        toast.add({ title: t("keyCreated"), description: t("keyCreatedDescription") });
+        reload();
+      });
+  };
+
+  const revoke = (keyId: string) => {
+    void authClient.apiKey.delete({ keyId }).then((result) => {
+      if (result.error) {
+        setError(result.error.message ?? "Unable to revoke publish key");
+        return;
+      }
+      reload();
+    });
+  };
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <Text variant="heading" as="h1">
+          {t("keys")}
+        </Text>
+        <Text variant="secondary">{t("keysDescription")}</Text>
+      </div>
+      {error ? (
+        <div role="alert" className="rounded-lg border border-kumo-danger p-3 text-sm">
+          {error}
+        </div>
+      ) : null}
+      {newKey ? (
+        <Surface className="grid gap-3 border border-kumo-success p-4">
+          <Text variant="heading" as="h2">
+            {t("keyCreated")}
+          </Text>
+          <Text variant="secondary">{t("keyCreatedDescription")}</Text>
+          <code className="break-all rounded bg-kumo-canvas p-3">{newKey}</code>
+          <Button variant="secondary" onClick={() => setNewKey(null)}>
+            {t("cancel")}
+          </Button>
+        </Surface>
+      ) : null}
+      <Surface className="grid gap-4 p-4">
+        <Text variant="heading" as="h2">
+          {t("createKey")}
+        </Text>
+        <Input
+          aria-label={t("keyName")}
+          placeholder={t("keyName")}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <Select
+          aria-label={t("targetApp")}
+          placeholder={t("targetApp")}
+          value={appId || null}
+          items={Object.fromEntries((appsQuery.data?.items ?? []).map((app) => [app.id, app.name]))}
+          onValueChange={(value) => setAppId(typeof value === "string" ? value : "")}
+        />
+        <Input
+          aria-label={t("expiresAt")}
+          placeholder={`${t("expiresAt")} (${t("neverExpires")})`}
+          value={expiresIn}
+          onChange={(event) => setExpiresIn(event.target.value)}
+          type="number"
+          min={1}
+        />
+        <Button variant="primary" onClick={create}>
+          {t("createKey")}
+        </Button>
+      </Surface>
+      <Surface className="overflow-auto p-4">
+        <Table>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>{t("keyName")}</Table.Head>
+              <Table.Head>{t("targetApp")}</Table.Head>
+              <Table.Head>{t("publishManifest")}</Table.Head>
+              <Table.Head>{t("status")}</Table.Head>
+              <Table.Head>{t("actions")}</Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {keys.map((key) => {
+              const id = typeof key.id === "string" ? key.id : "";
+              const target = keyAppId(key.metadata);
+              const label =
+                typeof key.name === "string"
+                  ? key.name
+                  : typeof key.start === "string"
+                    ? key.start
+                    : "—";
+              return (
+                <Table.Row key={id}>
+                  <Table.Cell>{label}</Table.Cell>
+                  <Table.Cell className="font-mono text-xs">{target ?? "—"}</Table.Cell>
+                  <Table.Cell>manifest:write</Table.Cell>
+                  <Table.Cell>{key.enabled === false ? t("disabled") : t("active")}</Table.Cell>
+                  <Table.Cell>
+                    <Button variant="secondary" onClick={() => revoke(id)}>
+                      {t("revokeKey")}
+                    </Button>
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
+          </Table.Body>
+        </Table>
+      </Surface>
+    </div>
   );
 }
 
@@ -4342,11 +4462,6 @@ function SettingsView() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [runtimeUrl, setRuntimeUrl] = useState("");
-  const [rotationConfirmationAppId, setRotationConfirmationAppId] = useState<string | null>(null);
-  const [rotatedAppKey, setRotatedAppKey] = useState<string | null>(null);
-  const [rotationError, setRotationError] = useState<unknown>(null);
-  const [isRotating, setIsRotating] = useState(false);
 
   const [pageDriver, setPageDriver] = useState<"database" | "s3" | "memory">("database");
   const [s3Enabled, setS3Enabled] = useState(false);
@@ -4364,34 +4479,10 @@ function SettingsView() {
 
   const app = query.data;
   const storageConfig = storageQuery.data?.config;
-  async function rotateAppKey() {
-    setRotationError(null);
-    setIsRotating(true);
-    try {
-      const result = await fetchClient.POST("/api/v1/apps/{appId}/app-keys/rotate", {
-        params: { path: { appId: rotationConfirmationAppId ?? "" } },
-      });
-      if (result.error) {
-        setRotationError(result.error);
-        return;
-      }
-      if (!result.data) {
-        setRotationError(new Error(t("requestFailed")));
-        return;
-      }
-      setRotationConfirmationAppId(null);
-      setRotatedAppKey(result.data.appKey);
-    } catch (error) {
-      setRotationError(error);
-    } finally {
-      setIsRotating(false);
-    }
-  }
   useEffect(() => {
     if (app) {
       setName(app.name);
       setDescription(app.description);
-      setRuntimeUrl(app.runtime.publicBaseUrl ?? "");
     }
   }, [app]);
   useEffect(() => {
@@ -4533,12 +4624,6 @@ function SettingsView() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
-              <Input
-                label="Runtime URL"
-                type="url"
-                value={runtimeUrl}
-                onChange={(e) => setRuntimeUrl(e.target.value)}
-              />
               <Select
                 label={t("status")}
                 value={app?.status ?? "active"}
@@ -4557,7 +4642,7 @@ function SettingsView() {
                 onClick={() =>
                   update.mutate({
                     params: { path: { appId: context.appId ?? "" } },
-                    body: { name, description, runtimePublicBaseUrl: runtimeUrl || undefined },
+                    body: { name, description },
                   })
                 }
               >
@@ -4736,58 +4821,6 @@ function SettingsView() {
               ) : null}
             </LayerCard.Primary>
           </LayerCard>
-          <LayerCard className="mt-4 max-w-2xl">
-            <LayerCard.Secondary>{t("appKey")}</LayerCard.Secondary>
-            <LayerCard.Primary className="grid gap-4">
-              <Text variant="secondary">{t("rotateAppKeyDescription")}</Text>
-              {rotationError ? <ErrorState error={rotationError} /> : null}
-              <div>
-                <Button
-                  onClick={() => {
-                    setRotationError(null);
-                    setRotationConfirmationAppId(context.appId ?? null);
-                  }}
-                >
-                  {t("rotateAppKey")}
-                </Button>
-              </div>
-            </LayerCard.Primary>
-          </LayerCard>
-          <Dialog.Root
-            role="alertdialog"
-            open={Boolean(rotationConfirmationAppId)}
-            onOpenChange={(value) => {
-              if (!value) setRotationConfirmationAppId(null);
-            }}
-          >
-            <Dialog className="px-8 py-6">
-              <Dialog.Title>{t("rotateAppKeyConfirmTitle")}</Dialog.Title>
-              <Dialog.Description>{t("rotateAppKeyConfirmDescription")}</Dialog.Description>
-              <div className="mt-4 flex justify-end gap-2">
-                <Dialog.Close render={<Button disabled={isRotating}>{t("cancel")}</Button>} />
-                <Button variant="destructive" loading={isRotating} onClick={rotateAppKey}>
-                  {t("rotateAppKey")}
-                </Button>
-              </div>
-            </Dialog>
-          </Dialog.Root>
-          <Dialog.Root
-            open={rotatedAppKey !== null}
-            onOpenChange={(value) => {
-              if (!value) setRotatedAppKey(null);
-            }}
-          >
-            <Dialog size="lg" className="px-8 py-6">
-              <Dialog.Title>{t("appKeyRotated")}</Dialog.Title>
-              <Dialog.Description>{t("appKeyRotatedDescription")}</Dialog.Description>
-              <div className="grid gap-3 py-4">
-                {rotatedAppKey ? <Credential label={t("appKey")} value={rotatedAppKey} /> : null}
-              </div>
-              <div className="flex justify-end">
-                <Dialog.Close render={<Button variant="primary">{t("continue")}</Button>} />
-              </div>
-            </Dialog>
-          </Dialog.Root>
         </>
       )}
     </>

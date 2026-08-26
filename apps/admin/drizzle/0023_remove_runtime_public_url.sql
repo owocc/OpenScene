@@ -1,0 +1,1 @@
+ALTER TABLE `apps` DROP COLUMN `runtime_public_base_url`;

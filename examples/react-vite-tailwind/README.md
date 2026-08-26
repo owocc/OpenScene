@@ -1,39 +1,51 @@
 # OpenScene React + Vite integration example
 
-`examples/react-vite` is a complete React application integrated with OpenScene and `@json-render/react`. The browser uses the framework-neutral `@openscene-ai/javascript` client and renders through `@openscene-ai/react`.
-
-This example deliberately contains **no hardcoded page JSON**. Admin is the source of published page documents, and Studio sends draft documents to the preview iframe over the OpenScene bridge protocol. The app source declares the component/action catalog and the manifest used by both runtime and build tooling.
+This example keeps the host application in control. It defines React component and action extensions, then mounts one query-driven `<OpenScene />` renderer. OpenScene does not create or inject a host application identity.
 
 ## Source layout
 
 ```text
 src/
-├── openscene.tsx  # component/action declarations and the shared manifest
-├── App.tsx        # Provider + Renderer shell
-├── main.tsx       # installOpenScene, then mount the shell
-├── index.css      # app-wide styles
-└── App.css        # component-level styles
+├── openscene.tsx              # component/action definitions and build manifest
+├── lib/render/renderer.tsx    # the single OpenScene runtime integration
+├── App.tsx                    # host application shell
+├── main.tsx                   # normal React entrypoint
+└── index.css                  # app-wide styles
 ```
 
-## Component and action declarations
+## Runtime integration
 
-`src/openscene.tsx` calls `defineOpenSceneReactApp()` with `baseReactComponents` (`View`, `Text`, `Button`) and custom extensions:
+`src/lib/render/renderer.tsx` is the only integration point:
 
-- `Image`: Image component supporting `src`, `alt`, `fit`, `loading`, and visual style editor.
-- `ReactViteCallout`: Composes the shared `View` primitive with tone variants (`info`, `success`, `warning`).
-- `ReactViteStatusCard`: Uses `useOpenSceneNode()` and spreads `nodeAttrs` onto its semantic `<article>` root.
-- `ReactViteOpenApiProvider`: Requests an OpenAPI operation and renders JSON response.
-- `reactViteSetNotice`: Action for storing runtime notice without altering the canonical page document.
+```tsx
+<OpenScene
+  baseUrl={import.meta.env.VITE_OPENSCENE_BASE_URL}
+  components={reactComponents}
+  actions={reactActions}
+/>
+```
 
-Both definitions keep their Zod props schema, editor metadata, and renderer together. `reactApp.manifest` is converted with `defineAppManifest()` and exported as the manifest consumed by the browser client and Vite manifest plugin.
+The renderer derives the page key from the browser pathname and loads public JSON from:
 
-## Runtime and editor behavior
+```text
+{VITE_OPENSCENE_BASE_URL}/{page-key}.json
+```
 
-`src/main.tsx` installs `installOpenScene()` once and checks that the returned client is `window.OpenScene` before mounting `OpenSceneProvider` and `OpenSceneRenderer`.
+The root path maps to `home.json`. No App ID, App Key, Runtime Key, or Admin request is sent by the browser.
 
-- A normal browser visit requests the published runtime delivery using `VITE_OPENSCENE_ADMIN_URL` and the application identity in `VITE_OPENSCENE_APP_KEY`. The browser path selects the page key: `/` resolves to `home`; `/pricing` resolves to `pricing`.
-- An editor iframe URL containing the OpenScene editor query contract skips the release fetch and connects with Studio's Protocol v2 bridge.
-- The client owns fetch, MessagePort, immutable document snapshots, runtime state, and error reporting. The React adapter subscribes and renders with `@json-render/react`.
+When Studio adds the editor query parameters, the same component skips static loading and connects to Studio through the Protocol v2 bridge. The query contract is parsed by the framework-neutral JavaScript package.
+
+## Build and manifest publishing
+
+The Vite plugin publishes the component catalog to an existing Admin App. App ID identifies the destination; a Better Auth Publish Key authorizes only manifest writes:
+
+```text
+OPENSCENE_ADMIN_URL=https://admin.example.com
+OPENSCENE_APP_ID=app_...
+OPENSCENE_PUBLISH_KEY=osc_publish_...
+```
+
+These values are build-time variables and must not use the `VITE_` prefix. The Publish Key is never included in browser assets.
 
 ## Development and build
 

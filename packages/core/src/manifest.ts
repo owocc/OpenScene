@@ -72,6 +72,28 @@ export const AppManifestSchema: z.ZodType<AppManifest> = z
   })
   .catchall(z.unknown()) as z.ZodType<AppManifest>;
 
+export interface SceneManifest {
+  protocolVersion: string;
+  appType: AppType;
+  components: Record<string, ComponentManifest>;
+  actions?: Record<string, unknown>;
+  dataSources?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Component catalog manifest without an application identity or credentials. */
+export const SceneManifestSchema: z.ZodType<SceneManifest> = z
+  .object({
+    protocolVersion: nonEmptyString,
+    appType: appTypeSchema,
+    components: z.record(nonEmptyString, ComponentManifestSchema),
+    actions: unknownRecord.optional(),
+    dataSources: unknownRecord.optional(),
+    capabilities: unknownRecord.optional(),
+  })
+  .catchall(z.unknown()) as z.ZodType<SceneManifest>;
+
 export interface RuntimePageDelivery {
   app: {
     id: string;
@@ -98,3 +120,22 @@ export const RuntimePageDeliverySchema: z.ZodType<RuntimePageDelivery> = z
     document: SceneDocumentSchema,
   })
   .catchall(z.unknown()) as unknown as z.ZodType<RuntimePageDelivery>;
+
+export interface PublishedSceneDocument {
+  schemaVersion: string;
+  page: {
+    key: string;
+    title?: string;
+  };
+  document: SceneDocument;
+  [key: string]: unknown;
+}
+
+/** Public static payload consumed from an S3/CloudFront base URL. */
+export const PublishedSceneDocumentSchema: z.ZodType<PublishedSceneDocument> = z
+  .object({
+    schemaVersion: nonEmptyString,
+    page: z.object({ key: nonEmptyString, title: z.string().optional() }),
+    document: SceneDocumentSchema,
+  })
+  .catchall(z.unknown()) as unknown as z.ZodType<PublishedSceneDocument>;

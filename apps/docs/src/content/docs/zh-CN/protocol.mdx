@@ -289,6 +289,43 @@ const AppManifestSchema: z.ZodType<AppManifest> = z
   .catchall(z.unknown()) as z.ZodType<AppManifest>;
 ```
 
+## SceneManifest
+
+由 `@openscene-ai/core` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface SceneManifest {
+  protocolVersion: string;
+  appType: AppType;
+  components: Record<string, ComponentManifest>;
+  actions?: Record<string, unknown>;
+  dataSources?: Record<string, unknown>;
+  capabilities?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+```
+
+## SceneManifestSchema
+
+Component catalog manifest without an application identity or credentials.
+
+**类型:** Constant
+
+```ts
+const SceneManifestSchema: z.ZodType<SceneManifest> = z
+  .object({
+    protocolVersion: nonEmptyString,
+    appType: appTypeSchema,
+    components: z.record(nonEmptyString, ComponentManifestSchema),
+    actions: unknownRecord.optional(),
+    dataSources: unknownRecord.optional(),
+    capabilities: unknownRecord.optional(),
+  })
+  .catchall(z.unknown()) as z.ZodType<SceneManifest>;
+```
+
 ## RuntimePageDelivery
 
 由 `@openscene-ai/core` 导出的协议接口。
@@ -327,6 +364,40 @@ const RuntimePageDeliverySchema: z.ZodType<RuntimePageDelivery> = z
     document: SceneDocumentSchema,
   })
   .catchall(z.unknown()) as unknown as z.ZodType<RuntimePageDelivery>;
+```
+
+## PublishedSceneDocument
+
+由 `@openscene-ai/core` 导出的协议接口。
+
+**类型:** Interface
+
+```ts
+interface PublishedSceneDocument {
+  schemaVersion: string;
+  page: {
+    key: string;
+    title?: string;
+  };
+  document: SceneDocument;
+  [key: string]: unknown;
+}
+```
+
+## PublishedSceneDocumentSchema
+
+Public static payload consumed from an S3/CloudFront base URL.
+
+**类型:** Constant
+
+```ts
+const PublishedSceneDocumentSchema: z.ZodType<PublishedSceneDocument> = z
+  .object({
+    schemaVersion: nonEmptyString,
+    page: z.object({ key: nonEmptyString, title: z.string().optional() }),
+    document: SceneDocumentSchema,
+  })
+  .catchall(z.unknown()) as unknown as z.ZodType<PublishedSceneDocument>;
 ```
 
 ## STUDIO_BRIDGE_PROTOCOL
@@ -552,6 +623,10 @@ const RendererPortMessageSchema = z.discriminatedUnion("type", [
     z.object({ scrollLeft: z.number().nonnegative(), scrollTop: z.number().nonnegative() }),
   ),
   envelope("RENDERER_ERROR", z.object({ message: nonEmptyString })),
+  /** Dev-mode only: renderer pushes its local manifest so Studio can populate
+   *  PropertyEditor without a server upload. Only handled when sessionId is
+   *  the local-test sentinel; ignored in production sessions. */
+  envelope("DEV_MANIFEST", z.object({ manifest: AppManifestSchema })),
 ]);
 ```
 

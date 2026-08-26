@@ -70,9 +70,6 @@ import {
   listVersions,
   patchAsset,
   pushManifest,
-  rotateAppKey,
-  runtimePage,
-  runtimeRelease,
   storageHealth,
   testAppStorage,
   syncManifest,
@@ -99,10 +96,10 @@ import {
 import {
   AiChatRequestSchema,
   AiConfigUpdateSchema,
-  AppManifestSchema,
   AppPromptCreateSchema,
   AppPromptPatchSchema,
   PromptPreviewRequestSchema,
+  SceneManifestSchema,
   SystemPromptUpdateSchema,
   UiSessionCreateSchema,
   UiSessionSchema,
@@ -210,7 +207,6 @@ async function handleRequest(
     }
     if (path.length === 2 && path[0] === "storage" && path[1] === "health" && method === "GET")
       return Response.json(await storageHealth());
-    if (path[0] === "runtime") return await handleRuntime(request, db, path, method);
     if (path[0] === "studio-sessions" && path[2] === "bootstrap" && method === "GET") {
       const authContext = await authenticate(request, db, "session");
       if (authContext.kind !== "session" || authContext.sessionId !== path[1]) throw notFound();
@@ -325,7 +321,7 @@ async function handleRequest(
       isPublicRawAsset || isLocalUpload
         ? "public"
         : path[0] === "apps" && path[2] === "manifest" && path[3] === "push"
-          ? "app-key"
+          ? "publish-key"
           : "management";
     await authenticate(request, db, requirement, appId);
     if (requirement === "management") assertManagementCsrf(request, method);
@@ -337,7 +333,6 @@ async function handleRequest(
     if (path.length === 2) return await resourceCrud(request, db, method, "app", path[1]);
 
     if (path[2] === "preview-profiles") return await previewRoutes(request, db, method, path);
-    if (path[2] === "app-keys") return await appKeyRoutes(db, method, path);
     if (path[2] === "prompts" || path[2] === "prompt")
       return await promptRoutes(request, db, method, path);
     if (path[2] === "manifest") return await manifestRoutes(request, db, method, path);
@@ -375,14 +370,6 @@ async function resourceCrud(
     return noContent();
   }
   throw notFound();
-}
-async function appKeyRoutes(
-  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
-  method: Method,
-  path: string[],
-): Promise<Response> {
-  if (path.length !== 4 || path[3] !== "rotate" || method !== "POST") throw notFound();
-  return json(await rotateAppKey(db, path[1]));
 }
 async function promptRoutes(
   request: NextRequest,
@@ -451,7 +438,7 @@ async function aiRoutes(
     }
     throw notFound();
   }
-  // Client consumption endpoint: every call must present a valid App Key or Studio Session and its app id.
+  // Client consumption endpoint: requests require a Studio Session or management authorization.
   if (path[1] === "chat" && method === "POST") {
     const authContext = await authenticate(request, db, "client");
     const input = await parseBody(request, AiChatRequestSchema);
@@ -507,7 +494,9 @@ async function manifestRoutes(
     return json(await getManifestRevision(db, appId, path[4]));
   if (path[3] === "sync" && method === "POST") return json(await syncManifest(db, appId));
   if (path[3] === "push" && method === "POST")
-    return json(await pushManifest(db, appId, await parseBody(request, AppManifestSchema), "push"));
+    return json(
+      await pushManifest(db, appId, await parseBody(request, SceneManifestSchema), "push"),
+    );
   throw notFound();
 }
 
@@ -750,37 +739,6 @@ async function sessionRoutes(
   throw notFound();
 }
 
-async function handleRuntime(
-  request: NextRequest,
-  db: Awaited<ReturnType<typeof initializeDatabase>>["db"],
-  path: string[],
-  method: Method,
-): Promise<Response> {
-  if (method !== "GET") throw notFound();
-  const appKey = path[2];
-  if (path[1] !== "apps" || !appKey) throw notFound();
-  const context = await authenticate(request, db, "runtime");
-  if (path[3] === "pages" && path.length === 5) {
-    const result = await runtimePage(db, appKey, path[4]);
-    if (context.appId && context.appId !== (result.payload as { app: { id: string } }).app.id)
-      throw notFound();
-    return json(result.payload, 200, {
-      etag: result.etag,
-      "cache-control": "public, max-age=60, s-maxage=300, immutable",
-    });
-  }
-  if (path[3] === "releases" && path.length === 5) {
-    const result = await runtimeRelease(db, appKey, path[4]);
-    if (context.appId && context.appId !== (result.payload as { app: { id: string } }).app.id)
-      throw notFound();
-    return json(result.payload, 200, {
-      etag: result.etag,
-      "cache-control": "public, max-age=60, s-maxage=300, immutable",
-    });
-  }
-  throw notFound();
-}
-
 async function body(request: NextRequest): Promise<unknown> {
   return parseBody(request, z.object({}).catchall(z.unknown()));
 }
@@ -816,11 +774,7 @@ function withCors(response: Response, request: NextRequest, path: string[]): Res
   const headers = new Headers(response.headers);
   const config = getConfig();
   const origin = request.headers.get("origin");
-  if (path[0] === "runtime" && config.auth.runtimePublic) {
-    headers.set("access-control-allow-origin", "*");
-    headers.set("access-control-allow-methods", "GET, OPTIONS");
-    headers.set("access-control-allow-headers", "content-type, authorization");
-  } else if (path[0] === "studio-sessions") {
+  if (path[0] === "studio-sessions") {
     headers.set("vary", appendVary(headers.get("vary"), "Origin"));
     const studioOrigin = new URL(config.studio.publicBaseUrl).origin;
     if (origin === studioOrigin) headers.set("access-control-allow-origin", studioOrigin);
@@ -832,10 +786,9 @@ function withCors(response: Response, request: NextRequest, path: string[]): Res
   } else if (path[0] === "ai") {
     headers.set("vary", appendVary(headers.get("vary"), "Origin"));
     if (path[1] === "chat") {
-      // Public consumption endpoint: any origin may call it, but the App Key is required.
       headers.set("access-control-allow-origin", "*");
       headers.set("access-control-allow-methods", "POST, OPTIONS");
-      headers.set("access-control-allow-headers", "content-type, x-openscene-app-key");
+      headers.set("access-control-allow-headers", "content-type, authorization");
     } else {
       const aiOrigin = request.headers.get("origin");
       if (

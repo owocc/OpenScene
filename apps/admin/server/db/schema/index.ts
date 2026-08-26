@@ -14,6 +14,7 @@ import {
   session,
   account,
   verification,
+  apikey,
   userRelations,
   sessionRelations,
   accountRelations,
@@ -36,7 +37,6 @@ export const apps = sqliteTable(
     manifestMode: text("manifest_mode", { enum: ["remote", "push"] }).notNull(),
     manifestUrl: text("manifest_url"),
     activeManifestRevisionId: text("active_manifest_revision_id"),
-    runtimePublicBaseUrl: text("runtime_public_base_url"),
     ...timestamps,
   },
   (table) => [uniqueIndex("apps_key_unique").on(table.key)],
@@ -104,7 +104,6 @@ export const manifestRevisions = sqliteTable(
       .notNull()
       .references(() => apps.id, { onDelete: "restrict" }),
     protocolVersion: text("protocol_version").notNull(),
-    appKey: text("app_key").notNull(),
     manifestJson: text("manifest_json").notNull(),
     checksum: text("checksum").notNull(),
     source: text("source", { enum: ["push", "sync"] }).notNull(),
@@ -113,25 +112,6 @@ export const manifestRevisions = sqliteTable(
   (table) => [
     index("manifest_revisions_app_index").on(table.appId, table.createdAt),
     uniqueIndex("manifest_revisions_app_checksum_unique").on(table.appId, table.checksum),
-  ],
-);
-
-export const appKeys = sqliteTable(
-  "app_keys",
-  {
-    id: text("id").primaryKey(),
-    appId: text("app_id")
-      .notNull()
-      .references(() => apps.id, { onDelete: "restrict" }),
-    kind: text("kind", { enum: ["app", "runtime"] }).notNull(),
-    keyHash: text("key_hash").notNull(),
-    lastUsedAt: text("last_used_at"),
-    revokedAt: text("revoked_at"),
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("app_keys_hash_unique").on(table.keyHash),
-    index("app_keys_app_index").on(table.appId),
   ],
 );
 
@@ -439,11 +419,18 @@ export const storageObjects = sqliteTable(
 );
 
 export const schema = {
+  user,
+  session,
+  account,
+  verification,
+  apikey,
+  userRelations,
+  sessionRelations,
+  accountRelations,
   apps,
   previewProfiles,
   manifestRevisions,
   appOpenApiDocs,
-  appKeys,
   pages,
   templates,
   documents,
@@ -454,18 +441,11 @@ export const schema = {
   assets,
   studioSessions,
   aiConfig,
-  appPrompts,
   systemPrompts,
+  appPrompts,
   aiChatSessions,
   appStorageConfigs,
   storageObjects,
-  user,
-  session,
-  account,
-  verification,
-  userRelations,
-  sessionRelations,
-  accountRelations,
 };
 
 export type AppRow = typeof apps.$inferSelect;

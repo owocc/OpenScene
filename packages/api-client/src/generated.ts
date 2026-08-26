@@ -114,22 +114,6 @@ export interface paths {
     patch: operations["updateApp"];
     trace?: never;
   };
-  "/api/v1/apps/{appId}/app-keys/rotate": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations["rotateAppKey"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/v1/apps/{appId}/assets": {
     parameters: {
       query?: never;
@@ -706,38 +690,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/runtime/apps/{appKey}/pages/{pageKey}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["getRuntimePage"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/runtime/apps/{appKey}/releases/{releaseId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["getRuntimeRelease"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/api/v1/storage/health": {
     parameters: {
       query?: never;
@@ -1107,21 +1059,10 @@ export interface components {
         url?: string;
         activeRevisionId?: string;
       };
-      runtime: {
-        /** Format: uri */
-        publicBaseUrl?: string;
-      };
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
-      credentials?: {
-        appKey: string;
-        runtimeKey: string;
-      };
-    };
-    AppKeyRotation: {
-      appKey: string;
     };
     /** @description An app AI prompt profile */
     AppPrompt: {
@@ -1413,7 +1354,60 @@ export interface components {
       [key: string]: unknown;
     };
     ManifestRevision: {
-      [key: string]: unknown;
+      id: string;
+      appId: string;
+      protocolVersion: string;
+      /** @enum {string} */
+      appType: "web" | "react-native" | "flutter";
+      manifest: {
+        protocolVersion: string;
+        /** @enum {string} */
+        appType: "web" | "react-native" | "flutter";
+        components: {
+          [key: string]: {
+            title: string;
+            description?: string;
+            category?: string;
+            tags?: string[];
+            props: {
+              [key: string]: unknown;
+            };
+            editor?: {
+              [key: string]: unknown;
+            };
+            events?: {
+              [key: string]: unknown;
+            };
+            children?: unknown;
+            slots?: {
+              [key: string]: unknown;
+            };
+            capabilities?: {
+              [key: string]: unknown;
+            };
+          } & {
+            [key: string]: unknown;
+          };
+        };
+        actions?: {
+          [key: string]: unknown;
+        };
+        dataSources?: {
+          [key: string]: unknown;
+        };
+        capabilities?: {
+          [key: string]: unknown;
+        };
+      } & {
+        [key: string]: unknown;
+      };
+      checksum: string;
+      /** @enum {string} */
+      source: "push" | "sync";
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
     };
     OpenApiDoc: {
       id: string;
@@ -1593,7 +1587,7 @@ export interface operations {
     parameters: {
       query?: never;
       header: {
-        "x-openscene-app-key": string;
+        authorization: string;
       };
       path?: never;
       cookie?: never;
@@ -2851,18 +2845,10 @@ export interface operations {
                 url?: string;
                 activeRevisionId?: string;
               };
-              runtime: {
-                /** Format: uri */
-                publicBaseUrl?: string;
-              };
               /** Format: date-time */
               createdAt: string;
               /** Format: date-time */
               updatedAt: string;
-              credentials?: {
-                appKey: string;
-                runtimeKey: string;
-              };
             }[];
             nextCursor: string | null;
           };
@@ -3019,8 +3005,6 @@ export interface operations {
             /** Format: uri */
             url?: string;
           };
-          /** Format: uri */
-          runtimePublicBaseUrl?: string;
         };
       };
     };
@@ -3047,18 +3031,10 @@ export interface operations {
               url?: string;
               activeRevisionId?: string;
             };
-            runtime: {
-              /** Format: uri */
-              publicBaseUrl?: string;
-            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            credentials?: {
-              appKey: string;
-              runtimeKey: string;
-            };
           };
         };
       };
@@ -3211,18 +3187,10 @@ export interface operations {
               url?: string;
               activeRevisionId?: string;
             };
-            runtime: {
-              /** Format: uri */
-              publicBaseUrl?: string;
-            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            credentials?: {
-              appKey: string;
-              runtimeKey: string;
-            };
           };
         };
       };
@@ -3511,8 +3479,6 @@ export interface operations {
             /** Format: uri */
             url?: string;
           };
-          /** Format: uri */
-          runtimePublicBaseUrl?: string;
         };
       };
     };
@@ -3539,156 +3505,10 @@ export interface operations {
               url?: string;
               activeRevisionId?: string;
             };
-            runtime: {
-              /** Format: uri */
-              publicBaseUrl?: string;
-            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-            credentials?: {
-              appKey: string;
-              runtimeKey: string;
-            };
-          };
-        };
-      };
-      /** @description Bad request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Authentication required */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Validation failed */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Internal Server Error */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-    };
-  };
-  rotateAppKey: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        appId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            appKey: string;
           };
         };
       };
@@ -8180,7 +8000,7 @@ export interface operations {
     parameters: {
       query?: never;
       header: {
-        "x-openscene-app-key": string;
+        authorization: string;
       };
       path: {
         appId: string;
@@ -14228,284 +14048,6 @@ export interface operations {
               driver?: "s3" | "memory" | "none" | "deprecated";
               detail?: string;
             };
-          };
-        };
-      };
-      /** @description Bad request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Authentication required */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Validation failed */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Internal Server Error */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-    };
-  };
-  getRuntimePage: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        appKey: string;
-        pageKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Bad request */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Authentication required */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource not found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Resource conflict */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Validation failed */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-      /** @description Internal Server Error */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": {
-            type: string;
-            title: string;
-            status: number;
-            detail: string;
-            instance: string;
-            errors?: {
-              path: string;
-              message: string;
-            }[];
-          };
-        };
-      };
-    };
-  };
-  getRuntimeRelease: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        appKey: string;
-        releaseId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": {
-            [key: string]: unknown;
           };
         };
       };

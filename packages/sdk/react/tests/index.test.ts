@@ -3,7 +3,8 @@ import { createEmptySceneDocument } from "@openscene-ai/core";
 import { z } from "zod";
 import {
   baseReactComponents,
-  defineOpenSceneReactApp,
+  createOpenSceneManifest,
+  createOpenSceneReactRuntime,
   defineOpenSceneReactComponent,
 } from "../src/catalog.js";
 
@@ -30,14 +31,15 @@ describe("OpenScene React catalog adapter", () => {
       category: "layout",
       render: () => null,
     });
-    const app = defineOpenSceneReactApp({ appKey: "test-app", components: [custom] });
-    expect(app.manifest.app).toEqual({ key: "test-app", type: "web" });
-    expect(app.manifest.components.Card.title).toBe("Card");
-    expect(app.manifest.components.Card.props).toBeDefined();
-    expect(JSON.stringify(app.manifest)).not.toContain("renderer");
-    expect(JSON.stringify(app.manifest)).not.toContain("__opensceneNodeId");
-    expect(app.catalog.componentNames).toContain("View");
-    expect(app.catalog.componentNames).toContain("Card");
+    const manifest = createOpenSceneManifest({ components: [custom] });
+    expect(manifest.appType).toBe("web");
+    expect(manifest.components.Card.title).toBe("Card");
+    expect(manifest.components.Card.props).toBeDefined();
+    expect(JSON.stringify(manifest)).not.toContain("renderer");
+    expect(JSON.stringify(manifest)).not.toContain("__opensceneNodeId");
+    const runtime = createOpenSceneReactRuntime({ components: [custom] });
+    expect(runtime.catalog.componentNames).toContain("View");
+    expect(runtime.catalog.componentNames).toContain("Card");
   });
 
   test("rejects named slots when the component is declared", () => {
@@ -51,14 +53,13 @@ describe("OpenScene React catalog adapter", () => {
       }),
     ).toThrow('OpenScene React renderer does not support named slot "header"');
   });
-
   test("base components and canonical documents are catalog-compatible", () => {
-    const app = defineOpenSceneReactApp();
+    const runtime = createOpenSceneReactRuntime();
     const document = createEmptySceneDocument();
     // A freshly created document has no root yet; json-render's spec
     // validation rejects it, which is why the renderer skips validation
     // until the author adds the first node.
-    expect(app.catalog.validate(document.spec).success).toBe(false);
+    expect(runtime.catalog.validate(document.spec).success).toBe(false);
     const rooted = {
       ...document,
       spec: {
@@ -67,7 +68,7 @@ describe("OpenScene React catalog adapter", () => {
         state: {},
       },
     };
-    expect(app.catalog.validate(rooted.spec).success).toBe(true);
+    expect(runtime.catalog.validate(rooted.spec).success).toBe(true);
     expect(Object.keys(baseReactComponents)).toEqual(["View", "Text", "Button"]);
   });
 });

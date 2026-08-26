@@ -1,22 +1,25 @@
 import { afterEach, describe, expect, test } from "vite-plus/test";
-import { createEmptySceneDocument,
-createBridgeEnvelope,
-type AppManifest, } from "@openscene-ai/core";
+import {
+  createBridgeEnvelope,
+  createEmptySceneDocument,
+  type PublishedSceneDocument,
+  type SceneManifest,
+} from "@openscene-ai/core";
 import { MessageChannel } from "node:worker_threads";
-import { OpenSceneController, defineAppManifest, openSceneDirectives } from "../src/index.ts";
+import { OpenSceneController, openSceneDirectives } from "../src/index.ts";
 import { evaluateDynamicValue, resolveTemplate } from "../src/solid/evaluate.ts";
 import { openSceneManifestPlugin } from "../src/vite.ts";
 
-const manifest: AppManifest = defineAppManifest({
-  protocolVersion: "2",
-  app: { key: "demo", type: "web" },
-  components: {},
-});
-
-const delivery = {
-  app: { id: "app-1", key: "demo", type: "web" as const },
-  page: { id: "page-1", key: "home", title: "Home" },
+const delivery: PublishedSceneDocument = {
+  schemaVersion: "1",
+  page: { key: "home", title: "Home" },
   document: createEmptySceneDocument(),
+};
+
+const manifest: SceneManifest = {
+  protocolVersion: "2",
+  appType: "web",
+  components: {},
 };
 
 const originalFetch = globalThis.fetch;
@@ -31,7 +34,7 @@ function fetchInputUrl(input: RequestInfo | URL): string {
 }
 
 describe("framework-neutral client", () => {
-  test("loads and validates a runtime delivery into an immutable document and store", async () => {
+  test("loads and validates a static page into an immutable document and store", async () => {
     let requested = "";
     globalThis.fetch = async (input) => {
       requested = fetchInputUrl(input);
@@ -41,12 +44,12 @@ describe("framework-neutral client", () => {
       });
     };
     const client = new OpenSceneController(
-      { apiBaseUrl: "https://admin.example", pageKey: "home", manifest },
+      { baseUrl: "https://cdn.example", pageKey: "home" },
       null,
     );
     await client.loadPage();
     const snapshot = client.getSnapshot();
-    expect(requested).toBe("https://admin.example/api/v1/runtime/apps/demo/pages/home");
+    expect(requested).toBe("https://cdn.example/home.json");
     expect(snapshot.status).toBe("ready");
     expect(Object.isFrozen(snapshot.document)).toBe(true);
     expect(snapshot.runtimeStore?.get("/__scene/pageInfo/title")).toBe("");
@@ -55,10 +58,10 @@ describe("framework-neutral client", () => {
     client.destroy();
   });
 
-  test("enters observable error state for malformed runtime responses", async () => {
+  test("enters observable error state for malformed static page responses", async () => {
     globalThis.fetch = async () => new Response(JSON.stringify({ invalid: true }), { status: 200 });
     const client = new OpenSceneController(
-      { apiBaseUrl: "https://admin.example", pageKey: "home", manifest },
+      { baseUrl: "https://cdn.example", pageKey: "home" },
       null,
     );
     await client.loadPage();
@@ -83,7 +86,7 @@ describe("framework-neutral client", () => {
       parent,
     }) as unknown as Window;
     const controller = new OpenSceneController(
-      { apiBaseUrl: "https://admin.example", pageKey: "home", manifest },
+      { baseUrl: "https://cdn.example", pageKey: "home" },
       target,
     );
     expect(fetchCalls).toBe(0);
@@ -117,13 +120,18 @@ describe("framework-neutral client", () => {
     channel.port1.close();
   });
 });
-
 describe("Vite manifest plugin", () => {
-  test("pushes a complete build manifest once and keeps the key in a header", async () => {
+  test("pushes a catalog manifest once with the publish key", async () => {
     const previous = {
       admin: process.env.OPENSCENE_ADMIN_URL,
       appId: process.env.OPENSCENE_APP_ID,
-      appKey: process.env.OPENSCENE_APP_KEY,
+      publishKey: process.env.OPENSCENE_PUBLISH_KEY,
+      httpsProxy: process.env.HTTPS_PROXY,
+      httpProxy: process.env.HTTP_PROXY,
+      allProxy: process.env.ALL_PROXY,
+      lowerHttpsProxy: process.env.https_proxy,
+      lowerHttpProxy: process.env.http_proxy,
+      lowerAllProxy: process.env.all_proxy,
     };
     let calls = 0;
     let sentBody = "";
@@ -131,23 +139,35 @@ describe("Vite manifest plugin", () => {
     globalThis.fetch = async (input, init) => {
       calls += 1;
       sentBody = typeof init?.body === "string" ? init.body : "";
-      sentHeader = new Headers(init?.headers).get("x-openscene-app-key") ?? "";
+      sentHeader = new Headers(init?.headers).get("authorization") ?? "";
       expect(fetchInputUrl(input)).toContain("/api/v1/apps/app-1/manifest/push");
       return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
     };
     process.env.OPENSCENE_ADMIN_URL = "https://admin.example";
     process.env.OPENSCENE_APP_ID = "app-1";
-    process.env.OPENSCENE_APP_KEY = "secret-key";
+    process.env.OPENSCENE_PUBLISH_KEY = "secret-key";
+    process.env.HTTPS_PROXY = "";
+    process.env.HTTP_PROXY = "";
+    process.env.ALL_PROXY = "";
+    process.env.https_proxy = "";
+    process.env.http_proxy = "";
+    process.env.all_proxy = "";
     const plugin = openSceneManifestPlugin({ manifest });
     plugin.configResolved?.({ command: "build", mode: "production", envDir: process.cwd() });
     await plugin.closeBundle?.();
     await plugin.closeBundle?.();
     expect(calls).toBe(1);
-    expect(sentHeader).toBe("secret-key");
-    expect(sentBody).toContain('"key":"demo"');
+    expect(sentHeader).toBe("Bearer secret-key");
+    expect(sentBody).toContain('"appType":"web"');
     process.env.OPENSCENE_ADMIN_URL = previous.admin;
     process.env.OPENSCENE_APP_ID = previous.appId;
-    process.env.OPENSCENE_APP_KEY = previous.appKey;
+    process.env.OPENSCENE_PUBLISH_KEY = previous.publishKey;
+    process.env.HTTPS_PROXY = previous.httpsProxy;
+    process.env.HTTP_PROXY = previous.httpProxy;
+    process.env.ALL_PROXY = previous.allProxy;
+    process.env.https_proxy = previous.lowerHttpsProxy;
+    process.env.http_proxy = previous.lowerHttpProxy;
+    process.env.all_proxy = previous.lowerAllProxy;
   });
 });
 

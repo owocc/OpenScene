@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { APP_TYPE_WEB } from "@openscene-ai/core";
 import { createEmptySceneDocument } from "@openscene-ai/core";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
@@ -8,9 +8,10 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { DELETE, GET, PATCH, POST, PUT } from "../../app/api/v1/[...path]/route";
 import { initializeDatabase, resetDatabaseForTests } from "../../server/db/client";
-import { appKeys, appStorageConfigs } from "../../server/db/schema";
+import { appStorageConfigs } from "../../server/db/schema";
 import { resetConfigForTests } from "../../server/config/env";
-import { resetStorageForTests } from "../../server/storage";
+import { getAppPageStorage, resetStorageForTests } from "../../server/storage";
+import { pageObjectKey } from "../../server/storage/keys";
 import { createOpenApiDocument } from "../../server/openapi/document";
 import {
   DEFAULT_APP_SYSTEM_PROMPT,
@@ -20,8 +21,8 @@ import {
 type PathContext = { params: Promise<{ path: string[] }> };
 
 let tempDir: string;
-let appA: { id: string; appKey: string; runtimeKey: string };
-let appB: { id: string; appKey: string; runtimeKey: string };
+let appA: { id: string };
+let appB: { id: string };
 let pageA: {
   id: string;
   documentId: string;
@@ -48,11 +49,7 @@ beforeAll(async () => {
   expect(responseA.status).toBe(201);
   const bodyA = await responseA.json();
   expect(bodyA.type).toBe(APP_TYPE_WEB);
-  appA = {
-    id: bodyA.id,
-    appKey: bodyA.credentials.appKey,
-    runtimeKey: bodyA.credentials.runtimeKey,
-  };
+  appA = { id: bodyA.id };
   const responseB = await call("POST", ["apps"], {
     key: "app-b",
     name: "App B",
@@ -60,11 +57,7 @@ beforeAll(async () => {
   });
   expect(responseB.status).toBe(201);
   const bodyB = await responseB.json();
-  appB = {
-    id: bodyB.id,
-    appKey: bodyB.credentials.appKey,
-    runtimeKey: bodyB.credentials.runtimeKey,
-  };
+  appB = { id: bodyB.id };
 });
 
 afterAll(async () => {
@@ -402,85 +395,32 @@ describe("Admin API HTTP flow", () => {
       { versionId: versionBody.id },
     );
     expect(release.status).toBe(201);
-    const runtime = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
-      "x-openscene-runtime-key": appA.runtimeKey,
-    });
-    const runtimeBody = await runtime.json();
-    expect(runtimeBody.app?.type ?? runtimeBody.type).toBe(APP_TYPE_WEB);
-    expect(runtimeBody.document.spec.title).toBe("Updated");
-    const crossApp = await call("GET", ["runtime", "apps", "app-a", "pages", "home"], undefined, {
-      "x-openscene-runtime-key": appB.runtimeKey,
-    });
-    expect(crossApp.status).toBe(404);
-  });
-
-  test("App Key cannot push a Manifest into another App", async () => {
-    const response = await call(
-      "POST",
-      ["apps", appB.id, "manifest", "push"],
-      { protocolVersion: "1.0", app: { key: "app-b", type: APP_TYPE_WEB }, components: {} },
-      { "x-openscene-app-key": appA.appKey },
-    );
-    expect(response.status).toBe(404);
-  });
-  test("atomically rotates App Key while preserving Runtime Key authentication", async () => {
-    const manifest = {
-      protocolVersion: "1.0",
-      app: { key: "app-a", type: APP_TYPE_WEB },
-      components: {},
-    };
-    const initialPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
-      "x-openscene-app-key": appA.appKey,
-    });
-    expect(initialPush.status).toBe(200);
-
-    const runtimeBefore = await call(
-      "GET",
-      ["runtime", "apps", "app-a", "pages", "home"],
-      undefined,
-      {
-        "x-openscene-runtime-key": appA.runtimeKey,
-      },
-    );
-    expect(runtimeBefore.status).toBe(200);
-
-    const oldAppKey = appA.appKey;
-    const rotated = await call("POST", ["apps", appA.id, "app-keys", "rotate"]);
-    expect(rotated.status).toBe(200);
-    const rotatedBody = await rotated.json();
-    expect(Object.keys(rotatedBody)).toEqual(["appKey"]);
-    expect(rotatedBody.appKey).not.toBe(oldAppKey);
-    appA.appKey = rotatedBody.appKey;
-
-    const oldPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
-      "x-openscene-app-key": oldAppKey,
-    });
-    expect(oldPush.status).toBe(404);
-    const newPush = await call("POST", ["apps", appA.id, "manifest", "push"], manifest, {
-      "x-openscene-app-key": appA.appKey,
-    });
-    expect(newPush.status).toBe(200);
-
-    const runtimeAfter = await call(
-      "GET",
-      ["runtime", "apps", "app-a", "pages", "home"],
-      undefined,
-      {
-        "x-openscene-runtime-key": appA.runtimeKey,
-      },
-    );
-    expect(runtimeAfter.status).toBe(200);
-
     const { db } = await initializeDatabase();
-    const activeAppKeys = await db
-      .select({ id: appKeys.id })
-      .from(appKeys)
-      .where(and(eq(appKeys.appId, appA.id), eq(appKeys.kind, "app"), isNull(appKeys.revokedAt)))
-      .all();
-    expect(activeAppKeys).toHaveLength(1);
+    const storage = await getAppPageStorage(db, appA.id);
+    const bytes = await storage.get(pageObjectKey(appA.id, "home"));
+    expect(bytes).toBeDefined();
+    const staticPayload = JSON.parse(new TextDecoder().decode(bytes)) as {
+      page: { key: string };
+      document: { spec: { title?: string } };
+    };
+    expect(staticPayload.page.key).toBe("home");
+    expect(staticPayload.document.spec.title).toBe("Updated");
+  });
 
-    const missingApp = await call("POST", ["apps", "app_missing", "app-keys", "rotate"]);
-    expect(missingApp.status).toBe(404);
+  test("manifest push requires a scoped Publish Key", async () => {
+    const response = await call("POST", ["apps", appA.id, "manifest", "push"], {
+      protocolVersion: "1.0",
+      appType: APP_TYPE_WEB,
+      components: {},
+    });
+    expect(response.status).toBe(401);
+    const invalid = await call(
+      "POST",
+      ["apps", appA.id, "manifest", "push"],
+      { protocolVersion: "1.0", appType: APP_TYPE_WEB, components: {} },
+      { authorization: "Bearer invalid-publish-key" },
+    );
+    expect(invalid.status).toBe(401);
   });
 
   test("deletes an empty App together with its generated defaults", async () => {
@@ -502,8 +442,6 @@ describe("Admin API HTTP flow", () => {
     expect(validToken.status).toBe(200);
 
     const login = await call("POST", ["auth", "session"], { token: "management-test-token" });
-    const rotationMissingToken = await call("POST", ["apps", appA.id, "app-keys", "rotate"]);
-    expect(rotationMissingToken.status).toBe(401);
     expect(login.status).toBe(200);
     const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
     expect(cookie).toMatch(/^openscene_admin_session=/);
@@ -515,21 +453,6 @@ describe("Admin API HTTP flow", () => {
       { description: "cookie write" },
       { cookie: cookie ?? "" },
     );
-    const rotationCsrfRejected = await call(
-      "POST",
-      ["apps", appA.id, "app-keys", "rotate"],
-      undefined,
-      { cookie: cookie ?? "" },
-    );
-    expect(rotationCsrfRejected.status).toBe(403);
-    const rotationCsrfAccepted = await call(
-      "POST",
-      ["apps", appA.id, "app-keys", "rotate"],
-      undefined,
-      { cookie: cookie ?? "", origin: "http://localhost" },
-    );
-    expect(rotationCsrfAccepted.status).toBe(200);
-    appA.appKey = (await rotationCsrfAccepted.json()).appKey;
     expect(csrfRejected.status).toBe(403);
     const csrfAccepted = await call(
       "PATCH",
@@ -566,15 +489,7 @@ describe("Admin API HTTP flow", () => {
     expect(document.openapi).toBe("3.0.3");
     const paths = document.paths as Record<string, unknown>;
     expect(paths["/api/v1/apps/{appId}/documents/{documentId}/draft"]).toBeDefined();
-    expect(paths["/api/v1/apps/{appId}/app-keys/rotate"]).toBeDefined();
-    expect(paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"]).toBeDefined();
-    const runtimeOperation = paths["/api/v1/runtime/apps/{appKey}/pages/{pageKey}"] as {
-      get: { parameters: Array<{ name: string }> };
-    };
-    expect(runtimeOperation.get.parameters.map((parameter) => parameter.name)).toEqual([
-      "appKey",
-      "pageKey",
-    ]);
+    expect(paths["/api/v1/apps/{appId}/manifest/push"]).toBeDefined();
     const authOperation = paths["/api/v1/auth/session"] as {
       get: { responses: Record<string, { content?: Record<string, { schema?: unknown }> }> };
       post: { requestBody: unknown };
@@ -665,7 +580,7 @@ describe("App AI prompts", () => {
   });
 
   test("requires appId and accepts promptKey on AI chat endpoint", async () => {
-    const headers = { "x-openscene-app-key": appA.appKey };
+    const headers: Record<string, string> = {};
     const missing = await call(
       "POST",
       ["ai", "chat"],
@@ -714,20 +629,15 @@ describe("App AI prompts", () => {
   });
 
   test("inspects and assembles complete system prompt via prompt-preview endpoint", async () => {
-    const response = await call(
-      "POST",
-      ["ai", "prompt-preview"],
-      {
-        appId: appA.id,
-        promptKey: "default",
-        selectedElement: {
-          nodeId: "button-1",
-          type: "Button",
-          props: { label: "Click me" },
-        },
+    const response = await call("POST", ["ai", "prompt-preview"], {
+      appId: appA.id,
+      promptKey: "default",
+      selectedElement: {
+        nodeId: "button-1",
+        type: "Button",
+        props: { label: "Click me" },
       },
-      { "x-openscene-app-key": appA.appKey },
-    );
+    });
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(typeof body.systemPrompt).toBe("string");

@@ -7,13 +7,18 @@ import {
   SceneDocumentSchema,
 } from "../../server/validation/schemas";
 import { decryptSecret, encryptSecret } from "../../server/crypto/encryption";
-import { assetObjectKey, releaseObjectKey, safeFileName } from "../../server/storage/keys";
+import {
+  assetObjectKey,
+  pageObjectKey,
+  releaseObjectKey,
+  safeFileName,
+} from "../../server/storage/keys";
 
 describe("runtime schemas", () => {
   test("accepts explicit content metadata without guessing from property names", () => {
     const manifest = ManifestSchema.parse({
       protocolVersion: "1.0",
-      app: { key: "demo", type: APP_TYPE_WEB },
+      appType: APP_TYPE_WEB,
       components: {
         Hero: {
           title: "Hero",
@@ -73,6 +78,7 @@ describe("storage keys", () => {
     expect(releaseObjectKey("app_a", "release_1")).toBe(
       "apps/app_a/releases/release_1/document.json",
     );
+    expect(pageObjectKey("app_a", "blog/pricing.v2")).toBe("apps/app_a/pages/blog/pricing.v2.json");
     expect(safeFileName("../../")).toBe("upload.bin");
   });
 });

@@ -1,21 +1,15 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { getAuth } from "../../lib/auth";
 import { getConfig } from "../config/env";
 import { forbidden, notFound, unauthorized } from "../errors";
 import { hashSecret } from "../db/ids";
-import { appKeys, studioSessions } from "../db/schema";
+import { studioSessions } from "../db/schema";
 import type { AppDatabase } from "../db/client";
-
-export type AuthRequirement =
-  | "management"
-  | "app-key"
-  | "runtime"
-  | "session"
-  | "client"
-  | "public";
+export type AuthRequirement = "management" | "publish-key" | "session" | "client" | "public";
 export type AuthContext = {
-  kind: "management" | "app-key" | "runtime" | "session" | "public";
+  kind: "management" | "publish-key" | "session" | "public";
   appId?: string;
   sessionId?: string;
 };
@@ -41,41 +35,25 @@ export async function authenticate(
     throw unauthorized();
   }
 
-  if (requirement === "app-key") {
-    const secret = request.headers.get(config.auth.appKeyHeader);
-    if (!secret) throw unauthorized("An App Key is required");
-    const key = await db
-      .select()
-      .from(appKeys)
-      .where(
-        and(
-          eq(appKeys.keyHash, hashSecret(secret)),
-          eq(appKeys.kind, "app"),
-          isNull(appKeys.revokedAt),
-        ),
-      )
-      .get();
-    if (!key || (appId && key.appId !== appId)) throw notFound();
-    return { kind: "app-key", appId: key.appId };
+  if (requirement === "publish-key") {
+    const secret = bearerToken(request);
+    if (!secret) throw unauthorized("A Publish Key is required");
+    const verification = await getAuth().api.verifyApiKey({
+      body: { key: secret, permissions: { manifest: ["write"] } },
+    });
+    if (!verification.valid || !verification.key) throw unauthorized("The Publish Key is invalid");
+    const metadata = verification.key.metadata;
+    const keyAppId =
+      metadata && typeof metadata === "object" && "appId" in metadata
+        ? typeof metadata.appId === "string"
+          ? metadata.appId
+          : undefined
+        : undefined;
+    if (!keyAppId) throw unauthorized("The Publish Key is not bound to an App");
+    if (appId && keyAppId !== appId) throw notFound();
+    return { kind: "publish-key", appId: keyAppId };
   }
-  if (requirement === "client") {
-    const appKeySecret = request.headers.get(config.auth.appKeyHeader);
-    if (appKeySecret) {
-      const key = await db
-        .select()
-        .from(appKeys)
-        .where(
-          and(
-            eq(appKeys.keyHash, hashSecret(appKeySecret)),
-            eq(appKeys.kind, "app"),
-            isNull(appKeys.revokedAt),
-          ),
-        )
-        .get();
-      if (!key || (appId && key.appId !== appId)) throw notFound();
-      return { kind: "app-key", appId: key.appId };
-    }
-
+  if (requirement === "client" || requirement === "session") {
     const sessionSecret = request.headers.get("x-openscene-session-token") ?? bearerToken(request);
     if (sessionSecret) {
       const session = await db
@@ -93,45 +71,10 @@ export async function authenticate(
     }
 
     if (isManagementRequest(request, config)) return { kind: "management" };
-    throw unauthorized("An App Key or valid Studio Session is required");
+    throw unauthorized("A valid Studio Session or management authorization is required");
   }
 
-  if (requirement === "runtime") {
-    if (config.auth.runtimePublic) return { kind: "public" };
-    const secret = request.headers.get(config.auth.runtimeKeyHeader) ?? bearerToken(request);
-    if (!secret) throw unauthorized("A Runtime Key is required");
-    const key = await db
-      .select()
-      .from(appKeys)
-      .where(
-        and(
-          eq(appKeys.keyHash, hashSecret(secret)),
-          eq(appKeys.kind, "runtime"),
-          isNull(appKeys.revokedAt),
-        ),
-      )
-      .get();
-    if (!key || (appId && key.appId !== appId)) throw notFound();
-    return { kind: "runtime", appId: key.appId };
-  }
-
-  const sessionSecret = request.headers.get("x-openscene-session-token") ?? bearerToken(request);
-  if (sessionSecret) {
-    const session = await db
-      .select()
-      .from(studioSessions)
-      .where(eq(studioSessions.tokenHash, hashSecret(sessionSecret)))
-      .get();
-    if (
-      session &&
-      new Date(session.expiresAt).getTime() > Date.now() &&
-      (!appId || session.appId === appId)
-    ) {
-      return { kind: "session", appId: session.appId, sessionId: session.id };
-    }
-  }
-  if (isManagementRequest(request, config)) return { kind: "management" };
-  throw unauthorized("A valid Studio Session is required");
+  throw unauthorized("Unsupported authentication requirement");
 }
 
 export function assertAppContext(context: AuthContext, appId: string): void {

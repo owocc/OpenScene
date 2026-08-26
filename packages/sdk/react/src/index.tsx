@@ -1,9 +1,9 @@
 export {
+  createOpenSceneManifest,
+  createOpenSceneReactRuntime,
   defineOpenSceneReactAction,
-  defineOpenSceneReactApp,
   defineOpenSceneReactComponent,
   defineOpenSceneAction,
-  defineOpenSceneApp,
   defineOpenSceneComponent,
   baseReactComponents,
   baseReactActions,
@@ -14,15 +14,14 @@ export {
   defineOpenApiRequestAction,
 } from "./catalog.ts";
 export type {
-  DefineOpenSceneReactAppOptions,
+  OpenSceneReactCatalogOptions,
   OpenSceneHandlerFactory,
   OpenSceneReactActionDefinition,
-  OpenSceneReactApp,
   OpenSceneReactComponentDefinition,
+  OpenSceneReactRuntime,
   ReactRenderer,
 } from "./catalog.ts";
-export { OpenSceneProvider, OpenSceneRenderer, useOpenScene } from "./provider.tsx";
-export type { OpenSceneProviderProps } from "./provider.tsx";
+export { OpenScene, OpenSceneProvider, OpenSceneRenderer, useOpenScene } from "./provider.tsx";
 export { useOpenSceneNode, View, Text, Button } from "./node.tsx";
 export type { OpenSceneNodeContextValue, PrimitiveProps } from "./node.tsx";
 export { useBoundProp, useStateValue, useAction } from "@json-render/react";
@@ -50,26 +49,36 @@ export type {
   SelectionReport,
 } from "@openscene-ai/javascript";
 
-export { APP_TYPE_WEB,
-APP_TYPE_REACT_NATIVE,
-APP_TYPE_FLUTTER,
-APP_TYPES,
-COMPONENT_DRAG_MIME, } from "@openscene-ai/core";
+export {
+  APP_TYPE_WEB,
+  APP_TYPE_REACT_NATIVE,
+  APP_TYPE_FLUTTER,
+  APP_TYPES,
+  COMPONENT_DRAG_MIME,
+} from "@openscene-ai/core";
 export type { AppType } from "@openscene-ai/core";
 
 export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene-ai/schema";
 
-export { SCENE_DOCUMENT_SCHEMA_VERSION,
-SceneDocumentSchema,
-createEmptySceneDocument,
-AppManifestSchema,
-ComponentManifestSchema,
-RuntimePageDeliverySchema, } from "@openscene-ai/core";
-export type { AppManifest,
-ComponentManifest,
-RuntimePageDelivery,
-SceneDocument,
-SceneGlobalConfig,
-ScenePageInfo,
-Spec,
-UIElement, } from "@openscene-ai/core";
+export {
+  SCENE_DOCUMENT_SCHEMA_VERSION,
+  SceneDocumentSchema,
+  createEmptySceneDocument,
+  AppManifestSchema,
+  ComponentManifestSchema,
+  PublishedSceneDocumentSchema,
+  RuntimePageDeliverySchema,
+  SceneManifestSchema,
+} from "@openscene-ai/core";
+export type {
+  AppManifest,
+  ComponentManifest,
+  PublishedSceneDocument,
+  RuntimePageDelivery,
+  SceneManifest,
+  SceneDocument,
+  SceneGlobalConfig,
+  ScenePageInfo,
+  Spec,
+  UIElement,
+} from "@openscene-ai/core";

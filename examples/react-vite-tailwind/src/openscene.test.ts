@@ -1,22 +1,18 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  createReactApp,
   createManifest,
   Image,
   imageProps,
-  baseViewProps,
   Callout,
   StatusCard,
   OpenApiProvider,
   setNotice,
+  reactComponents,
+  reactActions,
 } from "./openscene.tsx";
 
-describe("examples/react-vite OpenScene integration", () => {
-  it("defines baseViewProps with style editor metadata", () => {
-    expect(baseViewProps.class).toBeDefined();
-    expect(baseViewProps.className).toBeDefined();
-    expect(baseViewProps.style).toBeDefined();
-
+describe("React Vite OpenScene integration", () => {
+  it("defines image props with editor-friendly values", () => {
     const parsed = imageProps.parse({
       src: "https://example.com/photo.png",
       alt: "Sample photo",
@@ -34,24 +30,17 @@ describe("examples/react-vite OpenScene integration", () => {
     expect(parsed.style).toEqual({ width: "300px", height: "200px", borderRadius: "8px" });
   });
 
-  it("includes components in manifest and catalog", () => {
-    expect(Image).toBeDefined();
+  it("includes component and action definitions in the catalog manifest", () => {
     expect(Image.type).toBe("Image");
     expect(Callout.type).toBe("Callout");
     expect(StatusCard.type).toBe("StatusCard");
     expect(OpenApiProvider.type).toBe("OpenApiProvider");
     expect(setNotice.key).toBe("reactViteSetNotice");
+    expect(reactComponents).toHaveLength(4);
+    expect(reactActions).toHaveLength(2);
 
-    const app = createReactApp("test-react-app");
-    expect(app.catalog.componentNames).toContain("View");
-    expect(app.catalog.componentNames).toContain("Text");
-    expect(app.catalog.componentNames).toContain("Button");
-    expect(app.catalog.componentNames).toContain("Image");
-    expect(app.catalog.componentNames).toContain("Callout");
-    expect(app.catalog.componentNames).toContain("StatusCard");
-    expect(app.catalog.componentNames).toContain("OpenApiProvider");
-    const manifest = createManifest("test-react-app");
-    expect(manifest.app.key).toBe("test-react-app");
+    const manifest = createManifest();
+    expect(manifest.appType).toBe("web");
     expect(manifest.components.Image).toBeDefined();
     expect(manifest.components.Image.title).toBe("Image");
     expect(manifest.components.Image.category).toBe("media");
@@ -59,5 +48,6 @@ describe("examples/react-vite OpenScene integration", () => {
     expect(manifest.components.StatusCard).toBeDefined();
     expect(manifest.components.OpenApiProvider).toBeDefined();
     expect(manifest.actions?.reactViteSetNotice).toBeDefined();
+    expect("app" in manifest).toBe(false);
   });
 });
