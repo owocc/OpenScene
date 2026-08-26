@@ -60,11 +60,8 @@ jobs:
             EXTRA_ARGS="--dry-run"
           fi
 
-          echo "Publishing @openscene-ai/constants..."
-          cd packages/constants && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
-
-          echo "Publishing @openscene-ai/protocol..."
-          cd ../protocol && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
+          echo "Publishing @openscene-ai/core..."
+          cd packages/core && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS
 
           echo "Publishing @openscene-ai/schema..."
           cd ../schema && bun pm pack && npm publish *.tgz --access public $EXTRA_ARGS

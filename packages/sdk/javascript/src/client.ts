@@ -1,19 +1,17 @@
-import {
-  BridgeEnvelopeSchema,
-  RendererPortMessageSchema,
-  RendererWindowMessageSchema,
-  RuntimePageDeliverySchema,
-  StudioPortMessageSchema,
-  StudioWindowMessageSchema,
-  createBridgeEnvelope,
-  getEditorConnection,
-  type AppManifest,
-  type EditorConnection,
-  type ElementRect,
-  type RendererPortMessage,
-  type SceneDocument,
-  type StudioPortMessage,
-} from "@openscene-ai/protocol";
+import { BridgeEnvelopeSchema,
+RendererPortMessageSchema,
+RendererWindowMessageSchema,
+RuntimePageDeliverySchema,
+StudioPortMessageSchema,
+StudioWindowMessageSchema,
+createBridgeEnvelope,
+getEditorConnection,
+type AppManifest,
+type EditorConnection,
+type ElementRect,
+type RendererPortMessage,
+type SceneDocument,
+type StudioPortMessage, } from "@openscene-ai/core";
 import { createStateStore, type StateStore } from "@json-render/core";
 
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown

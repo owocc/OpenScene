@@ -8,7 +8,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { AgentUiAction, SceneDocument } from "@openscene-ai/protocol";
+import type { AgentUiAction, SceneDocument } from "@openscene-ai/core";
 
 import type { Surface, ViewportState } from "@/core/editor-state";
 import type { AdapterRegistry } from "@/core/registry";

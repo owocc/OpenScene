@@ -19,10 +19,9 @@ openscene/
 │   │   ├── react/        # @openscene-ai/react: React 19 UI adapter and runtime components
 │   │   ├── solid/        # @openscene-ai/solid: SolidJS UI adapter
 │   │   └── javascript/   # @openscene-ai/javascript: Framework-neutral runtime client and Vite manifest plugin
-│   ├── protocol/         # @openscene-ai/protocol: Document schema, protocol v2 bridge definitions
-│   ├── schema/           # @openscene-ai/schema: Styles, layout, OpenAPI schema contracts
-│   ├── constants/        # @openscene-ai/constants: Shared constants and status enums
-│   └── api-client/       # @openscene-ai/api-client: Generated TypeScript Admin REST API client
+│   ├── core/           # @openscene-ai/core: Constants, document schema, and protocol bridge
+│   ├── schema/         # @openscene-ai/schema: Styles, layout, OpenAPI schema contracts
+│   └── api-client/     # @openscene-ai/api-client: Generated TypeScript Admin REST API client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite integration example
 │   ├── solid-vite/      # SolidJS v1 + Vite integration example

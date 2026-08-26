@@ -1,12 +1,10 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import type { OpenSceneClient, OpenSceneClientState } from "@openscene-ai/javascript";
-import type { AppManifest, SceneDocument } from "@openscene-ai/protocol";
-import {
-  createBridgeEnvelope,
-  getEditorConnection,
-  isBridgeEnvelope,
-} from "@openscene-ai/protocol";
+import type { AppManifest, SceneDocument } from "@openscene-ai/core";
+import { createBridgeEnvelope,
+getEditorConnection,
+isBridgeEnvelope, } from "@openscene-ai/core";
 import type { OpenSceneSolidApp } from "./catalog.ts";
 import { OpenSceneContext } from "./context.ts";
 import { RuntimeProvider } from "./runtime-ctx.tsx";

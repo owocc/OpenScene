@@ -7,7 +7,7 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import { APP_TYPE_WEB, APP_TYPES } from "@openscene-ai/constants";
+import { APP_TYPE_WEB, APP_TYPES } from "@openscene-ai/core";
 export * from "./auth";
 import {
   user,

@@ -44,11 +44,10 @@
   "dependencies": {
     "@json-render/core": "^0.20.0",
     "@json-render/solid": "^0.20.0",
-    "@openscene-ai/constants": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
-    "@openscene-ai/protocol": "workspace:*",
     "@openscene-ai/schema": "workspace:*",
-    "@openscene-ai/solid-v2": "workspace:*"
+    "@openscene-ai/solid-v2": "workspace:*",
+    "@openscene-ai/core": "workspace:*"
   },
   "devDependencies": {
     "@solidjs/web": "^2.0.0-rc.0",

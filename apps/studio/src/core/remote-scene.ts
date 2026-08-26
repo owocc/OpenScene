@@ -1,4 +1,4 @@
-import type { SceneDocumentSnapshot } from "@openscene-ai/protocol";
+import type { SceneDocumentSnapshot } from "@openscene-ai/core";
 
 import type { AppDocument, JsonValue } from "./document";
 

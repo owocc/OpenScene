@@ -1,24 +1,24 @@
 {
-  "name": "@openscene-ai/constants",
-  "version": "0.0.3-alpha.0",
-  "description": "Shared OpenScene application constants.",
+  "name": "@openscene-ai/core",
+  "version": "0.0.1-alpha.0",
+  "description": "Core OpenScene constants, document schemas, and Studio bridge protocol.",
   "license": "MIT",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
-  "publishConfig": {
-    "access": "public"
-  },
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "vp pack",
     "dev": "vp pack --watch",
     "check": "vp check",
     "test": "vp test"
+  },
+  "dependencies": {
+    "@json-render/core": "^0.20.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

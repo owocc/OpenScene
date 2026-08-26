@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { APP_TYPE_WEB } from "@openscene-ai/core";
 
 import { createLocalTestBootstrap, LOCAL_TEST_SESSION_ID } from "./local-test-session";
 

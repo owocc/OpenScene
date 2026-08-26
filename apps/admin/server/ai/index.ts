@@ -15,7 +15,7 @@ import { nowIso } from "../db/ids";
 import { getConfig } from "../config/env";
 import { forbidden, validation } from "../errors";
 import { encryptSecret, decryptSecret } from "./encryption";
-import { AppManifestSchema, extractAgentUiActions } from "@openscene-ai/protocol";
+import { AppManifestSchema, extractAgentUiActions } from "@openscene-ai/core";
 import {
   AiChatRequestSchema,
   AiChatResponseSchema,

@@ -1,4 +1,4 @@
-import type { SceneDocument, UIElement } from "@openscene-ai/protocol";
+import type { SceneDocument, UIElement } from "@openscene-ai/core";
 
 import {
   addI18nKeyInDocument,

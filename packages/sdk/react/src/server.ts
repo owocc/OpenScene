@@ -1,5 +1,5 @@
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
+import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
 import { z } from "zod";
 import type {
   OpenSceneHandlerFactory,
@@ -216,35 +216,29 @@ export type {
   SelectionReport,
 } from "@openscene-ai/javascript";
 
-export {
-  APP_TYPE_WEB,
-  APP_TYPE_REACT_NATIVE,
-  APP_TYPE_FLUTTER,
-  APP_TYPES,
-  COMPONENT_DRAG_MIME,
-} from "@openscene-ai/constants";
-export type { AppType } from "@openscene-ai/constants";
+export { APP_TYPE_WEB,
+APP_TYPE_REACT_NATIVE,
+APP_TYPE_FLUTTER,
+APP_TYPES,
+COMPONENT_DRAG_MIME, } from "@openscene-ai/core";
+export type { AppType } from "@openscene-ai/core";
 
 export { openApiMethods, type OpenApiMethod, type OpenApiValue } from "@openscene-ai/schema";
 
-export {
-  SCENE_DOCUMENT_SCHEMA_VERSION,
-  SceneDocumentSchema,
-  createEmptySceneDocument,
-  AppManifestSchema,
-  ComponentManifestSchema,
-  RuntimePageDeliverySchema,
-} from "@openscene-ai/protocol";
-export type {
-  AppManifest,
-  ComponentManifest,
-  RuntimePageDelivery,
-  SceneDocument,
-  SceneGlobalConfig,
-  ScenePageInfo,
-  Spec,
-  UIElement,
-} from "@openscene-ai/protocol";
+export { SCENE_DOCUMENT_SCHEMA_VERSION,
+SceneDocumentSchema,
+createEmptySceneDocument,
+AppManifestSchema,
+ComponentManifestSchema,
+RuntimePageDeliverySchema, } from "@openscene-ai/core";
+export type { AppManifest,
+ComponentManifest,
+RuntimePageDelivery,
+SceneDocument,
+SceneGlobalConfig,
+ScenePageInfo,
+Spec,
+UIElement, } from "@openscene-ai/core";
 
 // ---------------------------------------------------------------------------
 // OpenAPI request action — server/Node stubs

@@ -10,7 +10,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import type { SceneDocument } from "@openscene-ai/protocol";
+import type { SceneDocument } from "@openscene-ai/core";
 
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";

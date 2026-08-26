@@ -63,7 +63,7 @@ OpenScene 只增加两个 framework-neutral 指令：`$page` 从运行时 `/__sc
 
 ## SCENE_DOCUMENT_SCHEMA_VERSION
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Constant
 
@@ -73,7 +73,7 @@ const SCENE_DOCUMENT_SCHEMA_VERSION = "1.0.0" as const;
 
 ## ScenePageInfo
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -89,7 +89,7 @@ interface ScenePageInfo {
 
 ## SceneGlobalConfig
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -106,7 +106,7 @@ interface SceneGlobalConfig {
 
 ## SceneDocument
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -189,7 +189,7 @@ const SceneDocumentSchema: z.ZodType<SceneDocument> = z
 
 ## createEmptySceneDocument
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Function
 
@@ -218,7 +218,7 @@ function createEmptySceneDocument(): SceneDocument {
 
 ## ComponentManifest
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -243,7 +243,7 @@ interface ComponentManifest {
 
 ## AppManifest
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -266,7 +266,7 @@ interface AppManifest {
 
 ## AppManifestSchema
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Constant
 
@@ -291,7 +291,7 @@ const AppManifestSchema: z.ZodType<AppManifest> = z
 
 ## RuntimePageDelivery
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -365,7 +365,7 @@ const editorQueryKeys = {
 
 ## EditorConnection
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -378,7 +378,7 @@ interface EditorConnection {
 
 ## StudioBridgeEnvelope
 
-由 `@openscene-ai/protocol` 导出的协议接口。
+由 `@openscene-ai/core` 导出的协议接口。
 
 **类型:** Interface
 
@@ -557,7 +557,7 @@ const RendererPortMessageSchema = z.discriminatedUnion("type", [
 
 ## RendererWindowMessage
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Type
 
@@ -567,7 +567,7 @@ type RendererWindowMessage = z.infer<typeof RendererWindowMessageSchema>;
 
 ## StudioWindowMessage
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Type
 
@@ -577,7 +577,7 @@ type StudioWindowMessage = z.infer<typeof StudioWindowMessageSchema>;
 
 ## StudioPortMessage
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Type
 
@@ -587,7 +587,7 @@ type StudioPortMessage = z.infer<typeof StudioPortMessageSchema>;
 
 ## RendererPortMessage
 
-由 `@openscene-ai/protocol` 导出的协议声明。
+由 `@openscene-ai/core` 导出的协议声明。
 
 **类型:** Type
 

@@ -1,5 +1,5 @@
-import type { AppType } from "@openscene-ai/constants";
-import type { AppManifest, ElementRect, SceneDocument } from "@openscene-ai/protocol";
+import type { AppType } from "@openscene-ai/core";
+import type { AppManifest, ElementRect, SceneDocument } from "@openscene-ai/core";
 import type { ReactNode } from "react";
 
 import type { ActiveToolMode, Surface, ViewportState } from "@/core/editor-state";

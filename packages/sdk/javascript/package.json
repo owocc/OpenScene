@@ -34,9 +34,9 @@
   },
   "dependencies": {
     "@json-render/core": "^0.20.0",
-    "@openscene-ai/protocol": "workspace:*",
     "undici": "^7.0.0",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "@openscene-ai/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

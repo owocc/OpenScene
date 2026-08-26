@@ -2,7 +2,7 @@ import { createMemo, For, Show, type Element as SolidElement } from "solid-js";
 import type { JSX } from "@solidjs/web";
 import { Dynamic } from "@solidjs/web";
 import { evaluateDynamicValue } from "@openscene-ai/javascript";
-import type { SceneDocument, UIElement } from "@openscene-ai/protocol";
+import type { SceneDocument, UIElement } from "@openscene-ai/core";
 import { useRuntime } from "./runtime-ctx.tsx";
 
 // Strip the private node-id injected by Studio so components don't see it.

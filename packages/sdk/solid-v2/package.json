@@ -30,10 +30,9 @@
     "test": "vp test"
   },
   "dependencies": {
-    "@openscene-ai/constants": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
-    "@openscene-ai/protocol": "workspace:*",
-    "@openscene-ai/schema": "workspace:*"
+    "@openscene-ai/schema": "workspace:*",
+    "@openscene-ai/core": "workspace:*"
   },
   "devDependencies": {
     "@solidjs/web": "^2.0.0-rc.0",

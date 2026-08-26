@@ -1,6 +1,6 @@
 import { createComponent, createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { APP_TYPE_WEB } from "@openscene-ai/core";
 import { defineAppManifest } from "@openscene-ai/javascript";
 import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import {

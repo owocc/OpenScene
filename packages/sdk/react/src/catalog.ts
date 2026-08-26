@@ -1,7 +1,7 @@
 import { defineCatalog, type Catalog } from "@json-render/core";
 import { schema } from "@json-render/react/schema";
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
+import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
 import { evaluateDynamicValue } from "@openscene-ai/javascript";
 import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import { z } from "zod";

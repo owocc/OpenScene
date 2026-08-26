@@ -8,12 +8,12 @@
     "preview": "vp preview"
   },
   "dependencies": {
-    "@openscene-ai/constants": "workspace:*",
     "@openscene-ai/javascript": "workspace:*",
     "@openscene-ai/schema": "workspace:*",
     "@openscene-ai/solid": "workspace:*",
     "solid-js": "^1.9.14",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "@openscene-ai/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

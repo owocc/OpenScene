@@ -1,7 +1,7 @@
 import { defineCatalog, type Catalog } from "@json-render/core";
 import { schema } from "@json-render/solid/schema";
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
+import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
 import { z } from "zod";
 import type { JSX } from "solid-js";
 import type { ComponentRenderProps } from "@json-render/solid";

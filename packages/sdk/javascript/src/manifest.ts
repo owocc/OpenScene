@@ -1,8 +1,6 @@
-import {
-  AppManifestSchema,
-  type AppManifest,
-  type ComponentManifest,
-} from "@openscene-ai/protocol";
+import { AppManifestSchema,
+type AppManifest,
+type ComponentManifest, } from "@openscene-ai/core";
 
 /** Validate and normalize the one manifest shared by runtime and build push. */
 export function defineAppManifest(manifest: AppManifest): AppManifest {

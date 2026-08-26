@@ -18,9 +18,7 @@ export {
   translationDirective,
 } from "./directives.ts";
 export type { DirectiveDefinition } from "@json-render/core";
-export type {
-  AppManifest,
-  ComponentManifest,
-  RuntimePageDelivery,
-  SceneDocument,
-} from "@openscene-ai/protocol";
+export type { AppManifest,
+ComponentManifest,
+RuntimePageDelivery,
+SceneDocument, } from "@openscene-ai/core";

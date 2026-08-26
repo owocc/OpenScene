@@ -5,8 +5,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   transpilePackages: [
     "@openscene-ai/api-client",
-    "@openscene-ai/constants",
-    "@openscene-ai/protocol",
+    "@openscene-ai/core",
     "@openscene-ai/schema",
   ],
   outputFileTracingIncludes: {

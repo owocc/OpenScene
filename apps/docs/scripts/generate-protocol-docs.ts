@@ -176,8 +176,8 @@ function render(locale: Locale): string {
     const description =
       documentationFor(node, locale) ||
       (chinese
-        ? `由 \`@openscene-ai/protocol\` 导出的协议${kind === "Interface" ? "接口" : "声明"}。`
-        : `Protocol ${kind.toLowerCase()} exported by \`@openscene-ai/protocol\`.`);
+        ? `由 \`@openscene-ai/core\` 导出的协议${kind === "Interface" ? "接口" : "声明"}。`
+        : `Protocol ${kind.toLowerCase()} exported by \`@openscene-ai/core\`.`);
     return `## ${name}\n\n${description}\n\n**${chinese ? "类型" : "Kind"}:** ${kind}\n\n\`\`\`ts\n${node
       .getText(source)
       .replace(/^export\s+/, "")}\n\`\`\``;

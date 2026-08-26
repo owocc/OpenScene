@@ -1,3 +1,5 @@
+export * from "./constants.ts";
+
 export {
   SCENE_DOCUMENT_SCHEMA_VERSION,
   SceneDocumentSchema,

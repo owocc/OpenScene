@@ -1,4 +1,4 @@
-import { APP_TYPE_WEB } from "@openscene-ai/constants";
+import { APP_TYPE_WEB } from "@openscene-ai/core";
 import { type AppDatabase, initializeDatabase } from "./client.ts";
 import { apps, appKeys, categories, locales } from "./schema/index.ts";
 import { eq } from "drizzle-orm";

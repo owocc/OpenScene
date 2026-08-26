@@ -19,10 +19,9 @@ openscene/
 │   │   ├── react/        # @openscene-ai/react: React 19 UI Adapter 与运行时组件库
 │   │   ├── solid/        # @openscene-ai/solid: SolidJS UI Adapter
 │   │   └── javascript/   # @openscene-ai/javascript: 框架中立的运行时 Client 与 Vite Manifest 插件
-│   ├── protocol/         # @openscene-ai/protocol: 协议定义、Document Schema、Bridge 规范
-│   ├── schema/           # @openscene-ai/schema: 样式、尺寸、OpenAPI 契约定义
-│   ├── constants/        # @openscene-ai/constants: 共享常量与状态定义
-│   └── api-client/       # @openscene-ai/api-client: 自动生成的 Admin REST API Client
+│   ├── core/           # @openscene-ai/core: 常量、Document Schema 与协议 Bridge
+│   ├── schema/         # @openscene-ai/schema: 样式、尺寸、OpenAPI 契约定义
+│   └── api-client/     # @openscene-ai/api-client: 自动生成的 Admin REST API Client
 ├── examples/
 │   ├── react-vite/       # React 19 + Vite 业务接入示例
 │   ├── solid-vite/      # SolidJS v1 + Vite 业务接入示例

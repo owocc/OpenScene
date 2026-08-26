@@ -16,7 +16,7 @@ import {
   Sparkles,
   User,
 } from "lucide-react";
-import { splitContentAndUiActions } from "@openscene-ai/protocol";
+import { splitContentAndUiActions } from "@openscene-ai/core";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "./markdown-content";

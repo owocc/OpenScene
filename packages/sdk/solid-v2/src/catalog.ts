@@ -1,6 +1,6 @@
-import { APP_TYPE_WEB, type AppType } from "@openscene-ai/constants";
+import { APP_TYPE_WEB, type AppType } from "@openscene-ai/core";
 import { evaluateDynamicValue } from "@openscene-ai/javascript";
-import type { AppManifest, ComponentManifest } from "@openscene-ai/protocol";
+import type { AppManifest, ComponentManifest } from "@openscene-ai/core";
 import { openApiMethods, type OpenApiValue } from "@openscene-ai/schema";
 import type { JSX } from "@solidjs/web";
 import { z } from "zod";

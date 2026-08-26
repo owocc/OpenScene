@@ -1,4 +1,4 @@
-import { APP_TYPE_FLUTTER, APP_TYPE_REACT_NATIVE, APP_TYPE_WEB } from "@openscene-ai/constants";
+import { APP_TYPE_FLUTTER, APP_TYPE_REACT_NATIVE, APP_TYPE_WEB } from "@openscene-ai/core";
 import { describe, expect, test } from "vite-plus/test";
 import {
   AppCreateSchema,

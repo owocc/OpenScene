@@ -29,9 +29,10 @@ import {
   APP_TYPE_FLUTTER,
   APP_TYPE_REACT_NATIVE,
   APP_TYPE_WEB,
+  AppManifestSchema,
   type AppType,
-} from "@openscene-ai/constants";
-import { AppManifestSchema, type ComponentManifest } from "@openscene-ai/protocol";
+  type ComponentManifest,
+} from "@openscene-ai/core";
 import { DeleteResource, useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";

@@ -1,10 +1,8 @@
 import { createSignal, onCleanup, onMount, type Accessor } from "solid-js";
-import {
-  createBridgeEnvelope,
-  getEditorConnection,
-  isBridgeEnvelope,
-  type SceneDocumentSnapshot,
-} from "@openscene-ai/protocol";
+import { createBridgeEnvelope,
+getEditorConnection,
+isBridgeEnvelope,
+type SceneDocumentSnapshot, } from "@openscene-ai/core";
 import type { SceneDocument } from "./types.js";
 
 export interface SceneEditorBridge {

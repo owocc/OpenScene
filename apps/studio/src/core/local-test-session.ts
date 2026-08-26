@@ -1,5 +1,5 @@
-import { APP_TYPE_WEB } from "@openscene-ai/constants";
-import { createEmptySceneDocument, type AppManifest } from "@openscene-ai/protocol";
+import { APP_TYPE_WEB } from "@openscene-ai/core";
+import { createEmptySceneDocument, type AppManifest } from "@openscene-ai/core";
 
 import type { StudioBootstrap } from "./studio-bootstrap";
 

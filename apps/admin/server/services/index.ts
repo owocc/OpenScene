@@ -37,13 +37,11 @@ import {
 } from "../storage";
 import { encryptSecret, decryptSecret } from "../crypto/encryption";
 import { assetObjectKey, normalizeFolderPath, releaseObjectKey } from "../storage/keys";
-import {
-  AppManifestSchema,
-  RuntimePageDeliverySchema,
-  SceneDocumentSchema,
-  createEmptySceneDocument,
-  type SceneDocument,
-} from "@openscene-ai/protocol";
+import { AppManifestSchema,
+RuntimePageDeliverySchema,
+SceneDocumentSchema,
+createEmptySceneDocument,
+type SceneDocument, } from "@openscene-ai/core";
 import {
   AppCreateSchema,
   AppKeyRotationSchema,

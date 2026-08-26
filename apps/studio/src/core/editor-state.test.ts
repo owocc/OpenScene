@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { createEmptySceneDocument } from "@openscene-ai/protocol";
+import { createEmptySceneDocument } from "@openscene-ai/core";
 
 import { createEditorState, editorReducer } from "./editor-state";
 

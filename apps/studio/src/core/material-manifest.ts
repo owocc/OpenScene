@@ -1,4 +1,4 @@
-import type { AppManifest } from "@openscene-ai/protocol";
+import type { AppManifest } from "@openscene-ai/core";
 
 import type { AdapterMeta, ComponentMeta, EditorMeta, PropMeta } from "./meta";
 import { isRecord, type DynamicMode, type JsonValue } from "./document";

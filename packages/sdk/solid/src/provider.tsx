@@ -21,7 +21,7 @@ import {
   type OpenSceneClient,
   type OpenSceneClientState,
 } from "@openscene-ai/javascript";
-import type { SceneDocument } from "@openscene-ai/protocol";
+import type { SceneDocument } from "@openscene-ai/core";
 import type { OpenSceneSolidApp } from "./catalog.js";
 import { OpenSceneContext, useOpenScene } from "./context.js";
 import { OpenSceneNodeProvider } from "./node.js";

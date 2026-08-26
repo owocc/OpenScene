@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vite-plus/test";
 // @ts-expect-error jsdom ships no type declarations
 import { JSDOM } from "jsdom";
+import type * as Core from "@openscene-ai/core";
 
-import {
-  createBridgeEnvelope,
-  createEmptySceneDocument,
-  type SceneDocument,
-} from "@openscene-ai/protocol";
+
+import { createBridgeEnvelope,
+createEmptySceneDocument,
+type SceneDocument, } from "@openscene-ai/core";
 
 import { OpenSceneController, type OpenSceneClientOptions } from "./client.js";
 import { createIndexedDbDraftStore } from "./draft-store.js";
-import type { AppManifest } from "@openscene-ai/protocol";
+import type { AppManifest } from "@openscene-ai/core";
 
 const manifest: AppManifest = {
   protocolVersion: "2",
@@ -91,7 +91,7 @@ describe("OpenScene bridge sync", () => {
       revision: 3,
     });
     const { StudioPortMessageSchema } =
-      require("@openscene-ai/protocol") as typeof import("@openscene-ai/protocol");
+      require("@openscene-ai/core") as typeof Core;
     expect(StudioPortMessageSchema.safeParse(envelope).success).toBe(true);
   });
 });

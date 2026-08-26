@@ -1,11 +1,9 @@
-import { APP_TYPES } from "@openscene-ai/constants";
-import {
-  AgentUiActionSchema,
-  AppManifestSchema,
-  ComponentManifestSchema,
-  RuntimePageDeliverySchema,
-  SceneDocumentSchema,
-} from "@openscene-ai/protocol";
+import { APP_TYPES } from "@openscene-ai/core";
+import { AgentUiActionSchema,
+AppManifestSchema,
+ComponentManifestSchema,
+RuntimePageDeliverySchema,
+SceneDocumentSchema, } from "@openscene-ai/core";
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 
@@ -19,7 +17,7 @@ export const ManifestSchema = AppManifestSchema;
 
 extendZodWithOpenApi(z);
 
-export type { AppManifest as Manifest, SceneDocument } from "@openscene-ai/protocol";
+export type { AppManifest as Manifest, SceneDocument } from "@openscene-ai/core";
 
 export const IdSchema = z.string().min(1).max(256);
 export const KeySchema = z.string().regex(/^[a-z0-9][a-z0-9._-]*$/);

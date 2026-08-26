@@ -1,10 +1,8 @@
 import { create } from "zustand";
-import {
-  applyAgentUiActionsToDocument,
-  extractAgentUiActions,
-  type AgentUiAction,
-  type SceneDocument,
-} from "@openscene-ai/protocol";
+import { applyAgentUiActionsToDocument,
+extractAgentUiActions,
+type AgentUiAction,
+type SceneDocument, } from "@openscene-ai/core";
 import { useQueryStore } from "./query-store";
 import { useStudioStore } from "./studio-store";
 
