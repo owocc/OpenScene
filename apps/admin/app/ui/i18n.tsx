@@ -7,7 +7,6 @@ import { buildHref, extractOrgSlugAndPath, parseLanguage, type AdminLanguage } f
 import { useActiveOrganization } from "../../lib/auth-client";
 
 export const adminQueryParsers = {
-  appId: parseAsString.withDefault(""),
   mode: parseAsStringLiteral(["standalone", "embedded"] as const).withDefault("standalone"),
 };
 
@@ -760,16 +759,15 @@ export type MessageKey = keyof typeof messages.en;
 export function useAdminContext() {
   const pathname = usePathname();
   const router = useRouter();
-  const [{ appId: queryAppId, mode }] = useQueryStates(adminQueryParsers, {
+  const [{ mode }] = useQueryStates(adminQueryParsers, {
     shallow: false,
   });
   const { data: activeOrg } = useActiveOrganization();
-  const { orgSlug: pathOrgSlug, viewPath } = extractOrgSlugAndPath(pathname);
+  const { orgSlug: pathOrgSlug, viewPath, appId: pathAppId } = extractOrgSlugAndPath(pathname);
   const orgSlug = activeOrg?.slug || pathOrgSlug || "";
+  const appId = pathAppId || undefined;
 
   const [language, setLanguageState] = useState<AdminLanguage>(getInitialLanguage);
-  const appId = queryAppId || undefined;
-
   useEffect(() => {
     const cookieValue = document.cookie
       .split(";")

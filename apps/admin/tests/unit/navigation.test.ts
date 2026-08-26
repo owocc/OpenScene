@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { messages } from "../../app/ui/i18n";
 import {
   buildHref,
+  extractOrgSlugAndPath,
   isAppScopedPath,
   isPersonalPath,
   navigationGroups,
@@ -25,13 +26,11 @@ describe("admin navigation context", () => {
     expect(parseTheme("dark")).toBe("dark");
   });
 
-  test("preserves mode, org slug, and app scope in links without leaking language to url", () => {
+  test("preserves mode, org slug, and app scope in path params", () => {
     expect(
       buildHref("/pages", { mode: "embedded", lang: "zh-CN", orgSlug: "acme", appId: "app_1" }),
-    ).toBe("/acme/pages?mode=embedded&appId=app_1");
-    expect(buildHref("/pages", { mode: "embedded", lang: "zh-CN", appId: "app_1" })).toBe(
-      "/pages?mode=embedded&appId=app_1",
-    );
+    ).toBe("/acme/app_1/pages?mode=embedded");
+    expect(buildHref("/pages", { mode: "embedded", lang: "zh-CN" })).toBe("/pages?mode=embedded");
   });
   test("distinguishes personal routes from org-scoped routes", () => {
     expect(isPersonalPath("/")).toBe(true);
@@ -52,10 +51,31 @@ describe("admin navigation context", () => {
     expect(buildHref("/settings", { orgSlug: "acme" })).toBe("/settings");
 
     // Org-scoped routes correctly receive orgSlug
+    // Org-scoped routes correctly receive orgSlug and app-scoped routes receive appId in path
     expect(buildHref("/apps", { orgSlug: "acme" })).toBe("/acme/apps");
     expect(buildHref("/overview", { orgSlug: "acme", appId: "app_1" })).toBe(
-      "/acme/overview?appId=app_1",
+      "/acme/app_1/overview",
     );
+  });
+  test("extracts orgSlug, appId, and viewPath correctly from path params", () => {
+    expect(extractOrgSlugAndPath("/acme/app_1/overview")).toEqual({
+      orgSlug: "acme",
+      appId: "app_1",
+      viewPath: "/overview",
+    });
+    expect(extractOrgSlugAndPath("/acme/app_1/pages/page_123")).toEqual({
+      orgSlug: "acme",
+      appId: "app_1",
+      viewPath: "/pages/page_123",
+    });
+    expect(extractOrgSlugAndPath("/acme/apps")).toEqual({
+      orgSlug: "acme",
+      viewPath: "/apps",
+    });
+    expect(extractOrgSlugAndPath("/account")).toEqual({
+      orgSlug: "",
+      viewPath: "/account",
+    });
   });
 
   test("keeps dictionary keys aligned", () => {

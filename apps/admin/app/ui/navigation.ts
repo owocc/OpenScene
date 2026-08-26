@@ -25,7 +25,26 @@ export function isPersonalPath(pathname: string): boolean {
   return first === "account" || first === "settings" || first === "login" || first === "invite";
 }
 
-export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; viewPath: string } {
+export const appScopedViews = new Set([
+  "overview",
+  "pages",
+  "templates",
+  "assets",
+  "components",
+  "preview-profiles",
+  "meta",
+  "categories",
+  "locales",
+  "openapi-docs",
+  "prompts",
+  "prompt",
+]);
+
+export function extractOrgSlugAndPath(pathname: string): {
+  orgSlug: string;
+  viewPath: string;
+  appId?: string;
+} {
   const clean = pathname.split("?")[0];
   const segments = clean.split("/").filter(Boolean);
   if (segments.length === 0) return { orgSlug: "", viewPath: "/" };
@@ -64,10 +83,20 @@ export function extractOrgSlugAndPath(pathname: string): { orgSlug: string; view
     "reference",
   ];
 
+  // Pattern A: /:orgSlug/:appId/:view... (e.g. /acme/app_123/overview, /acme/app_123/pages/p1)
+  if (segments.length >= 3 && appScopedViews.has(segments[2])) {
+    const orgSlug = segments[0];
+    const appId = segments[1];
+    const viewPath = `/${segments.slice(2).join("/")}`;
+    return { orgSlug, viewPath, appId };
+  }
+
+  // Pattern B: Root-level views without org slug (e.g. /apps, /keys)
   if (knownRootViews.includes(segments[0])) {
     return { orgSlug: "", viewPath: `/${segments.join("/")}` };
   }
 
+  // Pattern C: /:orgSlug/:view... (e.g. /acme/apps, /acme/keys, /acme/organization, /acme/overview)
   const orgSlug = segments[0];
   const viewSegments = segments.slice(1);
   const viewPath = viewSegments.length > 0 ? `/${viewSegments.join("/")}` : "/apps";
@@ -79,16 +108,36 @@ export function buildHref(
   context: { mode?: AdminMode; lang?: AdminLanguage; orgSlug?: string; appId?: string } = {},
   extra: Record<string, string | undefined> = {},
 ): string {
-  const { viewPath: cleanViewPath, orgSlug: extractedSlug } = extractOrgSlugAndPath(path);
+  const {
+    viewPath: cleanViewPath,
+    orgSlug: extractedSlug,
+    appId: extractedAppId,
+  } = extractOrgSlugAndPath(path);
   const isPersonal = isPersonalPath(cleanViewPath);
   const orgSlug = isPersonal ? "" : context.orgSlug || extractedSlug || "";
-  const basePath = orgSlug ? `/${orgSlug}${cleanViewPath}` : cleanViewPath;
+  const appId = isPersonal
+    ? undefined
+    : extra.appId !== undefined
+      ? extra.appId
+      : context.appId || extractedAppId;
+
+  const firstViewSegment = cleanViewPath.split("/").filter(Boolean)[0] || "";
+  const isAppScoped = appScopedViews.has(firstViewSegment);
+
+  let basePath = cleanViewPath;
+  if (orgSlug) {
+    if (isAppScoped && appId) {
+      basePath = `/${orgSlug}/${appId}${cleanViewPath}`;
+    } else {
+      basePath = `/${orgSlug}${cleanViewPath}`;
+    }
+  }
 
   const params = new URLSearchParams();
   if (context.mode) params.set("mode", context.mode);
-  if (context.appId && !isPersonal) params.set("appId", context.appId);
 
   for (const [key, value] of Object.entries(extra)) {
+    if (key === "appId") continue; // appId is in route params now
     if (value) params.set(key, value);
     else params.delete(key);
   }
@@ -99,20 +148,8 @@ export function buildHref(
 
 export function isAppScopedPath(pathname: string): boolean {
   const { viewPath } = extractOrgSlugAndPath(pathname);
-  return (
-    viewPath !== "/" &&
-    viewPath !== "/apps" &&
-    viewPath !== "/keys" &&
-    viewPath !== "/system" &&
-    viewPath !== "/login" &&
-    viewPath !== "/ai" &&
-    viewPath !== "/system-prompt" &&
-    viewPath !== "/organization" &&
-    !viewPath.startsWith("/invite") &&
-    viewPath !== "/settings" &&
-    viewPath !== "/account" &&
-    viewPath !== "/reference"
-  );
+  const first = viewPath.split("/").filter(Boolean)[0] || "";
+  return appScopedViews.has(first);
 }
 
 /**
