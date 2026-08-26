@@ -7,7 +7,7 @@ import {
   CaretDown,
   CaretRight,
   Check,
-  ClipboardText,
+  ClipboardText as ClipboardTextIcon,
   Code as CodeIcon,
   Cloud,
   Copy,
@@ -39,6 +39,7 @@ import { DeleteResource, useKumoToastManager } from "@cloudflare/kumo";
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Code } from "@cloudflare/kumo/components/code";
+import { ClipboardText } from "@cloudflare/kumo/components/clipboard-text";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
@@ -159,7 +160,7 @@ export function AdminConsole() {
   ) {
     return (
       <Empty
-        icon={<ClipboardText size={32} />}
+        icon={<ClipboardTextIcon size={32} />}
         title={t("chooseApp")}
         description={t("chooseAppDescription")}
         contents={
@@ -173,7 +174,7 @@ export function AdminConsole() {
   if (isAppScopedPath(pathname) && !context.appId) {
     return (
       <Empty
-        icon={<ClipboardText size={32} />}
+        icon={<ClipboardTextIcon size={32} />}
         title={t("chooseApp")}
         description={t("chooseAppDescription")}
         contents={
@@ -3885,7 +3886,7 @@ function ComponentsView() {
       />
       {!manifest ? (
         <Empty
-          icon={<ClipboardText size={32} />}
+          icon={<ClipboardTextIcon size={32} />}
           title="No active manifest"
           description="Components are managed by build output. Run the app build with manifest push configured to publish them."
         />
@@ -3982,7 +3983,7 @@ function ComponentDetailView() {
       <>
         <PageHeader title={t("components")} />
         <Empty
-          icon={<ClipboardText size={32} />}
+          icon={<ClipboardTextIcon size={32} />}
           title="No active manifest"
           description="Components are managed by build output. Run the app build with manifest push configured to publish them."
         />
@@ -4151,8 +4152,8 @@ function MetaView() {
 
       {/* 1. App 原始信息 (App Raw Information) */}
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <Surface className="grid gap-3 p-4">
-          <div className="flex items-center justify-between">
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="flex items-center justify-between border-b border-kumo-line pb-3">
             <Text variant="heading" as="h2">
               App 基础信息
             </Text>
@@ -4162,34 +4163,48 @@ function MetaView() {
               </Badge>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3 text-xs">
-            <div>
+          <div className="grid gap-3.5 text-xs">
+            <div className="flex flex-col gap-1">
               <Text variant="secondary">App ID</Text>
-              <span className="font-mono">{app.data?.id ?? "—"}</span>
+              {app.data?.id ? (
+                <div className="w-fit max-w-full">
+                  <ClipboardText text={app.data.id} size="sm" />
+                </div>
+              ) : (
+                <span className="font-mono text-kumo-subtle">—</span>
+              )}
             </div>
-            <div>
+            <div className="flex flex-col gap-1">
               <Text variant="secondary">Type</Text>
-              <Text>{app.data?.type ?? "—"}</Text>
+              <span className="font-medium text-sm text-kumo-default">{app.data?.type ?? "—"}</span>
             </div>
-            <div>
+            <div className="flex flex-col gap-1">
               <Text variant="secondary">Manifest Mode</Text>
-              <Text>{app.data?.manifest?.mode ?? "push"}</Text>
+              <span className="font-medium text-sm text-kumo-default">
+                {app.data?.manifest?.mode ?? "push"}
+              </span>
             </div>
-            <div>
+            <div className="flex flex-col gap-1">
               <Text variant="secondary">Active Revision ID</Text>
-              <span className="font-mono">{app.data?.manifest?.activeRevisionId ?? "—"}</span>
+              {app.data?.manifest?.activeRevisionId ? (
+                <div className="w-fit max-w-full">
+                  <ClipboardText text={app.data.manifest.activeRevisionId} size="sm" />
+                </div>
+              ) : (
+                <span className="font-mono text-kumo-subtle">—</span>
+              )}
             </div>
-            <div>
+            <div className="flex flex-col gap-1">
               <Text variant="secondary">Updated At</Text>
-              <Text>
+              <span className="text-sm text-kumo-default">
                 {app.data?.updatedAt ? new Date(app.data.updatedAt).toLocaleString() : "—"}
-              </Text>
+              </span>
             </div>
           </div>
-        </Surface>
+        </LayerCard>
 
-        <Surface className="grid gap-3 p-4">
-          <div className="flex items-center justify-between">
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="flex items-center justify-between border-b border-kumo-line pb-3">
             <Text variant="heading" as="h2">
               App 原始 JSON
             </Text>
@@ -4198,14 +4213,14 @@ function MetaView() {
               {t("copyJson")}
             </Button>
           </div>
-          <div className="max-h-56 overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
+          <div className="max-h-72 overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
             <Code code={appJson} lang="jsonc" />
           </div>
-        </Surface>
+        </LayerCard>
       </div>
 
       {/* 2. 组件原始 JSON (Components Raw JSON) */}
-      <Surface className="mb-6 grid gap-4 p-4">
+      <LayerCard className="mb-6 grid gap-4 p-5 shadow-sm ring ring-kumo-line">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kumo-line pb-3">
           <div>
             <Text variant="heading" as="h2">
@@ -4231,7 +4246,7 @@ function MetaView() {
 
         {componentKeys.length === 0 ? (
           <Empty
-            icon={<ClipboardText size={32} />}
+            icon={<ClipboardTextIcon size={32} />}
             title="暂无组件元信息"
             description="当前 App 尚未推送或同步组件 Manifest。"
           />
@@ -4299,12 +4314,12 @@ function MetaView() {
             </div>
           </div>
         )}
-      </Surface>
+      </LayerCard>
 
       {/* 3. 完整 Manifest JSON & 手动推送 */}
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <Surface className="grid gap-3 p-4">
-          <div className="flex items-center justify-between">
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="flex items-center justify-between border-b border-kumo-line pb-3">
             <Text variant="heading" as="h2">
               完整 Manifest JSON
             </Text>
@@ -4316,12 +4331,14 @@ function MetaView() {
           <div className="max-h-72 overflow-auto rounded-lg border border-kumo-line bg-kumo-canvas p-3">
             <Code code={manifestJson} lang="jsonc" />
           </div>
-        </Surface>
+        </LayerCard>
 
-        <Surface className="grid gap-4 p-4">
-          <Text variant="heading" as="h2">
-            推送 Manifest
-          </Text>
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="border-b border-kumo-line pb-3">
+            <Text variant="heading" as="h2">
+              推送 Manifest
+            </Text>
+          </div>
           <Input
             label="Publish Key"
             type="password"
@@ -4346,7 +4363,7 @@ function MetaView() {
                     path: { appId: context.appId ?? "" },
                     header: { authorization: `Bearer ${publishKey}` },
                   },
-                  body: JSON.parse(json),
+                  body: JSON.parse(json) as Record<string, unknown>,
                 });
               } catch {
                 toast.add({ title: t("requestFailed") });
@@ -4355,21 +4372,23 @@ function MetaView() {
           >
             {t("save")}
           </Button>
-        </Surface>
+        </LayerCard>
       </div>
 
       {/* 4. 修订版本历史 (Revision History) */}
-      <Surface className="grid gap-3 p-4">
-        <Text variant="heading" as="h2">
-          修订版本历史 (Revision history)
-        </Text>
+      <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+        <div className="border-b border-kumo-line pb-3">
+          <Text variant="heading" as="h2">
+            修订版本历史 (Revision history)
+          </Text>
+        </div>
         {manifestRevisions.length === 0 ? (
           <div className="py-3 text-xs text-kumo-subtle">暂无历史修订版本</div>
         ) : (
           manifestRevisions.map((rev) => (
             <div
               key={rev.id}
-              className="flex items-center justify-between border-b border-kumo-line py-2 text-xs"
+              className="flex items-center justify-between border-b border-kumo-line py-2 text-xs last:border-b-0"
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-kumo-subtle">{rev.checksum.slice(0, 12)}…</span>
@@ -4382,7 +4401,7 @@ function MetaView() {
             </div>
           ))
         )}
-      </Surface>
+      </LayerCard>
     </>
   );
 }
@@ -4747,7 +4766,7 @@ function SettingsView() {
           <LayerCard.Secondary>{t("appSettings")}</LayerCard.Secondary>
           <LayerCard.Primary className="py-6">
             <Empty
-              icon={<ClipboardText size={32} />}
+              icon={<ClipboardTextIcon size={32} />}
               title={t("chooseApp")}
               description={t("appSettingsChooseAppDescription")}
               contents={
