@@ -222,7 +222,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
-        if (!canManageAi && (item.key === "ai" || item.key === "systemPrompt")) {
+        if (!canManageAi && item.key === "ai") {
           return false;
         }
         if ("type" in item && item.type === "sub") {
@@ -459,97 +459,105 @@ export function AdminShell({ children }: { children: ReactNode }) {
               ⌘K
             </kbd>
           </button>
-          {filteredNavigationGroups.map((group) => (
-            <Sidebar.Group key={group.label}>
-              <Sidebar.GroupLabel>{t(group.key as MessageKey) || group.label}</Sidebar.GroupLabel>
-              <Sidebar.Menu>
-                {group.items.map((item) => {
-                  if ("type" in item && item.type === "sub") {
-                    const isAnySubActive = item.items.some(
-                      (sub) =>
-                        context.viewPath === sub.href ||
-                        context.viewPath.startsWith(`${sub.href}/`),
-                    );
-                    const SubIcon = icons[item.icon as keyof typeof icons] ?? Folder;
-                    return (
-                      <Sidebar.MenuItem key={item.key}>
-                        <Sidebar.Collapsible defaultOpen>
-                          <Sidebar.CollapsibleTrigger
-                            render={
-                              <Sidebar.MenuButton
-                                icon={SubIcon}
-                                tooltip={t(item.key as MessageKey)}
-                                active={isAnySubActive}
-                              >
-                                {t(item.key as MessageKey)} <Sidebar.MenuChevron />
-                              </Sidebar.MenuButton>
-                            }
-                          />
-                          <Sidebar.CollapsibleContent>
-                            <Sidebar.MenuSub>
-                              {item.items.map((sub) => {
-                                const subActive =
-                                  context.viewPath === sub.href ||
-                                  context.viewPath.startsWith(`${sub.href}/`);
-                                return (
-                                  <Sidebar.MenuSubButton
-                                    key={sub.href}
-                                    href={context.href(sub.href)}
-                                    active={subActive}
-                                  >
-                                    {t(sub.key as MessageKey)}
-                                  </Sidebar.MenuSubButton>
-                                );
-                              })}
-                            </Sidebar.MenuSub>
-                          </Sidebar.CollapsibleContent>
-                        </Sidebar.Collapsible>
-                      </Sidebar.MenuItem>
-                    );
-                  }
+          {filteredNavigationGroups.map((group, groupIndex) => {
+            const hasLabel = Boolean(group.label && group.label.trim().length > 0);
+            return (
+              <Sidebar.Group key={group.label || group.key || groupIndex}>
+                {hasLabel ? (
+                  <Sidebar.GroupLabel>
+                    {t(group.key as MessageKey) || group.label}
+                  </Sidebar.GroupLabel>
+                ) : null}
+                <Sidebar.Menu>
+                  {group.items.map((item) => {
+                    if ("type" in item && item.type === "sub") {
+                      const isAnySubActive = item.items.some(
+                        (sub) =>
+                          context.viewPath === sub.href ||
+                          context.viewPath.startsWith(`${sub.href}/`),
+                      );
+                      const SubIcon = icons[item.icon as keyof typeof icons] ?? Folder;
+                      return (
+                        <Sidebar.MenuItem key={item.key}>
+                          <Sidebar.Collapsible defaultOpen>
+                            <Sidebar.CollapsibleTrigger
+                              render={
+                                <Sidebar.MenuButton
+                                  icon={SubIcon}
+                                  tooltip={t(item.key as MessageKey)}
+                                  active={isAnySubActive}
+                                >
+                                  {t(item.key as MessageKey)} <Sidebar.MenuChevron />
+                                </Sidebar.MenuButton>
+                              }
+                            />
+                            <Sidebar.CollapsibleContent>
+                              <Sidebar.MenuSub>
+                                {item.items.map((sub) => {
+                                  const subActive =
+                                    context.viewPath === sub.href ||
+                                    context.viewPath.startsWith(`${sub.href}/`);
+                                  return (
+                                    <Sidebar.MenuSubButton
+                                      key={sub.href}
+                                      href={context.href(sub.href)}
+                                      active={subActive}
+                                    >
+                                      {t(sub.key as MessageKey)}
+                                    </Sidebar.MenuSubButton>
+                                  );
+                                })}
+                              </Sidebar.MenuSub>
+                            </Sidebar.CollapsibleContent>
+                          </Sidebar.Collapsible>
+                        </Sidebar.MenuItem>
+                      );
+                    }
 
-                  const directItem = item as {
-                    href: string;
-                    key: string;
-                    icon: keyof typeof icons;
-                    target?: string;
-                  };
-                  const Icon = icons[directItem.icon];
-                  const active =
-                    (directItem.href === "/" &&
-                      (context.viewPath === "/" || context.viewPath === "/organization/select")) ||
-                    (directItem.href !== "/" &&
-                      (context.viewPath === directItem.href ||
-                        (directItem.href !== "/apps" &&
-                          context.viewPath.startsWith(`${directItem.href}/`))));
-                  const isExternal = directItem.target === "_blank";
-                  const itemHref = isExternal
-                    ? directItem.href
-                    : isPersonal
+                    const directItem = item as {
+                      href: string;
+                      key: string;
+                      icon: keyof typeof icons;
+                      target?: string;
+                    };
+                    const Icon = icons[directItem.icon];
+                    const active =
+                      (directItem.href === "/" &&
+                        (context.viewPath === "/" ||
+                          context.viewPath === "/organization/select")) ||
+                      (directItem.href !== "/" &&
+                        (context.viewPath === directItem.href ||
+                          (directItem.href !== "/apps" &&
+                            context.viewPath.startsWith(`${directItem.href}/`))));
+                    const isExternal = directItem.target === "_blank";
+                    const itemHref = isExternal
                       ? directItem.href
-                      : context.href(directItem.href);
-                  return (
-                    <Sidebar.MenuButton
-                      key={directItem.href}
-                      href={itemHref}
-                      icon={Icon}
-                      active={active}
-                      tooltip={t(directItem.key as MessageKey)}
-                      target={isExternal ? "_blank" : undefined}
-                      rel={isExternal ? "noreferrer noopener" : undefined}
-                    >
-                      <span className="flex-1 truncate">{t(directItem.key as MessageKey)}</span>
-                      {(directItem as { badge?: string }).badge ? (
-                        <span className="ml-auto rounded border border-dashed border-kumo-line px-1.5 py-0.5 text-[10px] font-medium text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden">
-                          {(directItem as { badge?: string }).badge}
-                        </span>
-                      ) : null}
-                    </Sidebar.MenuButton>
-                  );
-                })}
-              </Sidebar.Menu>
-            </Sidebar.Group>
-          ))}
+                      : isPersonal
+                        ? directItem.href
+                        : context.href(directItem.href);
+                    return (
+                      <Sidebar.MenuButton
+                        key={directItem.href}
+                        href={itemHref}
+                        icon={Icon}
+                        active={active}
+                        tooltip={t(directItem.key as MessageKey)}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noreferrer noopener" : undefined}
+                      >
+                        <span className="flex-1 truncate">{t(directItem.key as MessageKey)}</span>
+                        {(directItem as { badge?: string }).badge ? (
+                          <span className="ml-auto rounded border border-dashed border-kumo-line px-1.5 py-0.5 text-[10px] font-medium text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden">
+                            {(directItem as { badge?: string }).badge}
+                          </span>
+                        ) : null}
+                      </Sidebar.MenuButton>
+                    );
+                  })}
+                </Sidebar.Menu>
+              </Sidebar.Group>
+            );
+          })}
         </Sidebar.Content>
         <Sidebar.Footer>
           <Sidebar.Trigger aria-label="Toggle sidebar" />

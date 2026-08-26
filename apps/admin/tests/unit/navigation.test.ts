@@ -87,6 +87,26 @@ describe("admin navigation context", () => {
       icon: "image",
     });
   });
+  test("nests AI providers and global prompts under AI sub-menu", () => {
+    const systemGroup = navigationGroups.find((group) => group.key === "system");
+    expect(systemGroup?.label).toBe("");
+    const aiSubMenu = systemGroup?.items.find(
+      (item) => "type" in item && item.type === "sub" && item.key === "ai",
+    );
+    expect(aiSubMenu).toBeDefined();
+    if (aiSubMenu && "items" in aiSubMenu) {
+      expect(aiSubMenu.items).toContainEqual({
+        href: "/ai",
+        key: "aiProviders",
+        icon: "sparkle",
+      });
+      expect(aiSubMenu.items).toContainEqual({
+        href: "/system-prompt",
+        key: "globalPrompts",
+        icon: "shieldWarning",
+      });
+    }
+  });
 
   test("identifies non-app-scoped and app-scoped paths correctly", () => {
     expect(isAppScopedPath("/settings")).toBe(false);

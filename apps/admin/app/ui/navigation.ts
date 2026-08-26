@@ -130,19 +130,23 @@ export const personalNavigationGroups = [
   },
 ] as const;
 
-/**
- * Organization-scoped navigation items (account, settings & org switcher moved to header navigation).
- */
 export const navigationGroups = [
   {
-    label: "System",
+    label: "",
     key: "system",
     items: [
       { href: "/apps", key: "apps", icon: "squares" },
       { href: "/keys", key: "keys", icon: "key" },
       { href: "/system", key: "system", icon: "gear" },
-      { href: "/ai", key: "ai", icon: "sparkle" },
-      { href: "/system-prompt", key: "systemPrompt", icon: "shieldWarning" },
+      {
+        type: "sub",
+        key: "ai",
+        icon: "sparkle",
+        items: [
+          { href: "/ai", key: "aiProviders", icon: "sparkle" },
+          { href: "/system-prompt", key: "globalPrompts", icon: "shieldWarning" },
+        ],
+      },
     ],
   },
   {

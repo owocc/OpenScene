@@ -238,6 +238,8 @@ export const messages = {
     storageDeleted: "Storage settings deleted",
     deleteStorage: "Delete Storage Config",
     deleteStorageConfirm: "Are you sure you want to remove the storage configuration for this app?",
+    aiProviders: "Providers",
+    globalPrompts: "Global Prompts",
     ai: "AI",
     aiDescription: "Configure the global AI provider used by every app.",
     aiConfiguration: "AI Configuration",
@@ -611,6 +613,8 @@ export const messages = {
     collapse: "收起",
     expand: "展开",
 
+    aiProviders: "提供商",
+    globalPrompts: "全局提示词",
     ai: "AI",
     aiDescription: "配置所有应用共用的全局 AI 提供商。",
     aiConfiguration: "AI 配置",
