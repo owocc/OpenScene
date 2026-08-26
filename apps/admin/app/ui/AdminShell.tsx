@@ -381,15 +381,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
     >
       <Sidebar className="h-full border-r border-kumo-line" fullScreenOnMobile>
         <Sidebar.Header className="w-full border-b border-kumo-line p-2.5">
-          <div className="flex h-9 items-center justify-between gap-2 px-1 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:p-0">
+          <div className="flex h-9 items-center justify-between gap-2 px-1 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
             <a
               href="/"
-              className="translate-y-0.5 cursor-pointer origin-left scale-[0.833] group-not-data-[state=collapsed]/sidebar:scale-100 transition-transform duration-250 flex items-center shrink-0 text-kumo-default"
+              className="translate-y-0.5 cursor-pointer origin-left scale-[0.833] group-not-data-[state=collapsed]/sidebar:scale-100 transition-transform duration-250 flex items-center justify-center shrink-0 text-kumo-default"
               aria-label="Home"
             >
-              <OpenSceneLogo className="h-7 w-auto shrink-0" />
+              <div>
+                <OpenSceneLogo />
+              </div>
             </a>
-
             {!isPersonal && (
               <DropdownMenu>
                 <DropdownMenu.Trigger
