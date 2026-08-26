@@ -582,17 +582,65 @@ export function AdminShell({ children }: { children: ReactNode }) {
                       : t("organizations")}
                 </Breadcrumbs.Current>
               </Breadcrumbs>
-            ) : (
+            ) : context.appId && currentApp ? (
               <Breadcrumbs size="sm">
                 <Breadcrumbs.Link href={context.href("/apps")}>
-                  {activeOrg?.name || t("apps")}
+                  {activeOrg?.name || context.orgSlug || t("apps")}
                 </Breadcrumbs.Link>
                 <Breadcrumbs.Separator />
-                <Breadcrumbs.Current>
-                  {context.viewPath === "/settings" && context.appId
-                    ? t("appSettings")
-                    : t((context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey)}
-                </Breadcrumbs.Current>
+                {context.viewPath === "/overview" ? (
+                  <Breadcrumbs.Current>{currentApp.name}</Breadcrumbs.Current>
+                ) : (
+                  <>
+                    <Breadcrumbs.Link href={context.href("/overview")}>
+                      {currentApp.name}
+                    </Breadcrumbs.Link>
+                    <Breadcrumbs.Separator />
+                    <Breadcrumbs.Current>
+                      {context.viewPath === "/settings"
+                        ? t("appSettings")
+                        : context.viewPath.startsWith("/pages/")
+                          ? t("pages")
+                          : context.viewPath.startsWith("/templates/")
+                            ? t("templates")
+                            : context.viewPath.startsWith("/components/")
+                              ? t("components")
+                              : context.viewPath.startsWith("/openapi-docs/")
+                                ? t("openapiDocs")
+                                : context.viewPath.startsWith("/prompts/") ||
+                                    context.viewPath.startsWith("/prompt/")
+                                  ? t("prompts")
+                                  : t(
+                                      (context.viewPath.slice(1).split("/")[0] ||
+                                        "overview") as MessageKey,
+                                    )}
+                    </Breadcrumbs.Current>
+                  </>
+                )}
+              </Breadcrumbs>
+            ) : (
+              <Breadcrumbs size="sm">
+                {context.viewPath === "/apps" ? (
+                  <Breadcrumbs.Current>
+                    {activeOrg?.name || context.orgSlug || t("apps")}
+                  </Breadcrumbs.Current>
+                ) : (
+                  <>
+                    <Breadcrumbs.Link href={context.href("/apps")}>
+                      {activeOrg?.name || context.orgSlug || t("apps")}
+                    </Breadcrumbs.Link>
+                    <Breadcrumbs.Separator />
+                    <Breadcrumbs.Current>
+                      {context.viewPath === "/ai"
+                        ? t("aiProviders")
+                        : context.viewPath === "/system-prompt"
+                          ? t("globalPrompts")
+                          : t(
+                              (context.viewPath.slice(1).split("/")[0] || "overview") as MessageKey,
+                            )}
+                    </Breadcrumbs.Current>
+                  </>
+                )}
               </Breadcrumbs>
             )}
           </div>
