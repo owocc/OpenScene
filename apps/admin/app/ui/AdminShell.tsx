@@ -32,8 +32,8 @@ import {
 import { OpenSceneLogo } from "./Logo";
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { CommandPalette } from "@cloudflare/kumo/components/command-palette";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
 import {
@@ -48,7 +48,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { defaultRoleStatements, hasStatement } from "@/lib/permissions";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
 import { useAdminContext, useI18n, type MessageKey } from "./i18n";
 import {
@@ -80,12 +80,13 @@ const icons = {
   tag: Tag,
   user: User,
 } as const;
-
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const context = useAdminContext();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [commandSearch, setCommandSearch] = useState("");
   const { data: session, isPending: isSessionPending } = useSession();
   const { data: orgs } = useListOrganizations();
   const { data: activeOrg } = useActiveOrganization();
@@ -94,6 +95,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
   useEffect(() => {
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
@@ -193,6 +204,121 @@ export function AdminShell({ children }: { children: ReactNode }) {
       }),
     }))
     .filter((group) => group.items.length > 0);
+  interface CommandItem {
+    id: string;
+    label: string;
+    category: string;
+    icon?: keyof typeof icons;
+    action: () => void;
+  }
+
+  const commandItems = useMemo<CommandItem[]>(() => {
+    const items: CommandItem[] = [];
+
+    // Personal / Global navigation items
+    items.push({
+      id: "nav-orgs",
+      label: t("organizations"),
+      category: "Account",
+      icon: "buildings",
+      action: () => context.router.push("/"),
+    });
+    items.push({
+      id: "nav-account",
+      label: t("account"),
+      category: "Account",
+      icon: "user",
+      action: () => context.router.push("/account"),
+    });
+    items.push({
+      id: "nav-settings",
+      label: t("settings"),
+      category: "Account",
+      icon: "sliders",
+      action: () => context.router.push("/settings"),
+    });
+    items.push({
+      id: "nav-create-org",
+      label: t("createNewOrg"),
+      category: "Account",
+      icon: "buildings",
+      action: () => context.router.push("/organization/new"),
+    });
+
+    // Organization-scoped navigation items
+    if (!isPersonal) {
+      for (const group of navigationGroups) {
+        for (const navItem of group.items) {
+          if ("type" in navItem && navItem.type === "sub") {
+            for (const sub of navItem.items) {
+              items.push({
+                id: `nav-${sub.key}`,
+                label: t(sub.key as MessageKey),
+                category: group.label,
+                icon: "file",
+                action: () => context.router.push(context.href(sub.href)),
+              });
+            }
+          } else {
+            const direct = navItem as {
+              href: string;
+              key: string;
+              icon: keyof typeof icons;
+              target?: string;
+            };
+            items.push({
+              id: `nav-${direct.key}`,
+              label: t(direct.key as MessageKey),
+              category: group.label,
+              icon: direct.icon,
+              action: () => {
+                if (direct.target === "_blank") window.open(direct.href, "_blank");
+                else context.router.push(context.href(direct.href));
+              },
+            });
+          }
+        }
+      }
+
+      // Apps in organization
+      for (const app of apps) {
+        items.push({
+          id: `app-${app.id}`,
+          label: `${t("app")}: ${app.name}`,
+          category: t("apps"),
+          icon: "squares",
+          action: () => context.router.push(context.href("/overview", { appId: app.id })),
+        });
+      }
+    }
+
+    // Switch organizations
+    if (orgs && orgs.length > 0) {
+      for (const org of orgs as Array<{ id: string; name: string; slug: string }>) {
+        items.push({
+          id: `org-${org.id}`,
+          label: `${t("organization")}: ${org.name}`,
+          category: t("organizations"),
+          icon: "buildings",
+          action: async () => {
+            await authClient.organization.setActive({ organizationId: org.id });
+            void queryClient.invalidateQueries();
+            context.router.push(buildHref("/apps", { orgSlug: org.slug }));
+          },
+        });
+      }
+    }
+
+    return items;
+  }, [t, context, isPersonal, apps, orgs, queryClient]);
+
+  const filteredCommandItems = useMemo(() => {
+    const q = commandSearch.trim().toLowerCase();
+    if (!q) return commandItems;
+    return commandItems.filter(
+      (item) => item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q),
+    );
+  }, [commandItems, commandSearch]);
   if (pathname === "/login") return <main className="min-h-dvh">{children}</main>;
   if (context.mode === "embedded") return <main className="min-h-dvh">{children}</main>;
   if (!isAuthenticated && !isChecking) return null;
@@ -277,22 +403,22 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </Sidebar.Header>
         <Sidebar.Content className="min-h-0 flex-1 overflow-y-auto">
-          {/* Quick search (matching Image #1 and Image #2) */}
-          <div className="relative mb-3 w-full">
-            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-kumo-subtle">
-              <MagnifyingGlass size={15} />
-            </span>
-            <Input
-              aria-label={t("search")}
-              placeholder="Quick search..."
-              value={navigationSearch}
-              onChange={(event) => setNavigationSearch(event.target.value)}
-              className="!pl-8 !pr-8 w-full text-xs"
-            />
-            <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[10px] font-medium text-kumo-subtle">
+          {/* Quick search button that triggers CommandPalette */}
+          <button
+            type="button"
+            onClick={() => setCommandPaletteOpen(true)}
+            className="mb-3 flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-kumo-line bg-kumo-base px-2.5 py-1.5 text-xs text-kumo-subtle transition-colors hover:border-kumo-brand hover:bg-kumo-fill hover:text-kumo-default cursor-pointer group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <MagnifyingGlass size={15} className="shrink-0" />
+              <span className="truncate group-data-[state=collapsed]/sidebar:hidden">
+                Quick search...
+              </span>
+            </div>
+            <kbd className="rounded border border-kumo-line bg-kumo-canvas px-1.5 py-0.5 text-[10px] font-medium text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden">
               ⌘K
-            </span>
-          </div>
+            </kbd>
+          </button>
           {filteredNavigationGroups.map((group) => (
             <Sidebar.Group key={group.label}>
               <Sidebar.GroupLabel>{t(group.key as MessageKey) || group.label}</Sidebar.GroupLabel>
@@ -571,6 +697,76 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </header>
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
+
+      {/* Command Palette Spotlight Search */}
+      <CommandPalette.Root
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        items={commandItems}
+        value={commandSearch}
+        onValueChange={setCommandSearch}
+        itemToStringValue={(item: { label: string }) => item.label}
+        onSelect={(item: { action: () => void }) => {
+          item.action();
+          setCommandPaletteOpen(false);
+        }}
+      >
+        <CommandPalette.Input placeholder="Type a command or search..." />
+        <CommandPalette.List>
+          {filteredCommandItems.length === 0 ? (
+            <CommandPalette.Empty>{t("noResults")}</CommandPalette.Empty>
+          ) : (
+            filteredCommandItems.map((item) => {
+              const Icon =
+                item.icon && icons[item.icon as keyof typeof icons]
+                  ? icons[item.icon as keyof typeof icons]
+                  : Sparkle;
+              return (
+                <CommandPalette.Item
+                  key={item.id}
+                  value={item}
+                  onClick={() => {
+                    item.action();
+                    setCommandPaletteOpen(false);
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Icon size={16} className="shrink-0 text-kumo-subtle" />
+                      <span className="truncate font-medium">{item.label}</span>
+                    </div>
+                    <span className="shrink-0 text-[10px] uppercase text-kumo-subtle">
+                      {item.category}
+                    </span>
+                  </div>
+                </CommandPalette.Item>
+              );
+            })
+          )}
+        </CommandPalette.List>
+        <CommandPalette.Footer>
+          <span className="flex items-center gap-3 text-xs text-kumo-subtle">
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-kumo-line bg-kumo-base px-1.5 py-0.5 text-[10px]">
+                ↑↓
+              </kbd>{" "}
+              to navigate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-kumo-line bg-kumo-base px-1.5 py-0.5 text-[10px]">
+                ↵
+              </kbd>{" "}
+              to select
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded border border-kumo-line bg-kumo-base px-1.5 py-0.5 text-[10px]">
+                esc
+              </kbd>{" "}
+              to close
+            </span>
+          </span>
+        </CommandPalette.Footer>
+      </CommandPalette.Root>
     </Sidebar.Provider>
   );
 }
