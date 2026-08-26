@@ -38,6 +38,7 @@ export const appScopedViews = new Set([
   "openapi-docs",
   "prompts",
   "prompt",
+  "settings",
 ]);
 
 export function extractOrgSlugAndPath(pathname: string): {
@@ -102,7 +103,6 @@ export function extractOrgSlugAndPath(pathname: string): {
   const viewPath = viewSegments.length > 0 ? `/${viewSegments.join("/")}` : "/apps";
   return { orgSlug, viewPath };
 }
-
 export function buildHref(
   path: string,
   context: { mode?: AdminMode; lang?: AdminLanguage; orgSlug?: string; appId?: string } = {},
@@ -113,16 +113,11 @@ export function buildHref(
     orgSlug: extractedSlug,
     appId: extractedAppId,
   } = extractOrgSlugAndPath(path);
-  const isPersonal = isPersonalPath(cleanViewPath);
-  const orgSlug = isPersonal ? "" : context.orgSlug || extractedSlug || "";
-  const appId = isPersonal
-    ? undefined
-    : extra.appId !== undefined
-      ? extra.appId
-      : context.appId || extractedAppId;
-
   const firstViewSegment = cleanViewPath.split("/").filter(Boolean)[0] || "";
   const isAppScoped = appScopedViews.has(firstViewSegment);
+  const appId = extra.appId !== undefined ? extra.appId : context.appId || extractedAppId;
+  const isPersonal = cleanViewPath === "/settings" ? !appId : isPersonalPath(cleanViewPath);
+  const orgSlug = isPersonal ? "" : context.orgSlug || extractedSlug || "";
 
   let basePath = cleanViewPath;
   if (orgSlug) {
@@ -147,7 +142,10 @@ export function buildHref(
 }
 
 export function isAppScopedPath(pathname: string): boolean {
-  const { viewPath } = extractOrgSlugAndPath(pathname);
+  const { viewPath, appId } = extractOrgSlugAndPath(pathname);
+  if (viewPath === "/settings") {
+    return Boolean(appId);
+  }
   const first = viewPath.split("/").filter(Boolean)[0] || "";
   return appScopedViews.has(first);
 }
@@ -174,6 +172,7 @@ export const navigationGroups = [
     items: [
       { href: "/apps", key: "apps", icon: "squares" },
       { href: "/keys", key: "keys", icon: "key" },
+      { href: "/organization", key: "organization", icon: "buildings" },
       { href: "/system", key: "system", icon: "gear" },
       {
         type: "sub",
@@ -215,6 +214,7 @@ export const navigationGroups = [
       { href: "/categories", key: "categories", icon: "tag" },
       { href: "/locales", key: "locales", icon: "globe" },
       { href: "/prompts", key: "prompts", icon: "chatText" },
+      { href: "/settings", key: "appSettings", icon: "sliders" },
     ],
   },
   {

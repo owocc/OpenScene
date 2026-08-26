@@ -56,12 +56,20 @@ describe("admin navigation context", () => {
     expect(buildHref("/overview", { orgSlug: "acme", appId: "app_1" })).toBe(
       "/acme/app_1/overview",
     );
+    expect(buildHref("/settings", { orgSlug: "acme", appId: "app_1" })).toBe(
+      "/acme/app_1/settings",
+    );
   });
   test("extracts orgSlug, appId, and viewPath correctly from path params", () => {
     expect(extractOrgSlugAndPath("/acme/app_1/overview")).toEqual({
       orgSlug: "acme",
       appId: "app_1",
       viewPath: "/overview",
+    });
+    expect(extractOrgSlugAndPath("/acme/app_1/settings")).toEqual({
+      orgSlug: "acme",
+      appId: "app_1",
+      viewPath: "/settings",
     });
     expect(extractOrgSlugAndPath("/acme/app_1/pages/page_123")).toEqual({
       orgSlug: "acme",

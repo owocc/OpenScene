@@ -200,7 +200,7 @@ export function AdminConsole() {
   if (viewPath === "/components") return <ComponentsView />;
   if (viewPath.startsWith("/components/")) return <ComponentDetailView />;
   if (viewPath === "/organization") return <OrganizationView />;
-  if (viewPath === "/settings") return <SettingsView />;
+  if (viewPath === "/settings") return context.appId ? <AppSettingsView /> : <SettingsView />;
   if (viewPath === "/account") return <AccountView />;
   if (viewPath === "/prompts" || viewPath === "/prompt") return <PromptsListView />;
   if (viewPath.startsWith("/prompts/") || viewPath.startsWith("/prompt/"))
@@ -4582,13 +4582,48 @@ function SettingsView() {
   const context = useAdminContext();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
+
+  return (
+    <>
+      <PageHeader title={t("settings")} description={t("settingsDescription")} />
+      <LayerCard className="mb-4 max-w-2xl shadow-sm ring ring-kumo-line p-5 grid gap-4">
+        <div className="border-b border-kumo-line pb-3">
+          <Text variant="heading" as="h2">
+            {t("preferences")}
+          </Text>
+        </div>
+        <Select
+          label={t("language")}
+          value={context.language}
+          items={{ en: t("english"), "zh-CN": t("chinese") }}
+          onValueChange={(value) => {
+            if (value === "en" || value === "zh-CN") context.setLanguage(value);
+          }}
+        />
+        <Select
+          label={t("theme")}
+          value={theme ?? "system"}
+          items={{
+            system: t("themeSystem"),
+            light: t("themeLight"),
+            dark: t("themeDark"),
+          }}
+          onValueChange={(value) => {
+            if (value === "system" || value === "light" || value === "dark") setTheme(value);
+          }}
+        />
+      </LayerCard>
+    </>
+  );
+}
+
+function AppSettingsView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
   const toast = useKumoToastManager();
   const queryClient = useQueryClient();
-  const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
   const hasAppSelected = Boolean(context.appId);
-  const selectedAppExists = Boolean(
-    context.appId && appsQuery.data?.items.some((item) => item.id === context.appId),
-  );
+
   const query = api.useQuery(
     "get",
     "/api/v1/apps/{appId}",
@@ -4644,12 +4679,14 @@ function SettingsView() {
 
   const app = query.data;
   const storageConfig = storageQuery.data?.config;
+
   useEffect(() => {
     if (app) {
       setName(app.name);
       setDescription(app.description);
     }
   }, [app]);
+
   useEffect(() => {
     if (storageConfig) {
       setPageDriver(storageConfig.pageDriver ?? storageConfig.driver ?? "database");
@@ -4733,74 +4770,62 @@ function SettingsView() {
       });
     }
   }
+
+  if (query.isLoading) return <LoadingState variant="detail" />;
+  if (query.error) return <ErrorState error={query.error} />;
+
   return (
     <>
-      <PageHeader title={t("settings")} description={t("settingsDescription")} />
-      <LayerCard className="mb-4 max-w-2xl">
-        <LayerCard.Secondary>{t("preferences")}</LayerCard.Secondary>
-        <LayerCard.Primary className="grid gap-4">
-          <Select
-            label={t("language")}
-            value={context.language}
-            items={{ en: t("english"), "zh-CN": t("chinese") }}
-            onValueChange={(value) => {
-              if (value === "en" || value === "zh-CN") context.setLanguage(value);
-            }}
-          />
-          <Select
-            label={t("theme")}
-            value={theme ?? "system"}
-            items={{
-              system: t("themeSystem"),
-              light: t("themeLight"),
-              dark: t("themeDark"),
-            }}
-            onValueChange={(value) => {
-              if (value === "system" || value === "light" || value === "dark") setTheme(value);
-            }}
-          />
-        </LayerCard.Primary>
-      </LayerCard>
-      {!hasAppSelected || (appsQuery.data && !selectedAppExists) ? (
-        <LayerCard className="max-w-2xl">
-          <LayerCard.Secondary>{t("appSettings")}</LayerCard.Secondary>
-          <LayerCard.Primary className="py-6">
-            <Empty
-              icon={<ClipboardTextIcon size={32} />}
-              title={t("chooseApp")}
-              description={t("appSettingsChooseAppDescription")}
-              contents={
-                <Button onClick={() => context.router.push(context.href("/apps"))}>
-                  {t("selectApp")}
-                </Button>
-              }
+      <PageHeader
+        title={t("appSettings")}
+        description={
+          t("appSettingsDescription") ||
+          "Configure general details and object storage for this application."
+        }
+      />
+      <div className="grid gap-6 max-w-3xl">
+        {/* App General Settings */}
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="border-b border-kumo-line pb-3">
+            <Text variant="heading" as="h2">
+              {t("appSettings")}
+            </Text>
+          </div>
+          <div className="grid gap-4">
+            <div className="flex flex-col gap-1 text-xs">
+              <Text variant="secondary">App ID</Text>
+              {app?.id ? (
+                <div className="w-fit">
+                  <ClipboardText text={app.id} size="sm" />
+                </div>
+              ) : (
+                "—"
+              )}
+            </div>
+            <Input
+              label={t("appName") || "Name"}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
             />
-          </LayerCard.Primary>
-        </LayerCard>
-      ) : (
-        <>
-          {query.error ? <ErrorState error={query.error} /> : null}
-          <LayerCard className="max-w-2xl">
-            <LayerCard.Secondary>{t("appSettings")}</LayerCard.Secondary>
-            <LayerCard.Primary className="grid gap-4">
-              <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Textarea
-                label="Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-              <Select
-                label={t("status")}
-                value={app?.status ?? "active"}
-                items={{ active: t("active"), disabled: t("disabled") }}
-                onValueChange={(value) => {
-                  if (value === "active" || value === "disabled")
-                    update.mutate({
-                      params: { path: { appId: context.appId ?? "" } },
-                      body: { status: value },
-                    });
-                }}
-              />
+            <Textarea
+              label={t("description") || "Description"}
+              value={description}
+              rows={3}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <Select
+              label={t("status")}
+              value={app?.status ?? "active"}
+              items={{ active: t("active"), disabled: t("disabled") }}
+              onValueChange={(value) => {
+                if (value === "active" || value === "disabled")
+                  update.mutate({
+                    params: { path: { appId: context.appId ?? "" } },
+                    body: { status: value },
+                  });
+              }}
+            />
+            <div className="flex justify-end pt-2 border-t border-kumo-line">
               <Button
                 variant="primary"
                 loading={update.isPending}
@@ -4813,181 +4838,187 @@ function SettingsView() {
               >
                 {t("save")}
               </Button>
-            </LayerCard.Primary>
-          </LayerCard>
-          <LayerCard className="mt-4 max-w-2xl">
-            <LayerCard.Secondary>{t("storageSettings")}</LayerCard.Secondary>
-            <LayerCard.Primary className="grid gap-4">
-              <Text variant="secondary">{t("storageSettingsDescription")}</Text>
-              {storageQuery.error ? <ErrorState error={storageQuery.error} /> : null}
-              {/* Page Release Storage Target */}
-              <div className="grid gap-2 border-b border-kumo-line pb-4">
-                <label className="text-xs font-semibold text-kumo-foreground block">
-                  {t("pageStorageTarget")}
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {/* Database Option Card */}
-                  <button
-                    type="button"
-                    onClick={() => setPageDriver("database")}
-                    className={cn(
-                      "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all cursor-pointer",
-                      pageDriver === "database"
-                        ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20"
-                        : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong",
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
-                        <Database size={15} className="text-kumo-subtle" />
-                        <span>{t("pageStorageTargetDatabase")}</span>
-                      </div>
-                      {pageDriver === "database" && (
-                        <Check size={14} weight="bold" className="text-kumo-primary" />
-                      )}
-                    </div>
-                    <Text variant="secondary">{t("storageModeDatabaseDescription")}</Text>
-                  </button>
+            </div>
+          </div>
+        </LayerCard>
 
-                  {/* S3 Option Card - Directly Disabled when S3 is not enabled */}
-                  <button
-                    type="button"
-                    disabled={!s3Enabled}
-                    onClick={() => s3Enabled && setPageDriver("s3")}
-                    className={cn(
-                      "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all",
-                      !s3Enabled
-                        ? "opacity-50 cursor-not-allowed bg-kumo-base/20 border-kumo-line"
-                        : pageDriver === "s3"
-                          ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20 cursor-pointer"
-                          : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong cursor-pointer",
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
-                        <Cloud size={15} className="text-kumo-subtle" />
-                        <span>{t("pageStorageTargetS3")}</span>
-                      </div>
-                      {pageDriver === "s3" && (
-                        <Check size={14} weight="bold" className="text-kumo-primary" />
-                      )}
-                    </div>
-                    <Text variant="secondary">
-                      {s3Enabled ? t("storageModeS3Description") : t("s3NotConfiguredHint")}
-                    </Text>
-                  </button>
-                </div>
-              </div>
-              {/* S3 Object Storage Configuration Card */}
-              <div className="grid gap-3 pt-1">
+        {/* Storage Settings */}
+        <LayerCard className="grid gap-4 p-5 shadow-sm ring ring-kumo-line">
+          <div className="border-b border-kumo-line pb-3">
+            <Text variant="heading" as="h2">
+              {t("storageSettings")}
+            </Text>
+          </div>
+          <Text variant="secondary">{t("storageSettingsDescription")}</Text>
+          {storageQuery.error ? <ErrorState error={storageQuery.error} /> : null}
+
+          {/* Page Release Storage Target */}
+          <div className="grid gap-2 border-b border-kumo-line pb-4">
+            <label className="text-xs font-semibold text-kumo-foreground block">
+              {t("pageStorageTarget")}
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Database Option Card */}
+              <button
+                type="button"
+                onClick={() => setPageDriver("database")}
+                className={cn(
+                  "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all cursor-pointer",
+                  pageDriver === "database"
+                    ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20"
+                    : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong",
+                )}
+              >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Text bold>{t("s3StorageConfig")}</Text>
-                    <Text variant="secondary">{t("s3AssetNotice")}</Text>
+                  <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
+                    <Database size={15} className="text-kumo-subtle" />
+                    <span>{t("pageStorageTargetDatabase")}</span>
                   </div>
-                  <Switch
-                    checked={s3Enabled}
-                    onCheckedChange={(checked) => {
-                      setS3Enabled(checked);
-                      if (!checked && pageDriver === "s3") {
-                        setPageDriver("database");
-                      }
-                    }}
-                  />
-                </div>
-                {s3Enabled ? (
-                  <div className="grid gap-3 pt-2">
-                    <Input
-                      label={t("storageBucket")}
-                      value={storageBucket}
-                      onChange={(e) => setStorageBucket(e.target.value)}
-                      placeholder={t("storageBucketPlaceholder")}
-                    />
-                    <Input
-                      label={t("storageEndpoint")}
-                      value={storageEndpoint}
-                      onChange={(e) => setStorageEndpoint(e.target.value)}
-                      placeholder={t("storageEndpointPlaceholder")}
-                    />
-                    <Input
-                      label={t("storageRegion")}
-                      value={storageRegion}
-                      onChange={(e) => setStorageRegion(e.target.value)}
-                      placeholder="auto"
-                    />
-                    <Input
-                      label={t("storageAccessKeyId")}
-                      value={storageAccessKeyId}
-                      onChange={(e) => setStorageAccessKeyId(e.target.value)}
-                    />
-                    <div>
-                      <Input
-                        label={t("storageSecretAccessKey")}
-                        type="password"
-                        value={storageSecretAccessKey}
-                        onChange={(e) => setStorageSecretAccessKey(e.target.value)}
-                        placeholder={
-                          storageConfig?.hasSecretAccessKey
-                            ? t("storageSecretAccessKeySet")
-                            : t("storageSecretAccessKeyPlaceholder")
-                        }
-                      />
-                      <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
-                    </div>
-                    <Switch
-                      checked={storageForcePathStyle}
-                      label={t("storageForcePathStyle")}
-                      onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
-                    />
-                    <Input
-                      label={t("storagePublicBaseUrl")}
-                      value={storagePublicBaseUrl}
-                      onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
-                      placeholder={t("storagePublicBaseUrlPlaceholder")}
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" loading={updateStorage.isPending} onClick={saveStorage}>
-                  {t("save")}
-                </Button>
-                {s3Enabled ? (
-                  <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
-                    {t("storageTest")}
-                  </Button>
-                ) : null}
-                {storageConfig ? (
-                  <Button
-                    variant="destructive"
-                    loading={deleteStorageMutation.isPending}
-                    onClick={deleteStorage}
-                  >
-                    {t("delete")}
-                  </Button>
-                ) : null}
-              </div>
-              {updateStorage.error ? <ErrorState error={updateStorage.error} /> : null}
-              {testStorageMutation.error ? <ErrorState error={testStorageMutation.error} /> : null}
-              {storageTestResult ? (
-                <div className="mt-2">
-                  {storageTestResult.status === "up" ? (
-                    <Badge variant="green">{t("storageConnectionSuccess")}</Badge>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="red">{t("storageConnectionFailed")}</Badge>
-                      {storageTestResult.detail ? (
-                        <Text variant="secondary">{storageTestResult.detail}</Text>
-                      ) : null}
-                    </div>
+                  {pageDriver === "database" && (
+                    <Check size={14} weight="bold" className="text-kumo-primary" />
                   )}
                 </div>
-              ) : null}
-            </LayerCard.Primary>
-          </LayerCard>
-        </>
-      )}
+                <Text variant="secondary">{t("storageModeDatabaseDescription")}</Text>
+              </button>
+
+              {/* S3 Option Card */}
+              <button
+                type="button"
+                disabled={!s3Enabled}
+                onClick={() => s3Enabled && setPageDriver("s3")}
+                className={cn(
+                  "flex flex-col gap-1 p-3 rounded-lg border text-left transition-all",
+                  !s3Enabled
+                    ? "opacity-50 cursor-not-allowed bg-kumo-base/20 border-kumo-line"
+                    : pageDriver === "s3"
+                      ? "border-kumo-primary bg-kumo-base ring-2 ring-kumo-primary/20 cursor-pointer"
+                      : "border-kumo-line bg-kumo-base/50 hover:border-kumo-line-strong cursor-pointer",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-medium text-xs text-kumo-foreground">
+                    <Cloud size={15} className="text-kumo-subtle" />
+                    <span>{t("pageStorageTargetS3")}</span>
+                  </div>
+                  {pageDriver === "s3" && (
+                    <Check size={14} weight="bold" className="text-kumo-primary" />
+                  )}
+                </div>
+                <Text variant="secondary">
+                  {s3Enabled ? t("storageModeS3Description") : t("s3NotConfiguredHint")}
+                </Text>
+              </button>
+            </div>
+          </div>
+
+          {/* S3 Object Storage Configuration */}
+          <div className="grid gap-3 pt-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <Text bold>{t("s3StorageConfig")}</Text>
+                <Text variant="secondary">{t("s3AssetNotice")}</Text>
+              </div>
+              <Switch
+                checked={s3Enabled}
+                onCheckedChange={(checked) => {
+                  setS3Enabled(checked);
+                  if (!checked && pageDriver === "s3") {
+                    setPageDriver("database");
+                  }
+                }}
+              />
+            </div>
+            {s3Enabled ? (
+              <div className="grid gap-3 pt-2">
+                <Input
+                  label={t("storageBucket")}
+                  value={storageBucket}
+                  onChange={(e) => setStorageBucket(e.target.value)}
+                  placeholder={t("storageBucketPlaceholder")}
+                />
+                <Input
+                  label={t("storageEndpoint")}
+                  value={storageEndpoint}
+                  onChange={(e) => setStorageEndpoint(e.target.value)}
+                  placeholder={t("storageEndpointPlaceholder")}
+                />
+                <Input
+                  label={t("storageRegion")}
+                  value={storageRegion}
+                  onChange={(e) => setStorageRegion(e.target.value)}
+                  placeholder="auto"
+                />
+                <Input
+                  label={t("storageAccessKeyId")}
+                  value={storageAccessKeyId}
+                  onChange={(e) => setStorageAccessKeyId(e.target.value)}
+                />
+                <div>
+                  <Input
+                    label={t("storageSecretAccessKey")}
+                    type="password"
+                    value={storageSecretAccessKey}
+                    onChange={(e) => setStorageSecretAccessKey(e.target.value)}
+                    placeholder={
+                      storageConfig?.hasSecretAccessKey
+                        ? t("storageSecretAccessKeySet")
+                        : t("storageSecretAccessKeyPlaceholder")
+                    }
+                  />
+                  <Text variant="secondary">{t("storageSecretAccessKeyHint")}</Text>
+                </div>
+                <Switch
+                  checked={storageForcePathStyle}
+                  label={t("storageForcePathStyle")}
+                  onCheckedChange={(checked) => setStorageForcePathStyle(checked)}
+                />
+                <Input
+                  label={t("storagePublicBaseUrl")}
+                  value={storagePublicBaseUrl}
+                  onChange={(e) => setStoragePublicBaseUrl(e.target.value)}
+                  placeholder={t("storagePublicBaseUrlPlaceholder")}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-kumo-line">
+            <Button variant="primary" loading={updateStorage.isPending} onClick={saveStorage}>
+              {t("save")}
+            </Button>
+            {s3Enabled ? (
+              <Button loading={testStorageMutation.isPending} onClick={runStorageTest}>
+                {t("storageTest")}
+              </Button>
+            ) : null}
+            {storageConfig ? (
+              <Button
+                variant="destructive"
+                loading={deleteStorageMutation.isPending}
+                onClick={deleteStorage}
+              >
+                {t("delete")}
+              </Button>
+            ) : null}
+          </div>
+          {updateStorage.error ? <ErrorState error={updateStorage.error} /> : null}
+          {testStorageMutation.error ? <ErrorState error={testStorageMutation.error} /> : null}
+          {storageTestResult ? (
+            <div className="mt-2">
+              {storageTestResult.status === "up" ? (
+                <Badge variant="green">{t("storageConnectionSuccess")}</Badge>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <Badge variant="red">{t("storageConnectionFailed")}</Badge>
+                  {storageTestResult.detail ? (
+                    <Text variant="secondary">{storageTestResult.detail}</Text>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </LayerCard>
+      </div>
     </>
   );
 }
