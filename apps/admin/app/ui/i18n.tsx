@@ -57,6 +57,10 @@ export const messages = {
     allCategories: "All categories",
     uncategorized: "Uncategorized",
     previewProfiles: "Preview profiles",
+    previewProfileRequiredTitle: "Preview profile required",
+    previewProfileRequiredDescription:
+      "Studio requires a valid preview profile with a runtime preview URL to load and edit this resource. Please configure a preview profile first.",
+    goToPreviewProfiles: "Go to Preview Profiles",
     assets: "Assets",
     folder: "Folder",
     allFolders: "All folders",
@@ -443,6 +447,10 @@ export const messages = {
     allCategories: "全部分类",
     uncategorized: "未分类",
     previewProfiles: "预览配置",
+    previewProfileRequiredTitle: "未配置预览地址",
+    previewProfileRequiredDescription:
+      "打开 Studio 进行可视化编辑前，必须先在「预览配置」中配置有效的应用运行/预览地址（Preview Profile）。请先前往配置预览地址。",
+    goToPreviewProfiles: "前往配置预览地址",
     assets: "资源管理",
     folder: "文件夹",
     allFolders: "所有文件夹",

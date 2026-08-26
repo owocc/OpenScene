@@ -882,9 +882,14 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
     },
   });
 
+  const [noPreviewProfileOpen, setNoPreviewProfileOpen] = useState(false);
+
   function openStudio(resource: Resource) {
     const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
-    if (!profile) return;
+    if (!profile || !profile.url?.trim()) {
+      setNoPreviewProfileOpen(true);
+      return;
+    }
     studioWindow.current = window.open("", "_blank");
     if (studioWindow.current) studioWindow.current.opener = null;
     studio.mutate({
@@ -1332,6 +1337,24 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
           </div>
         </Dialog>
       </Dialog.Root>
+      <Dialog.Root open={noPreviewProfileOpen} onOpenChange={setNoPreviewProfileOpen}>
+        <Dialog size="base" className="px-8 py-6">
+          <Dialog.Title>{t("previewProfileRequiredTitle")}</Dialog.Title>
+          <Dialog.Description>{t("previewProfileRequiredDescription")}</Dialog.Description>
+          <div className="flex justify-end gap-2 pt-4 border-t border-kumo-line mt-4">
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+            <Button
+              variant="primary"
+              onClick={() => {
+                setNoPreviewProfileOpen(false);
+                context.router.push(context.href("/preview-profiles"));
+              }}
+            >
+              {t("goToPreviewProfiles")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
     </>
   );
 }
@@ -1462,6 +1485,7 @@ function ResourceDetailView() {
   >(null);
   const [createVersionDialog, setCreateVersionDialog] = useState(false);
   const [editDialog, setEditDialog] = useState(false);
+  const [noPreviewProfileOpen, setNoPreviewProfileOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -1470,7 +1494,6 @@ function ResourceDetailView() {
     defaultPromptId: "",
     currentVersionId: "",
   });
-
   function openEdit() {
     if (!resource) return;
     setEditForm({
@@ -1548,7 +1571,10 @@ function ResourceDetailView() {
         <Button
           loading={studio.isPending}
           onClick={() => {
-            if (!profile) return;
+            if (!profile || !profile.url?.trim()) {
+              setNoPreviewProfileOpen(true);
+              return;
+            }
             studioWindow.current = window.open("", "_blank");
             if (studioWindow.current) studioWindow.current.opener = null;
             studio.mutate({
@@ -2045,6 +2071,24 @@ function ResourceDetailView() {
               }
             >
               {t("create")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+      <Dialog.Root open={noPreviewProfileOpen} onOpenChange={setNoPreviewProfileOpen}>
+        <Dialog size="base" className="px-8 py-6">
+          <Dialog.Title>{t("previewProfileRequiredTitle")}</Dialog.Title>
+          <Dialog.Description>{t("previewProfileRequiredDescription")}</Dialog.Description>
+          <div className="flex justify-end gap-2 pt-4 border-t border-kumo-line mt-4">
+            <Dialog.Close render={<Button>{t("cancel")}</Button>} />
+            <Button
+              variant="primary"
+              onClick={() => {
+                setNoPreviewProfileOpen(false);
+                context.router.push(context.href("/preview-profiles"));
+              }}
+            >
+              {t("goToPreviewProfiles")}
             </Button>
           </div>
         </Dialog>
