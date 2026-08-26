@@ -4,9 +4,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowSquareOut,
+  ArrowsClockwise,
+  BookOpen,
   CaretDown,
   CaretRight,
   Check,
+  CheckCircle,
+  Clock,
   ClipboardText as ClipboardTextIcon,
   Code as CodeIcon,
   Cloud,
@@ -16,14 +20,20 @@ import {
   Eye,
   File as FileIcon,
   Folder,
+  Gear,
+  Info,
+  Key,
   Lock,
   MusicNotes,
   PencilSimple,
   Plus,
   Power,
+  RocketLaunch,
+  ShieldCheck,
   SlidersHorizontal,
   Star,
   Tag,
+  TerminalWindow,
   Trash,
   UploadSimple,
   VideoCamera,
@@ -47,7 +57,6 @@ import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Input } from "@cloudflare/kumo/components/input";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
-import { Loader } from "@cloudflare/kumo/components/loader";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Surface } from "@cloudflare/kumo/components/surface";
 import { Switch } from "@cloudflare/kumo/components/switch";
@@ -151,6 +160,7 @@ export function AdminConsole() {
   const appsQuery = api.useQuery("get", "/api/v1/apps", { params: { query: { limit: "100" } } });
 
   if (viewPath === "/apps") return <AppsView />;
+  if (viewPath === "/keys/new" || viewPath.startsWith("/keys/")) return <KeyFormView />;
   if (viewPath === "/keys") return <KeysView />;
   if (viewPath === "/system") return <SystemView />;
   if (
@@ -4531,174 +4541,1318 @@ function MetaView() {
   );
 }
 
-function keyAppId(metadata: unknown): string | null {
-  if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && "appId" in metadata) {
-    return typeof metadata.appId === "string" ? metadata.appId : null;
+type KeyMetadata = {
+  appId?: string;
+  scope?: string;
+  environment?: "cicd" | "production" | "development" | "staging" | "testing" | "custom";
+  template?: "cicd" | "dev" | "prod" | "temp" | "custom";
+  notes?: string;
+};
+
+function parseKeyMetadata(metadata: unknown): KeyMetadata {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    return metadata as KeyMetadata;
   }
-  return null;
+  return {};
 }
 
+const PUBLISH_KEY_PREFIX = "osc_publish_";
+
+type KeyTemplateId = "cicd" | "dev" | "prod" | "temp" | "custom";
+
+interface KeyTemplateItem {
+  id: KeyTemplateId;
+  nameKey: "templateCicd" | "templateDev" | "templateProd" | "templateTemp" | "templateCustom";
+  descKey:
+    | "templateCicdDesc"
+    | "templateDevDesc"
+    | "templateProdDesc"
+    | "templateTempDesc"
+    | "templateCustomDesc";
+  icon: typeof RocketLaunch;
+  defaultName: string;
+  defaultExpiresDays: number | null; // null = never
+  environment: "cicd" | "development" | "production" | "testing" | "custom";
+}
+
+const KEY_TEMPLATES: KeyTemplateItem[] = [
+  {
+    id: "cicd",
+    nameKey: "templateCicd",
+    descKey: "templateCicdDesc",
+    icon: RocketLaunch,
+    defaultName: "cicd-pipeline",
+    defaultExpiresDays: 365,
+    environment: "cicd",
+  },
+  {
+    id: "dev",
+    nameKey: "templateDev",
+    descKey: "templateDevDesc",
+    icon: TerminalWindow,
+    defaultName: "local-dev-cli",
+    defaultExpiresDays: 30,
+    environment: "development",
+  },
+  {
+    id: "prod",
+    nameKey: "templateProd",
+    descKey: "templateProdDesc",
+    icon: ShieldCheck,
+    defaultName: "prod-service",
+    defaultExpiresDays: null,
+    environment: "production",
+  },
+  {
+    id: "temp",
+    nameKey: "templateTemp",
+    descKey: "templateTempDesc",
+    icon: Clock,
+    defaultName: "temp-debug",
+    defaultExpiresDays: 7,
+    environment: "testing",
+  },
+  {
+    id: "custom",
+    nameKey: "templateCustom",
+    descKey: "templateCustomDesc",
+    icon: SlidersHorizontal,
+    defaultName: "custom-publish-key",
+    defaultExpiresDays: 90,
+    environment: "custom",
+  },
+];
+
+const EXPIRY_PRESETS: Array<{ labelKey: string; days: number | null }> = [
+  { labelKey: "days7", days: 7 },
+  { labelKey: "days30", days: 30 },
+  { labelKey: "days90", days: 90 },
+  { labelKey: "days180", days: 180 },
+  { labelKey: "days365", days: 365 },
+  { labelKey: "neverExpiresLabel", days: null },
+];
+
 function KeysView() {
+  const context = useAdminContext();
   const { t } = useI18n();
   const toast = useKumoToastManager();
   const appsQuery = api.useQuery("get", "/api/v1/apps", {
     params: { query: { limit: "100" } },
   });
   const [keys, setKeys] = useState<Array<Record<string, unknown>>>([]);
-  const [name, setName] = useState("");
-  const [appId, setAppId] = useState("");
-  const [expiresIn, setExpiresIn] = useState("");
-  const [newKey, setNewKey] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  // Revoke confirm dialog state
+  const [revokingKey, setRevokingKey] = useState<{ id: string; name: string } | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+
+  // Rotate confirm & success state
+  const [rotatingKey, setRotatingKey] = useState<Record<string, unknown> | null>(null);
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotatedKeyData, setRotatedKeyData] = useState<{
+    key: string;
+    name: string;
+    appId: string;
+    appName: string;
+  } | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [activeSnippetTab, setActiveSnippetTab] = useState<"env" | "cicd" | "cli">("env");
+
   const [error, setError] = useState<string | null>(null);
 
   const reload = () => {
-    void authClient.apiKey.list({ query: { limit: 100 } }).then((result) => {
-      if (result.error) {
-        setError(result.error.message ?? "Unable to list publish keys");
-        return;
-      }
-      const records = result.data?.apiKeys;
-      setKeys(Array.isArray(records) ? (records as Array<Record<string, unknown>>) : []);
-    });
+    setIsLoading(true);
+    void authClient.apiKey
+      .list({ query: { limit: 100 } })
+      .then((result) => {
+        setIsLoading(false);
+        if (result.error) {
+          setError(result.error.message ?? "Unable to list publish keys");
+          return;
+        }
+        const records = result.data?.apiKeys;
+        setKeys(Array.isArray(records) ? (records as Array<Record<string, unknown>>) : []);
+      })
+      .catch(() => {
+        setIsLoading(false);
+      });
   };
 
   useEffect(() => {
     reload();
   }, []);
 
-  const create = () => {
+  const confirmRevoke = async () => {
+    if (!revokingKey) return;
+    setIsRevoking(true);
+    try {
+      const result = await authClient.apiKey.delete({ keyId: revokingKey.id });
+      setIsRevoking(false);
+      setRevokingKey(null);
+      if (result.error) {
+        setError(result.error.message ?? "Unable to revoke publish key");
+        return;
+      }
+      toast.add({ title: t("revokeKey"), description: `${revokingKey.name} revoked.` });
+      reload();
+    } catch {
+      setIsRevoking(false);
+      setRevokingKey(null);
+      setError("Unable to revoke publish key");
+    }
+  };
+
+  const confirmRotate = async () => {
+    if (!rotatingKey) return;
+    const oldKeyId = typeof rotatingKey.id === "string" ? rotatingKey.id : "";
+    const oldName = typeof rotatingKey.name === "string" ? rotatingKey.name : "publish-key";
+    const meta = parseKeyMetadata(rotatingKey.metadata);
+    const oldAppId = meta.appId ?? "";
+    const targetApp = appsQuery.data?.items.find((a) => a.id === oldAppId);
+
+    setIsRotating(true);
+    setError(null);
+    try {
+      // 1. Create a new key with identical configuration and unified system prefix
+      const createResult = await authClient.apiKey.create({
+        name: oldName,
+        prefix: PUBLISH_KEY_PREFIX,
+        metadata: {
+          ...meta,
+          appId: oldAppId,
+          scope: "manifest:write",
+        },
+      });
+
+      if (createResult.error || !createResult.data?.key) {
+        setIsRotating(false);
+        setError(createResult.error?.message ?? "Failed to rotate publish key");
+        return;
+      }
+
+      // 2. Revoke the old key
+      if (oldKeyId) {
+        await authClient.apiKey.delete({ keyId: oldKeyId });
+      }
+
+      setIsRotating(false);
+      setRotatingKey(null);
+      setRotatedKeyData({
+        key: createResult.data.key,
+        name: oldName,
+        appId: oldAppId,
+        appName: targetApp?.name ?? oldAppId,
+      });
+      setCopiedKey(false);
+      toast.add({ title: t("rotateKeySuccess") });
+      reload();
+    } catch {
+      setIsRotating(false);
+      setError("Failed to rotate publish key");
+    }
+  };
+
+  const copyToClipboard = (text: string, isKey = false) => {
+    void navigator.clipboard.writeText(text);
+    if (isKey) {
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2500);
+      toast.add({ title: t("keyCopied") });
+    } else {
+      toast.add({ title: t("snippetCopied") });
+    }
+  };
+
+  // Filter keys
+  const filteredKeys = useMemo(() => {
+    return keys.filter((key) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const keyName = typeof key.name === "string" ? key.name.toLowerCase() : "";
+        const prefixStr = typeof key.prefix === "string" ? key.prefix : "osc_publish_";
+        const startStr = typeof key.start === "string" ? key.start : "";
+        const meta = parseKeyMetadata(key.metadata);
+        const targetId = meta.appId ? meta.appId.toLowerCase() : "";
+        return (
+          keyName.includes(q) ||
+          prefixStr.includes(q) ||
+          startStr.includes(q) ||
+          targetId.includes(q)
+        );
+      }
+      return true;
+    });
+  }, [keys, searchQuery]);
+
+  const getEnvBadge = (env?: string) => {
+    switch (env) {
+      case "production":
+        return <Badge variant="success">{t("envProd")}</Badge>;
+      case "cicd":
+        return <Badge variant="primary">{t("envCicd")}</Badge>;
+      case "development":
+        return <Badge variant="neutral">{t("envDev")}</Badge>;
+      case "staging":
+        return <Badge variant="warning">{t("envStaging")}</Badge>;
+      case "testing":
+        return <Badge variant="warning">{t("envTesting")}</Badge>;
+      default:
+        return <Badge variant="neutral">{env || "API"}</Badge>;
+    }
+  };
+  return (
+    <div className="grid gap-6">
+      {/* 1. Header with { } icon, subtitle, Documentation & Create Token */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span className="font-mono text-xl font-bold text-kumo-subtle">{`{ }`}</span>
+            <h1 className="text-2xl font-semibold text-kumo-foreground">{t("userApiTokens")}</h1>
+          </div>
+          <p className="mt-1 text-sm text-kumo-subtle">{t("userApiTokensDescription")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton
+            variant="secondary"
+            icon={BookOpen}
+            href={context.href("/reference")}
+            target="_blank"
+          >
+            {t("documentation")}
+          </LinkButton>
+          <LinkButton variant="primary" icon={Plus} href={context.href("/keys/new")}>
+            {t("createToken")}
+          </LinkButton>
+        </div>
+      </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-kumo-danger bg-kumo-danger/10 p-3 text-sm text-kumo-danger"
+        >
+          {error}
+        </div>
+      ) : null}
+
+      {/* 2. Blue Info Banner */}
+      <div className="flex items-center justify-between rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-xs text-blue-300">
+        <div className="flex items-center gap-2.5">
+          <Info size={16} className="shrink-0 text-blue-400" />
+          <span>{t("accountBannerHint")}</span>
+        </div>
+      </div>
+
+      {/* 3. Section Title & Search */}
+      <div className="grid gap-3">
+        <h2 className="text-base font-semibold text-kumo-foreground">{t("apiTokens")}</h2>
+        <div className="w-full max-w-sm">
+          <Input
+            aria-label={t("searchTokens")}
+            placeholder={t("searchTokens")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* 4. Table / Empty State */}
+      {filteredKeys.length === 0 && !isLoading ? (
+        <LayerCard className="p-8 text-center ring ring-kumo-line shadow-sm">
+          <Empty
+            icon={<Key size={36} className="text-kumo-subtle" />}
+            title={searchQuery ? t("noResults") : t("noKeysTitle")}
+            description={searchQuery ? t("noResultsDescription") : t("noKeysDesc")}
+            contents={
+              <LinkButton variant="primary" icon={Plus} href={context.href("/keys/new")}>
+                {t("createToken")}
+              </LinkButton>
+            }
+          />
+        </LayerCard>
+      ) : (
+        <LayerCard className="overflow-hidden p-0 ring ring-kumo-line shadow-sm">
+          <Table layout="fixed">
+            <Table.Header>
+              <Table.Row>
+                <Table.Head className="w-[35%]">{t("tokenName")}</Table.Head>
+                <Table.Head className="w-[35%]">{t("permissions")}</Table.Head>
+                <Table.Head className="w-[22%]">
+                  <div className="flex items-center gap-1.5">
+                    <span>{t("resources")}</span>
+                    <Gear size={14} className="text-kumo-subtle" />
+                  </div>
+                </Table.Head>
+                <Table.Head className="w-[8%] text-right"></Table.Head>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {filteredKeys.map((key) => {
+                const id = typeof key.id === "string" ? key.id : "";
+                const meta = parseKeyMetadata(key.metadata);
+                const targetId = meta.appId ?? "";
+                const targetApp = appsQuery.data?.items.find((a) => a.id === targetId);
+                const label =
+                  typeof key.name === "string" && key.name.trim()
+                    ? key.name
+                    : typeof key.start === "string"
+                      ? `osc_publish_${key.start}...`
+                      : "—";
+                const appDisplayName = targetApp ? targetApp.name : targetId || t("allAccounts");
+
+                return (
+                  <Table.Row key={id} className="hover:bg-kumo-tint/50">
+                    <Table.Cell>
+                      <div className="flex items-center gap-2">
+                        <span
+                          onClick={() => context.router.push(context.href(`/keys/${id}`))}
+                          className="cursor-pointer font-medium text-kumo-foreground hover:text-kumo-brand hover:underline"
+                        >
+                          {label}
+                        </span>
+                        {meta.environment ? <span>{getEnvBadge(meta.environment)}</span> : null}
+                        {meta.notes ? (
+                          <span title={meta.notes} className="cursor-help text-blue-400">
+                            <Info size={14} />
+                          </span>
+                        ) : null}
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-xs text-kumo-subtle">
+                        App.Manifest Publish, App.Metadata Read
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <span className="text-xs text-kumo-subtle">
+                        {targetApp ? `1 App (${appDisplayName})` : appDisplayName}
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell sticky="right" className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenu.Trigger
+                          render={
+                            <Button variant="ghost" size="sm" icon={DotsThree} aria-label="操作" />
+                          }
+                        />
+                        <DropdownMenu.Content align="end">
+                          <DropdownMenu.Item
+                            icon={PencilSimple}
+                            onClick={() => context.router.push(context.href(`/keys/${id}`))}
+                          >
+                            {t("edit")}
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item
+                            icon={ArrowsClockwise}
+                            onClick={() => setRotatingKey(key)}
+                          >
+                            {t("rotateKey")}
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Separator />
+                          <DropdownMenu.Item
+                            icon={Trash}
+                            variant="danger"
+                            onClick={() => setRevokingKey({ id, name: label })}
+                          >
+                            {t("revokeKey")}
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table>
+        </LayerCard>
+      )}
+
+      {/* Dialog: Rotate Key Confirmation */}
+      <Dialog.Root
+        open={Boolean(rotatingKey)}
+        onOpenChange={(open) => !open && setRotatingKey(null)}
+      >
+        <Dialog size="base" className="px-8 py-6">
+          <Dialog.Title>{t("rotateKeyConfirmTitle")}</Dialog.Title>
+          <Dialog.Description>{t("rotateKeyConfirmDesc")}</Dialog.Description>
+          {rotatingKey ? (
+            <div className="my-3 rounded-lg bg-kumo-tint p-3 font-mono text-xs text-kumo-foreground">
+              当前密钥:{" "}
+              {typeof rotatingKey.name === "string"
+                ? rotatingKey.name
+                : typeof rotatingKey.id === "string"
+                  ? rotatingKey.id
+                  : "—"}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Dialog.Close render={<Button variant="secondary">{t("cancel")}</Button>} />
+            <Button variant="primary" loading={isRotating} onClick={confirmRotate}>
+              {t("rotate")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+
+      {/* Dialog: Rotated Key Success */}
+      <Dialog.Root
+        open={Boolean(rotatedKeyData)}
+        onOpenChange={(open) => !open && setRotatedKeyData(null)}
+      >
+        <Dialog size="lg" className="max-w-2xl px-8 py-6">
+          <div className="flex items-center gap-3 pb-2">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-kumo-success/15 text-kumo-success">
+              <CheckCircle size={24} weight="fill" />
+            </span>
+            <div>
+              <Dialog.Title>{t("rotateKeySuccess")}</Dialog.Title>
+              <Dialog.Description>{t("keySecurityWarning")}</Dialog.Description>
+            </div>
+          </div>
+
+          {rotatedKeyData ? (
+            <div className="grid gap-4 py-4">
+              <div className="rounded-xl border border-kumo-success/30 bg-kumo-canvas p-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-kumo-foreground">
+                    {t("keyDetails")}:{" "}
+                    <span className="font-mono text-kumo-brand">{rotatedKeyData.name}</span>
+                  </span>
+                  <Badge variant="success">{t("activeStatus")}</Badge>
+                </div>
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-kumo-card p-2.5 font-mono text-sm ring-1 ring-kumo-line">
+                  <code className="break-all select-all font-semibold text-kumo-foreground">
+                    {rotatedKeyData.key}
+                  </code>
+                  <Button
+                    variant={copiedKey ? "primary" : "secondary"}
+                    size="sm"
+                    icon={copiedKey ? Check : Copy}
+                    onClick={() => copyToClipboard(rotatedKeyData.key, true)}
+                  >
+                    {copiedKey ? t("keyCopied") : t("copyKey")}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Snippets */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-kumo-foreground">
+                    {t("integrationGuides")}
+                  </span>
+                  <div className="flex rounded-lg bg-kumo-tint p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSnippetTab("env")}
+                      className={cn(
+                        "rounded px-2.5 py-1 text-xs font-medium transition",
+                        activeSnippetTab === "env"
+                          ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                          : "text-kumo-subtle hover:text-kumo-foreground",
+                      )}
+                    >
+                      .env
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSnippetTab("cicd")}
+                      className={cn(
+                        "rounded px-2.5 py-1 text-xs font-medium transition",
+                        activeSnippetTab === "cicd"
+                          ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                          : "text-kumo-subtle hover:text-kumo-foreground",
+                      )}
+                    >
+                      GitHub Actions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSnippetTab("cli")}
+                      className={cn(
+                        "rounded px-2.5 py-1 text-xs font-medium transition",
+                        activeSnippetTab === "cli"
+                          ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                          : "text-kumo-subtle hover:text-kumo-foreground",
+                      )}
+                    >
+                      CLI
+                    </button>
+                  </div>
+                </div>
+
+                {activeSnippetTab === "env" ? (
+                  <div className="relative rounded-lg bg-kumo-canvas p-3 font-mono text-xs ring-1 ring-kumo-line">
+                    <pre className="overflow-x-auto text-kumo-foreground">
+                      {`OPENSCENE_APP_ID=${rotatedKeyData.appId}\nOPENSCENE_PUBLISH_KEY=${rotatedKeyData.key}`}
+                    </pre>
+                    <button
+                      type="button"
+                      title={t("copySnippet")}
+                      onClick={() =>
+                        copyToClipboard(
+                          `OPENSCENE_APP_ID=${rotatedKeyData.appId}\nOPENSCENE_PUBLISH_KEY=${rotatedKeyData.key}`,
+                        )
+                      }
+                      className="absolute right-2 top-2 rounded bg-kumo-card p-1 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                ) : null}
+
+                {activeSnippetTab === "cicd" ? (
+                  <div className="relative rounded-lg bg-kumo-canvas p-3 font-mono text-xs ring-1 ring-kumo-line">
+                    <pre className="overflow-x-auto text-kumo-foreground">
+                      {`- name: Publish OpenScene Manifest\n  env:\n    OPENSCENE_APP_ID: \${{ secrets.OPENSCENE_APP_ID }}\n    OPENSCENE_PUBLISH_KEY: \${{ secrets.OPENSCENE_PUBLISH_KEY }}\n  run: npx openscene publish`}
+                    </pre>
+                    <button
+                      type="button"
+                      title={t("copySnippet")}
+                      onClick={() =>
+                        copyToClipboard(
+                          `- name: Publish OpenScene Manifest\n  env:\n    OPENSCENE_APP_ID: \${{ secrets.OPENSCENE_APP_ID }}\n    OPENSCENE_PUBLISH_KEY: \${{ secrets.OPENSCENE_PUBLISH_KEY }}\n  run: npx openscene publish`,
+                        )
+                      }
+                      className="absolute right-2 top-2 rounded bg-kumo-card p-1 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                ) : null}
+
+                {activeSnippetTab === "cli" ? (
+                  <div className="relative rounded-lg bg-kumo-canvas p-3 font-mono text-xs ring-1 ring-kumo-line">
+                    <pre className="overflow-x-auto text-kumo-foreground">
+                      {`npx openscene publish --app-id ${rotatedKeyData.appId} --key ${rotatedKeyData.key}`}
+                    </pre>
+                    <button
+                      type="button"
+                      title={t("copySnippet")}
+                      onClick={() =>
+                        copyToClipboard(
+                          `npx openscene publish --app-id ${rotatedKeyData.appId} --key ${rotatedKeyData.key}`,
+                        )
+                      }
+                      className="absolute right-2 top-2 rounded bg-kumo-card p-1 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-2 border-t border-kumo-line pt-4">
+            <Button variant="primary" onClick={() => setRotatedKeyData(null)}>
+              {t("continue")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+
+      {/* Dialog: Revoke Confirmation */}
+      <Dialog.Root
+        role="alertdialog"
+        open={Boolean(revokingKey)}
+        onOpenChange={(open) => !open && setRevokingKey(null)}
+      >
+        <Dialog className="px-8 py-6">
+          <Dialog.Title>{t("revokeKeyConfirmTitle")}</Dialog.Title>
+          <Dialog.Description>{t("revokeKeyConfirmDesc")}</Dialog.Description>
+          {revokingKey ? (
+            <div className="my-3 rounded-lg bg-kumo-tint p-3 font-mono text-xs text-kumo-foreground">
+              {revokingKey.name}
+            </div>
+          ) : null}
+          <div className="flex justify-end gap-2 pt-2">
+            <Dialog.Close render={<Button variant="secondary">{t("cancel")}</Button>} />
+            <Button variant="destructive" loading={isRevoking} onClick={confirmRevoke}>
+              {t("revokeKey")}
+            </Button>
+          </div>
+        </Dialog>
+      </Dialog.Root>
+    </div>
+  );
+}
+
+function KeyFormView() {
+  const context = useAdminContext();
+  const { t } = useI18n();
+  const toast = useKumoToastManager();
+  const appsQuery = api.useQuery("get", "/api/v1/apps", {
+    params: { query: { limit: "100" } },
+  });
+
+  const segments = context.viewPath.split("/").filter(Boolean);
+  const isEdit = segments.length >= 2 && segments[0] === "keys" && segments[1] !== "new";
+  const editKeyId = isEdit ? segments[1] : null;
+  const [keysList, setKeysList] = useState<Array<Record<string, unknown>>>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<KeyTemplateId>("cicd");
+  const [name, setName] = useState("");
+  const [appId, setAppId] = useState("");
+  const [environment, setEnvironment] = useState<
+    "cicd" | "production" | "development" | "staging" | "testing" | "custom"
+  >("cicd");
+  const [enabled, setEnabled] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [keyStart, setKeyStart] = useState("");
+
+  // Expiration selection state: preset days | null (never) | "custom"
+  const [expiryOption, setExpiryOption] = useState<number | null | "custom">(365);
+  const [customDays, setCustomDays] = useState<string>("60");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Success result state (for Create mode)
+  const [createdKeyData, setCreatedKeyData] = useState<{
+    key: string;
+    name: string;
+    appId: string;
+    appName: string;
+    environment: string;
+    expiresDays: number | null;
+  } | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [activeSnippetTab, setActiveSnippetTab] = useState<"env" | "cicd" | "cli">("env");
+
+  // Load key data if editing
+  useEffect(() => {
+    void authClient.apiKey.list({ query: { limit: 100 } }).then((result) => {
+      const records = result.data?.apiKeys;
+      const allKeys = Array.isArray(records) ? (records as Array<Record<string, unknown>>) : [];
+      setKeysList(allKeys);
+
+      if (isEdit && editKeyId) {
+        const found = allKeys.find((k) => k.id === editKeyId);
+        if (found) {
+          setName(typeof found.name === "string" ? found.name : "");
+          setEnabled(found.enabled !== false);
+          setKeyStart(typeof found.start === "string" ? found.start : "");
+          const meta = parseKeyMetadata(found.metadata);
+          if (meta.appId) setAppId(meta.appId);
+          if (meta.environment) setEnvironment(meta.environment);
+          if (meta.notes) setNotes(meta.notes);
+        }
+      }
+    });
+  }, [isEdit, editKeyId]);
+
+  // Initialize create form from query parameters or default
+  useEffect(() => {
+    if (isEdit) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tplParam = params.get("template") as KeyTemplateId | null;
+    const targetTpl = KEY_TEMPLATES.find((tpl) => tpl.id === tplParam) ?? KEY_TEMPLATES[0];
+    setSelectedTemplate(targetTpl.id);
+    const apps = appsQuery.data?.items ?? [];
+    const defaultApp = apps[0];
+    const appSuffix = defaultApp ? `-${defaultApp.key || defaultApp.name.toLowerCase()}` : "";
+    setName(`${targetTpl.defaultName}${appSuffix}`);
+    setEnvironment(targetTpl.environment);
+    setExpiryOption(targetTpl.defaultExpiresDays);
+    if (defaultApp && !appId) {
+      setAppId(defaultApp.id);
+    }
+  }, [isEdit, appsQuery.data?.items]);
+
+  const handleSelectTemplate = (templateId: KeyTemplateId) => {
+    const template = KEY_TEMPLATES.find((item) => item.id === templateId) ?? KEY_TEMPLATES[0];
+    setSelectedTemplate(template.id);
+    const apps = appsQuery.data?.items ?? [];
+    const targetApp = apps.find((a) => a.id === appId) ?? apps[0];
+    const appSuffix = targetApp ? `-${targetApp.key || targetApp.name.toLowerCase()}` : "";
+    setName(`${template.defaultName}${appSuffix}`);
+    setEnvironment(template.environment);
+    setExpiryOption(template.defaultExpiresDays);
+  };
+
+  const handleSave = async () => {
     const selectedAppId = appId || appsQuery.data?.items[0]?.id || "";
     if (!name.trim() || !selectedAppId) {
       setError("A key name and target App are required");
       return;
     }
+
+    setIsSubmitting(true);
     setError(null);
-    const parsedExpiresIn = Number(expiresIn);
-    void authClient.apiKey
-      .create({
-        name: name.trim(),
-        prefix: "osc_publish_",
-        metadata: { appId: selectedAppId, scope: "manifest:write" },
-        permissions: { manifest: ["write"] },
-        ...(Number.isInteger(parsedExpiresIn) && parsedExpiresIn > 0
-          ? { expiresIn: parsedExpiresIn * 86_400 }
-          : {}),
-      })
-      .then((result) => {
-        if (result.error || !result.data) {
-          setError(result.error?.message ?? "The publish key could not be created");
+
+    if (isEdit && editKeyId) {
+      // Edit Mode: update key via authClient.apiKey.update
+      try {
+        const found = keysList.find((k) => k.id === editKeyId);
+        const currentMeta = parseKeyMetadata(found?.metadata);
+        const result = await authClient.apiKey.update({
+          keyId: editKeyId,
+          name: name.trim(),
+          enabled,
+          metadata: {
+            ...currentMeta,
+            appId: selectedAppId,
+            scope: "manifest:write",
+            environment,
+            notes: notes.trim() || undefined,
+          },
+        });
+        setIsSubmitting(false);
+        if (result.error) {
+          setError(result.error.message ?? "Failed to update publish key");
           return;
         }
-        setNewKey(result.data.key);
-        setName("");
-        setExpiresIn("");
-        toast.add({ title: t("keyCreated"), description: t("keyCreatedDescription") });
-        reload();
-      });
-  };
+        toast.add({ title: t("keyUpdated") });
+        context.router.push(context.href("/keys"));
+      } catch (err: unknown) {
+        setIsSubmitting(false);
+        const msg = err instanceof Error ? err.message : "Failed to update publish key";
+        setError(msg);
+      }
+      return;
+    }
 
-  const revoke = (keyId: string) => {
-    void authClient.apiKey.delete({ keyId }).then((result) => {
-      if (result.error) {
-        setError(result.error.message ?? "Unable to revoke publish key");
+    // Create Mode: create key via authClient.apiKey.create
+    let expiresSeconds: number | null = null;
+    let expiresDaysCount: number | null = null;
+    if (expiryOption === "custom") {
+      const daysNum = parseInt(customDays, 10);
+      if (!isNaN(daysNum) && daysNum > 0) {
+        expiresSeconds = daysNum * 86_400;
+        expiresDaysCount = daysNum;
+      }
+    } else if (typeof expiryOption === "number" && expiryOption > 0) {
+      expiresSeconds = expiryOption * 86_400;
+      expiresDaysCount = expiryOption;
+    }
+
+    try {
+      const result = await authClient.apiKey.create({
+        name: name.trim(),
+        prefix: PUBLISH_KEY_PREFIX,
+        metadata: {
+          appId: selectedAppId,
+          scope: "manifest:write",
+          environment,
+          template: selectedTemplate,
+          notes: notes.trim() || undefined,
+        },
+        ...(expiresSeconds ? { expiresIn: expiresSeconds } : {}),
+      });
+
+      setIsSubmitting(false);
+
+      if (result.error || !result.data?.key) {
+        setError(result.error?.message ?? "The publish key could not be created");
         return;
       }
-      reload();
-    });
+
+      const targetApp = appsQuery.data?.items.find((a) => a.id === selectedAppId);
+      setCreatedKeyData({
+        key: result.data.key,
+        name: name.trim(),
+        appId: selectedAppId,
+        appName: targetApp?.name ?? selectedAppId,
+        environment,
+        expiresDays: expiresDaysCount,
+      });
+      setCopiedKey(false);
+      toast.add({ title: t("keyCreated"), description: t("keyCreatedDescription") });
+    } catch (err: unknown) {
+      setIsSubmitting(false);
+      const msg = err instanceof Error ? err.message : "Failed to create key";
+      setError(msg);
+    }
   };
 
-  return (
-    <div className="grid gap-6">
-      <div>
-        <Text variant="heading" as="h1">
-          {t("keys")}
-        </Text>
-        <Text variant="secondary">{t("keysDescription")}</Text>
+  const copyToClipboard = (text: string, isKey = false) => {
+    void navigator.clipboard.writeText(text);
+    if (isKey) {
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2500);
+      toast.add({ title: t("keyCopied") });
+    } else {
+      toast.add({ title: t("snippetCopied") });
+    }
+  };
+
+  const resetForm = () => {
+    setCreatedKeyData(null);
+    handleSelectTemplate("cicd");
+    setError(null);
+  };
+
+  const targetAppSelectItems = useMemo(() => {
+    const items: Record<string, string> = {};
+    for (const app of appsQuery.data?.items ?? []) {
+      items[app.id] = `${app.name} (${app.key || app.id})`;
+    }
+    return items;
+  }, [appsQuery.data?.items]);
+
+  if (createdKeyData) {
+    return (
+      <div className="mx-auto grid max-w-3xl gap-6">
+        <PageHeader title={t("keyCreated")} description={t("keySecurityWarning")}>
+          <LinkButton icon={ArrowLeft} href={context.href("/keys")}>
+            {t("backToKeys")}
+          </LinkButton>
+        </PageHeader>
+
+        <LayerCard className="grid gap-6 p-6 ring ring-kumo-line shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-kumo-success/15 text-kumo-success">
+              <CheckCircle size={28} weight="fill" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-kumo-foreground">{t("keyCreated")}</h2>
+              <p className="text-xs text-kumo-subtle">{t("keySecurityWarning")}</p>
+            </div>
+          </div>
+
+          {/* Key Box */}
+          <div className="rounded-xl border border-kumo-success/30 bg-kumo-canvas p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-kumo-foreground">
+                {t("keyDetails")}:{" "}
+                <span className="font-mono text-kumo-brand">{createdKeyData.name}</span>
+              </span>
+              <Badge variant="success">{t("activeStatus")}</Badge>
+            </div>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-kumo-card p-3 font-mono text-sm ring-1 ring-kumo-line">
+              <code className="break-all select-all font-semibold text-kumo-foreground">
+                {createdKeyData.key}
+              </code>
+              <Button
+                variant={copiedKey ? "primary" : "secondary"}
+                size="sm"
+                icon={copiedKey ? Check : Copy}
+                onClick={() => copyToClipboard(createdKeyData.key, true)}
+              >
+                {copiedKey ? t("keyCopied") : t("copyKey")}
+              </Button>
+            </div>
+          </div>
+
+          {/* Key Attributes summary */}
+          <div className="grid grid-cols-2 gap-4 rounded-lg bg-kumo-tint/50 p-4 text-xs sm:grid-cols-4">
+            <div>
+              <span className="block text-kumo-subtle">{t("boundApp")}</span>
+              <span className="font-semibold text-kumo-foreground">{createdKeyData.appName}</span>
+            </div>
+            <div>
+              <span className="block text-kumo-subtle">{t("environment")}</span>
+              <span className="font-semibold text-kumo-foreground">
+                {createdKeyData.environment}
+              </span>
+            </div>
+            <div>
+              <span className="block text-kumo-subtle">{t("keyScope")}</span>
+              <span className="font-mono font-semibold text-kumo-foreground">manifest:write</span>
+            </div>
+            <div>
+              <span className="block text-kumo-subtle">{t("expiresAt")}</span>
+              <span className="font-semibold text-kumo-foreground">
+                {createdKeyData.expiresDays
+                  ? `${createdKeyData.expiresDays} ${t("days")}`
+                  : t("neverExpiresLabel")}
+              </span>
+            </div>
+          </div>
+
+          {/* Integration Snippets */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-kumo-foreground">
+                {t("integrationGuides")}
+              </span>
+              <div className="flex rounded-lg bg-kumo-tint p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveSnippetTab("env")}
+                  className={cn(
+                    "rounded px-3 py-1 text-xs font-medium transition",
+                    activeSnippetTab === "env"
+                      ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                      : "text-kumo-subtle hover:text-kumo-foreground",
+                  )}
+                >
+                  .env
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSnippetTab("cicd")}
+                  className={cn(
+                    "rounded px-3 py-1 text-xs font-medium transition",
+                    activeSnippetTab === "cicd"
+                      ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                      : "text-kumo-subtle hover:text-kumo-foreground",
+                  )}
+                >
+                  GitHub Actions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSnippetTab("cli")}
+                  className={cn(
+                    "rounded px-3 py-1 text-xs font-medium transition",
+                    activeSnippetTab === "cli"
+                      ? "bg-kumo-card text-kumo-foreground shadow-sm"
+                      : "text-kumo-subtle hover:text-kumo-foreground",
+                  )}
+                >
+                  CLI
+                </button>
+              </div>
+            </div>
+
+            {activeSnippetTab === "env" ? (
+              <div className="relative rounded-lg bg-kumo-canvas p-4 font-mono text-xs ring-1 ring-kumo-line">
+                <pre className="overflow-x-auto text-kumo-foreground">
+                  {`OPENSCENE_APP_ID=${createdKeyData.appId}\nOPENSCENE_PUBLISH_KEY=${createdKeyData.key}`}
+                </pre>
+                <button
+                  type="button"
+                  title={t("copySnippet")}
+                  onClick={() =>
+                    copyToClipboard(
+                      `OPENSCENE_APP_ID=${createdKeyData.appId}\nOPENSCENE_PUBLISH_KEY=${createdKeyData.key}`,
+                    )
+                  }
+                  className="absolute right-3 top-3 rounded bg-kumo-card p-1.5 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            ) : null}
+
+            {activeSnippetTab === "cicd" ? (
+              <div className="relative rounded-lg bg-kumo-canvas p-4 font-mono text-xs ring-1 ring-kumo-line">
+                <pre className="overflow-x-auto text-kumo-foreground">
+                  {`- name: Publish OpenScene Manifest\n  env:\n    OPENSCENE_APP_ID: \${{ secrets.OPENSCENE_APP_ID }}\n    OPENSCENE_PUBLISH_KEY: \${{ secrets.OPENSCENE_PUBLISH_KEY }}\n  run: npx openscene publish`}
+                </pre>
+                <button
+                  type="button"
+                  title={t("copySnippet")}
+                  onClick={() =>
+                    copyToClipboard(
+                      `- name: Publish OpenScene Manifest\n  env:\n    OPENSCENE_APP_ID: \${{ secrets.OPENSCENE_APP_ID }}\n    OPENSCENE_PUBLISH_KEY: \${{ secrets.OPENSCENE_PUBLISH_KEY }}\n  run: npx openscene publish`,
+                    )
+                  }
+                  className="absolute right-3 top-3 rounded bg-kumo-card p-1.5 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            ) : null}
+
+            {activeSnippetTab === "cli" ? (
+              <div className="relative rounded-lg bg-kumo-canvas p-4 font-mono text-xs ring-1 ring-kumo-line">
+                <pre className="overflow-x-auto text-kumo-foreground">
+                  {`npx openscene publish --app-id ${createdKeyData.appId} --key ${createdKeyData.key}`}
+                </pre>
+                <button
+                  type="button"
+                  title={t("copySnippet")}
+                  onClick={() =>
+                    copyToClipboard(
+                      `npx openscene publish --app-id ${createdKeyData.appId} --key ${createdKeyData.key}`,
+                    )
+                  }
+                  className="absolute right-3 top-3 rounded bg-kumo-card p-1.5 text-kumo-subtle shadow-sm ring-1 ring-kumo-line hover:text-kumo-foreground"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-kumo-line pt-4">
+            <Button variant="secondary" onClick={resetForm}>
+              {t("createKey")}
+            </Button>
+            <Button variant="primary" onClick={() => context.router.push(context.href("/keys"))}>
+              {t("doneAndReturn")}
+            </Button>
+          </div>
+        </LayerCard>
       </div>
+    );
+  }
+
+  const title = isEdit ? t("editKeyTitle") : t("createKeyTitle");
+  const description = isEdit ? t("editKeyDescription") : t("createKeyDescription");
+
+  return (
+    <div className="mx-auto grid max-w-4xl gap-6">
+      <PageHeader title={title} description={description}>
+        <LinkButton icon={ArrowLeft} href={context.href("/keys")}>
+          {t("backToKeys")}
+        </LinkButton>
+      </PageHeader>
+
       {error ? (
-        <div role="alert" className="rounded-lg border border-kumo-danger p-3 text-sm">
+        <div
+          role="alert"
+          className="rounded-lg border border-kumo-danger bg-kumo-danger/10 p-3 text-sm text-kumo-danger"
+        >
           {error}
         </div>
       ) : null}
-      {newKey ? (
-        <Surface className="grid gap-3 border border-kumo-success p-4">
-          <Text variant="heading" as="h2">
-            {t("keyCreated")}
-          </Text>
-          <Text variant="secondary">{t("keyCreatedDescription")}</Text>
-          <code className="break-all rounded bg-kumo-canvas p-3">{newKey}</code>
-          <Button variant="secondary" onClick={() => setNewKey(null)}>
-            {t("cancel")}
-          </Button>
-        </Surface>
-      ) : null}
-      <Surface className="grid gap-4 p-4">
-        <Text variant="heading" as="h2">
-          {t("createKey")}
-        </Text>
-        <Input
-          aria-label={t("keyName")}
-          placeholder={t("keyName")}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Select
-          aria-label={t("targetApp")}
-          placeholder={t("targetApp")}
-          value={appId || null}
-          items={Object.fromEntries((appsQuery.data?.items ?? []).map((app) => [app.id, app.name]))}
-          onValueChange={(value) => setAppId(typeof value === "string" ? value : "")}
-        />
-        <Input
-          aria-label={t("expiresAt")}
-          placeholder={`${t("expiresAt")} (${t("neverExpires")})`}
-          value={expiresIn}
-          onChange={(event) => setExpiresIn(event.target.value)}
-          type="number"
-          min={1}
-        />
-        <Button variant="primary" onClick={create}>
-          {t("createKey")}
-        </Button>
-      </Surface>
-      <Surface className="overflow-auto p-4">
-        <Table>
-          <Table.Header>
-            <Table.Row>
-              <Table.Head>{t("keyName")}</Table.Head>
-              <Table.Head>{t("targetApp")}</Table.Head>
-              <Table.Head>{t("publishManifest")}</Table.Head>
-              <Table.Head>{t("status")}</Table.Head>
-              <Table.Head>{t("actions")}</Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {keys.map((key) => {
-              const id = typeof key.id === "string" ? key.id : "";
-              const target = keyAppId(key.metadata);
-              const label =
-                typeof key.name === "string"
-                  ? key.name
-                  : typeof key.start === "string"
-                    ? key.start
-                    : "—";
+
+      {/* Template Picker: only in Create Mode */}
+      {!isEdit && (
+        <div>
+          <div className="mb-2">
+            <h2 className="text-sm font-semibold text-kumo-foreground">{t("keyTemplates")}</h2>
+            <p className="text-xs text-kumo-subtle">{t("selectTemplateHint")}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {KEY_TEMPLATES.map((tpl) => {
+              const Icon = tpl.icon;
+              const isSelected = selectedTemplate === tpl.id;
               return (
-                <Table.Row key={id}>
-                  <Table.Cell>{label}</Table.Cell>
-                  <Table.Cell className="font-mono text-xs">{target ?? "—"}</Table.Cell>
-                  <Table.Cell>manifest:write</Table.Cell>
-                  <Table.Cell>{key.enabled === false ? t("disabled") : t("active")}</Table.Cell>
-                  <Table.Cell>
-                    <Button variant="secondary" onClick={() => revoke(id)}>
-                      {t("revokeKey")}
-                    </Button>
-                  </Table.Cell>
-                </Table.Row>
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => handleSelectTemplate(tpl.id)}
+                  className={cn(
+                    "flex flex-col items-start justify-between rounded-xl p-3.5 text-left transition",
+                    isSelected
+                      ? "bg-kumo-card text-kumo-brand ring-2 ring-kumo-brand shadow-sm"
+                      : "bg-kumo-card text-kumo-foreground ring-1 ring-kumo-line hover:bg-kumo-tint",
+                  )}
+                >
+                  <div className="mb-2 flex w-full items-center justify-between">
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg",
+                        isSelected ? "bg-kumo-brand text-white" : "bg-kumo-tint text-kumo-brand",
+                      )}
+                    >
+                      <Icon size={18} />
+                    </span>
+                    {isSelected ? <Check size={16} className="text-kumo-brand font-bold" /> : null}
+                  </div>
+                  <div>
+                    <span className="block text-xs font-semibold text-kumo-foreground">
+                      {t(tpl.nameKey)}
+                    </span>
+                    <span className="mt-0.5 line-clamp-2 text-[11px] text-kumo-subtle">
+                      {t(tpl.descKey)}
+                    </span>
+                  </div>
+                </button>
               );
             })}
-          </Table.Body>
-        </Table>
-      </Surface>
+          </div>
+        </div>
+      )}
+
+      {/* Main Configuration Form */}
+      <LayerCard className="grid gap-6 p-6 ring ring-kumo-line shadow-sm">
+        {/* Section 1: Target App & Permissions */}
+        <div className="grid gap-4">
+          <div className="border-b border-kumo-line pb-2">
+            <h3 className="text-sm font-semibold text-kumo-foreground">
+              {isEdit ? "应用与权限分配" : t("basicSettings")}
+            </h3>
+          </div>
+
+          {/* Target App Select */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-kumo-foreground">
+              {t("targetApp")} <span className="text-kumo-danger">*</span>
+            </label>
+            <Select
+              aria-label={t("targetApp")}
+              placeholder={t("targetApp")}
+              value={appId || null}
+              items={targetAppSelectItems}
+              onValueChange={(value) => setAppId(typeof value === "string" ? value : "")}
+            />
+            <span className="mt-1 block text-xs text-kumo-subtle">
+              {isEdit ? t("boundAppReassignHint") : t("keyScopeDesc")}
+            </span>
+          </div>
+
+          {/* Permission Scope Card */}
+          <div className="rounded-xl border border-kumo-line bg-kumo-tint/40 p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={20} className="text-kumo-brand shrink-0" />
+              <div>
+                <span className="font-semibold text-xs text-kumo-foreground block">
+                  {t("manifestWriteScope")}
+                </span>
+                <span className="text-xs text-kumo-subtle block">
+                  {t("manifestWriteScopeDesc")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Name & Environment */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-kumo-foreground">
+                {t("keyName")} <span className="text-kumo-danger">*</span>
+              </label>
+              <Input
+                aria-label={t("keyName")}
+                placeholder={t("keyName")}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-kumo-foreground">
+                {t("environment")}
+              </label>
+              <Select
+                aria-label={t("environment")}
+                value={environment}
+                items={{
+                  cicd: t("envCicd"),
+                  production: t("envProd"),
+                  development: t("envDev"),
+                  staging: t("envStaging"),
+                  testing: t("envTesting"),
+                  custom: t("templateCustom"),
+                }}
+                onValueChange={(val) =>
+                  setEnvironment(
+                    val as "cicd" | "production" | "development" | "staging" | "testing" | "custom",
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          {/* Active / Disabled switch in Edit Mode */}
+          {isEdit && (
+            <div className="flex items-center justify-between rounded-xl border border-kumo-line p-4">
+              <div>
+                <span className="block text-xs font-semibold text-kumo-foreground">
+                  {t("keyStatus")}
+                </span>
+                <span className="text-xs text-kumo-subtle">
+                  {enabled
+                    ? "密钥当前有效，可正常用于发布 Manifest"
+                    : "禁用后使用该密钥的请求将被拒绝"}
+                </span>
+              </div>
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Expiration Settings (Only for Create Mode) */}
+        {!isEdit && (
+          <div className="grid gap-3">
+            <div className="border-b border-kumo-line pb-2">
+              <h3 className="text-sm font-semibold text-kumo-foreground">{t("expirySettings")}</h3>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {EXPIRY_PRESETS.map((preset) => {
+                const isSelected = expiryOption === preset.days;
+                return (
+                  <button
+                    key={preset.labelKey}
+                    type="button"
+                    onClick={() => setExpiryOption(preset.days)}
+                    className={cn(
+                      "rounded-lg px-3.5 py-2 text-xs font-medium transition",
+                      isSelected
+                        ? "bg-kumo-brand text-white shadow-sm"
+                        : "bg-kumo-card text-kumo-foreground ring-1 ring-kumo-line hover:bg-kumo-tint",
+                    )}
+                  >
+                    {t(preset.labelKey as any)}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setExpiryOption("custom")}
+                className={cn(
+                  "rounded-lg px-3.5 py-2 text-xs font-medium transition",
+                  expiryOption === "custom"
+                    ? "bg-kumo-brand text-white shadow-sm"
+                    : "bg-kumo-card text-kumo-foreground ring-1 ring-kumo-line hover:bg-kumo-tint",
+                )}
+              >
+                {t("customDays")}
+              </button>
+            </div>
+            {expiryOption === "custom" ? (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="w-32">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={customDays}
+                    onChange={(e) => setCustomDays(e.target.value)}
+                    placeholder="60"
+                  />
+                </div>
+                <span className="text-xs text-kumo-subtle">{t("days")}</span>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Section 3: Notes & Key Identifier */}
+        <div className="grid gap-4">
+          <div className="border-b border-kumo-line pb-2">
+            <h3 className="text-sm font-semibold text-kumo-foreground">{t("advancedSettings")}</h3>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-kumo-foreground">
+                {t("keyNotes")}
+              </label>
+              <Input
+                aria-label={t("keyNotes")}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder={t("keyNotesPlaceholder")}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-kumo-foreground">
+                {t("keyPrefix")}
+              </label>
+              <div className="flex h-9 items-center rounded-lg border border-kumo-line bg-kumo-tint/50 px-3 font-mono text-xs text-kumo-subtle">
+                <span>{PUBLISH_KEY_PREFIX}</span>
+                {keyStart ? <span className="text-kumo-foreground">{keyStart}••••••••</span> : null}
+                <span className="ml-auto text-[11px] text-kumo-subtle font-sans">
+                  （系统统一内置前缀）
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex items-center justify-end gap-3 border-t border-kumo-line pt-4">
+          <LinkButton variant="secondary" href={context.href("/keys")}>
+            {t("cancel")}
+          </LinkButton>
+          <Button
+            variant="primary"
+            loading={isSubmitting}
+            disabled={!name.trim() || (!appId && (appsQuery.data?.items.length ?? 0) === 0)}
+            onClick={handleSave}
+          >
+            {isEdit ? t("save") : t("createKey")}
+          </Button>
+        </div>
+      </LayerCard>
     </div>
   );
 }

@@ -75,6 +75,7 @@ const icons = {
   globe: Globe,
   image: Image,
   key: Key,
+  plus: Plus,
   shieldWarning: ShieldWarning,
   sliders: SlidersHorizontal,
   sparkle: Sparkle,
