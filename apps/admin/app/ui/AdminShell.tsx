@@ -218,7 +218,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const activeNavGroups = isPersonal ? personalNavigationGroups : navigationGroups;
 
   const normalizedNavigationSearch = navigationSearch.trim().toLocaleLowerCase();
+  const hasAppSelected = Boolean(context.appId);
+
   const filteredNavigationGroups = activeNavGroups
+    .filter((group) => {
+      // Hide the App menu group if no app is selected
+      if (group.key === "app" && !hasAppSelected) {
+        return false;
+      }
+      return true;
+    })
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
@@ -288,6 +297,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
     // Organization-scoped navigation items
     if (!isPersonal) {
       for (const group of navigationGroups) {
+        if (group.key === "app" && !context.appId) {
+          continue;
+        }
         for (const navItem of group.items) {
           if ("type" in navItem && navItem.type === "sub") {
             for (const sub of navItem.items) {
