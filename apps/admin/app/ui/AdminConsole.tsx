@@ -21,6 +21,7 @@ import {
   PencilSimple,
   Plus,
   Power,
+  SlidersHorizontal,
   Star,
   Tag,
   Trash,
@@ -884,8 +885,14 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
 
   const [noPreviewProfileOpen, setNoPreviewProfileOpen] = useState(false);
 
-  function openStudio(resource: Resource) {
-    const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
+  function openStudio(
+    resource: Resource,
+    selectedProfile?: components["schemas"]["PreviewProfile"],
+  ) {
+    const profile =
+      selectedProfile ??
+      profilesQuery.data?.find((item) => item.isDefault) ??
+      profilesQuery.data?.[0];
     if (!profile || !profile.url?.trim()) {
       setNoPreviewProfileOpen(true);
       return;
@@ -1118,12 +1125,38 @@ function ResourceListView({ kind }: { kind: "pages" | "templates" }) {
                         }
                       />
                       <DropdownMenu.Content>
-                        <DropdownMenu.Item
-                          icon={ArrowSquareOut}
-                          onClick={() => openStudio(resource)}
-                        >
-                          {t("studio")}
-                        </DropdownMenu.Item>
+                        {profilesQuery.data && profilesQuery.data.length > 1 ? (
+                          <DropdownMenu.Sub>
+                            <DropdownMenu.SubTrigger icon={ArrowSquareOut}>
+                              {t("studio")}
+                            </DropdownMenu.SubTrigger>
+                            <DropdownMenu.SubContent className="w-56">
+                              <div className="px-3 py-1.5 text-xs font-semibold text-kumo-subtle uppercase">
+                                {t("previewProfiles")}
+                              </div>
+                              {profilesQuery.data.map((p) => (
+                                <DropdownMenu.Item
+                                  key={p.id}
+                                  onClick={() => openStudio(resource, p)}
+                                >
+                                  <span className="flex-1 truncate text-left">{p.name}</span>
+                                  {p.isDefault ? (
+                                    <Badge variant="green" className="text-[10px]">
+                                      {t("default")}
+                                    </Badge>
+                                  ) : null}
+                                </DropdownMenu.Item>
+                              ))}
+                            </DropdownMenu.SubContent>
+                          </DropdownMenu.Sub>
+                        ) : (
+                          <DropdownMenu.Item
+                            icon={ArrowSquareOut}
+                            onClick={() => openStudio(resource)}
+                          >
+                            {t("studio")}
+                          </DropdownMenu.Item>
+                        )}
                         <DropdownMenu.Item icon={PencilSimple} onClick={() => openEdit(resource)}>
                           {t("edit")}
                         </DropdownMenu.Item>
@@ -1547,7 +1580,28 @@ function ResourceDetailView() {
   }
   if (pageQuery.isLoading || templateQuery.isLoading) return <LoadingState variant="detail" />;
   if (!resource) return <ErrorState error={pageQuery.error || templateQuery.error} />;
-  const profile = profilesQuery.data?.find((item) => item.isDefault) ?? profilesQuery.data?.[0];
+  const profiles = profilesQuery.data ?? [];
+  const defaultProfile = profiles.find((item) => item.isDefault) ?? profiles[0];
+
+  function launchStudio(targetProfile?: components["schemas"]["PreviewProfile"]) {
+    if (!resource) return;
+    const profileToUse = targetProfile ?? defaultProfile;
+    if (!profileToUse || !profileToUse.url?.trim()) {
+      setNoPreviewProfileOpen(true);
+      return;
+    }
+    studioWindow.current = window.open("", "_blank");
+    if (studioWindow.current) studioWindow.current.opener = null;
+    studio.mutate({
+      params: { path: { appId: context.appId ?? "" } },
+      body: {
+        resourceKind: kind,
+        resourceId: resource.id,
+        previewProfileId: profileToUse.id,
+        returnUrl: window.location.href,
+      },
+    });
+  }
   const json = JSON.stringify(
     (draftQuery.data as { document?: unknown } | undefined)?.document ?? {},
     null,
@@ -1568,28 +1622,55 @@ function ResourceDetailView() {
         <Button icon={PencilSimple} onClick={openEdit}>
           {t("edit")}
         </Button>
-        <Button
-          loading={studio.isPending}
-          onClick={() => {
-            if (!profile || !profile.url?.trim()) {
-              setNoPreviewProfileOpen(true);
-              return;
-            }
-            studioWindow.current = window.open("", "_blank");
-            if (studioWindow.current) studioWindow.current.opener = null;
-            studio.mutate({
-              params: { path: { appId: context.appId ?? "" } },
-              body: {
-                resourceKind: kind,
-                resourceId: resource.id,
-                previewProfileId: profile.id,
-                returnUrl: window.location.href,
-              },
-            });
-          }}
-        >
-          {t("studio")}
-        </Button>
+        <div className="inline-flex rounded-lg shadow-sm">
+          <Button
+            icon={ArrowSquareOut}
+            loading={studio.isPending}
+            className={profiles.length > 1 ? "rounded-r-none border-r-0" : ""}
+            onClick={() => launchStudio(defaultProfile)}
+          >
+            {t("studio")}
+          </Button>
+          {profiles.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenu.Trigger
+                render={
+                  <Button
+                    aria-label="Select preview profile"
+                    className="rounded-l-none px-2 border-l border-kumo-line"
+                  >
+                    <CaretDown size={14} />
+                  </Button>
+                }
+              />
+              <DropdownMenu.Content align="end" className="w-56">
+                <div className="px-3 py-1.5 text-xs font-semibold text-kumo-subtle uppercase">
+                  {t("previewProfiles")}
+                </div>
+                {profiles.map((p) => {
+                  const isDefault = p.isDefault || p.id === defaultProfile?.id;
+                  return (
+                    <DropdownMenu.Item key={p.id} onClick={() => launchStudio(p)}>
+                      <span className="flex-1 truncate text-left">{p.name}</span>
+                      {isDefault ? (
+                        <Badge variant="green" className="text-[10px]">
+                          {t("default")}
+                        </Badge>
+                      ) : null}
+                    </DropdownMenu.Item>
+                  );
+                })}
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  icon={SlidersHorizontal}
+                  onClick={() => context.router.push(context.href("/preview-profiles"))}
+                >
+                  {t("previewProfiles")}
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </PageHeader>
       <div className="flex flex-col gap-4">
         {kind === "page" && (
