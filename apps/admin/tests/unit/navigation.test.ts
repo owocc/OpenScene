@@ -144,6 +144,21 @@ describe("admin navigation context", () => {
       expect(resourcesSub.items.map((i) => i.key)).toEqual(["pages", "templates", "assets"]);
     }
   });
+  test("groups components, preview profiles, meta, and openapi docs in nested Developer Config sub-menu under App", () => {
+    const appGroup = navigationGroups.find((group) => group.label === "App");
+    const devSub = appGroup?.items.find(
+      (item) => "type" in item && item.type === "sub" && item.key === "developerConfig",
+    );
+    expect(devSub).toBeDefined();
+    if (devSub && "type" in devSub && devSub.type === "sub") {
+      expect(devSub.items.map((i) => i.key)).toEqual([
+        "components",
+        "previewProfiles",
+        "meta",
+        "openapiDocs",
+      ]);
+    }
+  });
 
   test("includes API reference navigation in Developer group with _blank target", () => {
     const developerGroup = navigationGroups.find((group) => group.label === "Developer");
