@@ -6,7 +6,6 @@ import {
   CaretUpDown,
   ChartLine,
   ChatText,
-  Cloud,
   Code,
   Copy,
   Cube,
@@ -36,7 +35,6 @@ import { CommandPalette } from "@cloudflare/kumo/components/command-palette";
 import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Input } from "@cloudflare/kumo/components/input";
-import { Select } from "@cloudflare/kumo/components/select";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
 import {
   authClient,
@@ -197,13 +195,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, isAuthenticated, isChecking, session, orgs, activeOrg, context]);
 
-  const [navigationSearch, setNavigationSearch] = useState("");
   const appsQuery = api.useQuery("get", "/api/v1/apps", {
     params: { query: { limit: "100" } },
   });
   const apps = appsQuery.data?.items ?? [];
   const currentApp = apps.find((app) => app.id === context.appId);
-  const appItems = Object.fromEntries(apps.map((app) => [app.id, app.name]));
 
   const memberRole = activeMember?.role;
   let activeStatements: Record<string, readonly string[]> = defaultRoleStatements.owner;
@@ -216,6 +212,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   const isPersonal = isPersonalPath(pathname);
   const activeNavGroups = isPersonal ? personalNavigationGroups : navigationGroups;
+  const navigationSearch = "";
 
   const normalizedNavigationSearch = navigationSearch.trim().toLocaleLowerCase();
   const hasAppSelected = Boolean(context.appId);
